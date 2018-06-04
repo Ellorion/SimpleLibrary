@@ -157,6 +157,25 @@ _Memory_Resize(
 }
 
 instant void
+Memory_Free(
+	void *data
+) {
+	if (data == 0)  return;
+
+	Memory_Header mem_header = Memory_GetHeader(data);
+
+	if (mem_header.sig == MEMORY_SIGNATURE) {
+		void *mem = (char *)data - sizeof(Memory_Header);
+		free(mem);
+
+		Assert(mem != data);
+	}
+	else {
+		LOG_DEBUG("Trying to free heap pointer(?).")
+	}
+}
+
+instant void
 Memory_Copy(
 	const void *dest,
 	const void *src,
@@ -194,25 +213,6 @@ Memory_Set(
 		*cDest++ = cData;
 
 	return dest;
-}
-
-instant void
-Memory_Free(
-	void *data
-) {
-	if (data == 0)  return;
-
-	Memory_Header mem_header = Memory_GetHeader(data);
-
-	if (mem_header.sig == MEMORY_SIGNATURE) {
-		void *mem = (char *)data - sizeof(Memory_Header);
-		free(mem);
-
-		Assert(mem != data);
-	}
-	else {
-		LOG_DEBUG("Trying to free heap pointer(?).")
-	}
 }
 
 /// Time
@@ -431,6 +431,9 @@ To_String(
 	String_Append(s_data, c_data, len);
 }
 
+/// does NOT add memory for '\0'
+/// make sure you add an additional byte
+/// in the buffer so you don't truncate the string
 instant void
 To_CString(
 	char *c_buffer,
@@ -439,19 +442,25 @@ To_CString(
 ) {
 	Assert(s_data);
 
-	if (!s_data->len AND buffer_len) {
+	if (!buffer_len)  return;
+
+	if (!s_data->len) {
 		c_buffer[0] = '\0';
 		return;
 	}
 
-    if (buffer_len > s_data->len + 1)
-    	buffer_len = s_data->len;
+	/// stop copying memory after '\0'
+	if (buffer_len > s_data->len + 1) {
+		buffer_len = s_data->len + 1;
+	}
 
-	FOR(buffer_len, it) {
+	/// stop before '\0'
+	FOR(buffer_len - 1, it) {
 		c_buffer[it] = s_data->value[it];
 	}
 
-	if (buffer_len)  c_buffer[buffer_len] = '\0';
+	/// set final '\0'
+	c_buffer[buffer_len - 1] = '\0';
 }
 
 String &
@@ -857,29 +866,27 @@ String_Insert(
 	const char *c_data,
 	u64 index_start
 ) {
-	if (!s_data OR !c_data)
-		return 0;
+	if (!s_data)  return 0;
+	if (!c_data)  return 0;
 
 	u64 len = String_Length(c_data);
 
-	if (len > 0) {
-		if (s_data->value) {
-			Memory_Resize(s_data, char, len);
+	if (s_data->value) {
+		Memory_Resize(s_data->value, char, s_data->len + len);
 
-			/// move memory
-			Memory_Copy(s_data->value + index_start + len, s_data->value + index_start, s_data->len - index_start);
-		}
-		else {
-			s_data->value = Memory_Create(char, index_start + len);
-			Memory_Set(s_data->value, ' ', index_start + len);
-		}
-
-		FOR_START(index_start, index_start + len, it) {
-			s_data->value[index_start + (it - index_start)] = *c_data++;
-		}
-
-		s_data->len += len;
+		/// move memory
+		Memory_Copy(s_data->value + index_start + len, s_data->value + index_start, s_data->len - index_start);
 	}
+	else {
+		s_data->value = Memory_Create(char, index_start + len);
+		Memory_Set(s_data->value, ' ', index_start + len);
+	}
+
+	FOR_START(index_start, index_start + len, it) {
+		s_data->value[index_start + (it - index_start)] = *c_data++;
+	}
+
+	s_data->len += len;
 
 	return len;
 }
@@ -950,12 +957,16 @@ String_Replace(
 	Assert(find);
 	Assert(replace);
 
-	char *c_data = Memory_Create(char, replace->len);
-	To_CString(c_data, replace->len, replace);
+	char *c_data = Memory_Create(char, replace->len + 1);
+	To_CString(c_data, replace->len + 1, replace);
 	String_Replace(s_data, find, c_data);
 	Memory_Free(c_data);
 }
 
+/// Circle data into a fixed size container,
+/// which may clear after it reached full capacity
+/// f.e. upon reaching the desired size, the content
+/// can be compared to given keyword to trigger events
 instant bool
 String_AddCircle(
 	String *s_data,
@@ -1061,146 +1072,6 @@ operator == (
 	return String_IsEqual(&s_data1, s_data2.value, s_data2.len);
 }
 
-instant void
-Test_Strings(
-) {
-	char buffer[100];
-	String s_data;
-
-	AssertMessage(String_Length(&s_data) == 0, "Initial string length not zero");
-
-	String_Destroy(&s_data);
-	AssertMessage(String_Length(&s_data) == 0, "Empty string destruction failed");
-
-	String_Destroy(&s_data);
-	AssertMessage(String_Length(&s_data) == 0, "Multiple mpty string destruction failed");
-
-	s_data << "Hello";
-	To_CString(buffer, 100, &s_data);
-	AssertMessage(String_IsEqual(buffer,  "Hello", 5), "C_String data does not match");
-	AssertMessage(String_IsEqual(&s_data, "Hello", 5), "String data does not match (truncated)");
-	AssertMessage(String_IsEqual(&s_data, "Hello")   , "String data does not match (autosize)");
-	AssertMessage(String_IsEqual(&s_data, "Hel", 3)  , "String data does not match (substring)");
-	AssertMessage(String_Length(&s_data) == 5, "Appending c_string to empty string failed");
-
-	String_Destroy(&s_data);
-	AssertMessage(String_Length(&s_data) == 0, "Clearing existing data failed");
-
-	s_data << "Hello";
-	s_data << " World";
-	AssertMessage(String_IsEqual(&s_data, "Hello World"), "String data does not match (append c_string)");
-	AssertMessage(String_Length(&s_data) == 11, "Appending on existing data failed");
-
-	s_data << '!';
-	AssertMessage(String_IsEqual(&s_data, "Hello World!"), "String data does not match (append char)");
-	AssertMessage(String_Length(&s_data) == 12, "Appending single character on existing data failed");
-
-	To_CString(buffer, 5, &s_data);
-	AssertMessage(String_Length(buffer) == 5, "Buffer overflow when converting string to c_string");
-
-	String_Destroy(&s_data);
-
-	String s_hello;
-	String s_world;
-
-	s_hello << "Hello";
-	s_world << " World!";
-
-	s_hello << s_world;
-	AssertMessage(String_IsEqual(&s_hello, "Hello World!"), "String data does not match (append string)");
-	AssertMessage(String_Length(&s_hello) == 12, "Length error on appending two strings.");
-
-	String_Destroy(&s_data);
-
-	/// store string in buffer (f.e. for filling dynamic string arrays)
-	String s_buffer;
-	To_String(&s_buffer, "buffer");
-	AssertMessage(String_IsEqual(&s_buffer, "buffer"), "String data does not match (buffer)");
-
-	String s_buffer_copy;
-	String_Copy(&s_buffer_copy, &s_buffer);
-	AssertMessage(String_IsEqual(&s_buffer_copy, "buffer"), "String copy failed (autosize");
-	String_Destroy(&s_buffer_copy);
-
-	String_Copy(&s_buffer_copy, &s_buffer, 3);
-	AssertMessage(String_IsEqual(&s_buffer_copy, "buf"), "String copy failed (substring)");
-	String_Destroy(&s_buffer_copy);
-
-	String_Destroy(&s_buffer);
-
-	Memory_Set(buffer, 0, 100);
-
-	s_buffer << "copy_test";
-	To_CString(buffer, 100, &s_buffer);
-	String_Copy(buffer + 9, buffer);
-	To_String(&s_buffer, buffer);
-	AssertMessage(String_IsEqual(&s_buffer, "copy_testcopy_test"), "C_string copy_test failed.");
-
-	String_Destroy(&s_buffer);
-
-	s_buffer << "xxx_test_xxx";
-	AssertMessage(String_IndexOf(&s_buffer, "test") == 4, "String indexof failed.");
-	AssertMessage(String_StartWith(&s_buffer, "xxx_"), "String startwidth failed.");
-
-	long pos_found = 0;
-	if (String_Find(&s_buffer, "_xxx", &pos_found, 0, true)) {
-		AssertMessage(pos_found == 12, "Data in string not found at correct index.");
-	}
-	else {
-		AssertMessage(false, "Could not find data in string.");
-	}
-
-	if (String_FindRev(&s_buffer, "_xxx", &pos_found, 0, true)) {
-		AssertMessage(pos_found == 12, "Data in string not found at correct index.");
-	}
-	else {
-		AssertMessage(false, "Could not find data in string.");
-	}
-
-	AssertMessage(String_EndWith(&s_buffer, "_xxx"), "End not found in string.");
-
-	String_Destroy(&s_buffer);
-
-	s_buffer << "aaa_test_bbb";
-	AssertMessage(String_IndexOfRev(&s_buffer, "bbb") == 9, "String indexofrev failed.");
-
-	String_Destroy(&s_buffer);
-
-	s_buffer << "AbCDeFG";
-	String_ToLower(&s_buffer);
-	AssertMessage(String_IsEqual(&s_buffer, "abcdefg"), "String_ToLower failed.");
-
-	String_ToUpper(&s_buffer);
-	AssertMessage(String_IsEqual(&s_buffer, "ABCDEFG"), "String_ToUpper failed.");
-
-	String_Reverse(&s_buffer);
-	AssertMessage(String_IsEqual(&s_buffer, "GFEDCBA"), "String_Reverse failed.");
-
-	String_Destroy(&s_buffer);
-
-	s_buffer << "   test   ";
-	String ts_buffer = s_buffer;
-	String_TrimLeft(&ts_buffer);
-	String_TrimRight(&ts_buffer);
-	AssertMessage(ts_buffer.len == 4, "Trimming test failed.");
-
-	String_Destroy(&s_buffer);
-
-	s_buffer << "aaa__ccc";
-    String_Insert(&s_buffer, "bbb", 4);
-    AssertMessage(String_IsEqual(&s_buffer, "aaa_bbb_ccc"), "String insertion failed.");
-
-	String_Remove(&s_buffer, 4, 7);
-	AssertMessage(String_IsEqual(&s_buffer, "aaa__ccc"), "String removal failed.");
-
-	String s_replace;
-	s_replace << "_bbb_";
-	String_Replace(&s_buffer, "__", &s_replace);
-	AssertMessage(String_IsEqual(&s_buffer, "aaa_bbb_ccc"), "String replacing failed.");
-
-    String_Destroy(&s_buffer);
-}
-
 
 /// Array
 /// ===========================================================================
@@ -1283,7 +1154,7 @@ Array_Clear(
 
 template<typename T>
 instant void
-SL_Array_Destroy(
+Array_Destroy(
 	Array<T> *array,
 	bool use_generic = false
 ) {
@@ -1300,23 +1171,6 @@ Array_Find(
 ) {
 	FOR_ARRAY(*array, it) {
 		if (ARRAY_IT(*array, it) == find) {
-			SetIfValid(*index) = it;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-template <typename T>
-instant bool
-Array_Find(
-	Array<T *> *array,
-	T find,
-	u64 *index = 0
-) {
-	FOR_ARRAY(*array, it) {
-		if (*ARRAY_IT(*array, it) == find) {
 			SetIfValid(*index) = it;
 			return true;
 		}
@@ -1350,50 +1204,30 @@ Array_Remove(
 	return result;
 }
 
-void
-Test_Arrays() {
-	String s_data1;
-	s_data1 << "test";
+/// Will copy string values, so array content has to be free'd
+instant Array<String>
+String_Split(
+	String *s_data,
+	const char *delimiter,
+	bool exclude_delim = true
+) {
+	Array<String> as_result;
 
-	Array<String> as_test;
-	Array_Add(&as_test, s_data1);
+	String s_data_it = *s_data;
+	u64 len_delim = String_Length(delimiter);
 
-	FOR_ARRAY(as_test, it) {
-		String s_data_it = ARRAY_IT(as_test, it);
-		AssertMessage(String_IsEqual(&s_data_it, "test"), "Array_Add failed.");
+	s64 pos_found;
+	while(String_Find(&s_data_it, delimiter, &pos_found, 0, false)) {
+		String s_element;
+		String_Append(&s_element, s_data_it.value, pos_found);
+		Array_Add(&as_result, s_element);
+		s_data_it.value += pos_found + len_delim;
+		s_data_it.len   -= pos_found + len_delim;
 	}
 
-	Array_Clear(&as_test);
-	AssertMessage(		as_test.size  == 0
-					AND as_test.count == 0
-					AND as_test.limit == 8
-					AND as_test.memory > 0, "Clearing array failed.");
-
-	/// Memory ownership in local scope and not in array
-	String_Destroy(&s_data1);
-
-	String *s_item = 0;
-
-	s_item = Array_AddEmpty(&as_test);
-	*s_item << "bla";
-
-	FOR_ARRAY(as_test, it) {
-		String s_data_it = ARRAY_IT(as_test, it);
-		AssertMessage(String_IsEqual(&s_data_it, "bla"), "Array_AddEmpty failed.");
+	if (s_data_it.len > 0) {
+		Array_Add(&as_result, s_data_it);
 	}
 
-	s_item = Array_AddEmpty(&as_test);
-	*s_item << "blub";
-
-	u64 index_found = 0;
-	Array_Find(&as_test, *s_item, &index_found);
-	AssertMessage(index_found == 1, "Array_Find failed.");
-
-	while(as_test.count) {
-		String s_data_it = Array_Remove(&as_test, 0);
-		String_Destroy(&s_data_it);
-	}
-	AssertMessage(as_test.count == 0, "Array_Remove failed.");
-
-	String_Destroy(&s_data1);
+	return as_result;
 }
