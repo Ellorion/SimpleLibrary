@@ -354,6 +354,8 @@ Time_Move(
 
 /// String
 /// ===========================================================================
+#define String_Split Array_Split
+
 struct String {
 	u64  len    = 0;
 	char *value = 0;
@@ -406,7 +408,7 @@ instant void
 String_Append(
 	String *s_data,
 	const char *c_data,
-	u64 len_append
+	u64 len_append = 0
 ) {
     Assert(s_data);
 
@@ -461,42 +463,6 @@ To_CString(
 
 	/// set final '\0'
 	c_buffer[buffer_len - 1] = '\0';
-}
-
-String &
-operator << (
-	String &s_data,
-	const char *c_data
-) {
-	String_Append(&s_data, c_data, 0);
-	return s_data;
-}
-
-String &
-operator << (
-	String &s_data,
-	const char c_data
-) {
-	String_Append(&s_data, &c_data, 1);
-	return s_data;
-}
-
-String &
-operator << (
-	String &s_dest,
-	String *s_append
-) {
-	if (s_append)  String_Append(&s_dest, s_append->value, s_append->len);
-	return s_dest;
-}
-
-String &
-operator << (
-	String &s_dest,
-	String s_append
-) {
-	String_Append(&s_dest, s_append.value, s_append.len);
-	return s_dest;
 }
 
 instant bool
@@ -963,68 +929,6 @@ String_Replace(
 	Memory_Free(c_data);
 }
 
-/// Circle data into a fixed size container,
-/// which may clear after it reached full capacity
-/// f.e. upon reaching the desired size, the content
-/// can be compared to given keyword to trigger events
-instant bool
-String_AddCircle(
-	String *s_data,
-	const char *c_data,
-	u32 c_data_len,
-	u32 buffer_limit,
-	bool reset_full_buffer
-) {
-	Assert(s_data);
-
-	if (!c_data)        return false;
-	if (!c_data_len)    return false;
-	if (!buffer_limit)  return false;
-
-	if (s_data->len + c_data_len > buffer_limit) {
-		if (reset_full_buffer) {
-			String_Clear(s_data);
-		}
-		else {
-			u32 diff = (s_data->len + c_data_len) - buffer_limit;
-			String_Remove(s_data, 0, diff);
-		}
-	}
-
-	String_Append(s_data, c_data, c_data_len);
-
-	return (s_data->len == buffer_limit);
-}
-
-instant bool
-String_AddCircle(
-	String *s_data,
-	u16 data,
-	u32 buffer_limit,
-	bool reset_full_buffer
-) {
-	Assert(s_data);
-
-	if (!data)          return false;
-	if (!buffer_limit)  return false;
-
-	u32 data_size = 1;
-
-	if (s_data->len + data_size > buffer_limit) {
-		if (reset_full_buffer) {
-			String_Clear(s_data);
-		}
-		else {
-			u32 diff = (s_data->len + data_size) - buffer_limit;
-			String_Remove(s_data, 0, diff);
-		}
-	}
-
-	*s_data << data;
-
-	return (s_data->len == buffer_limit);
-}
-
 instant char *
 String_Encode64(
 	const char *text
@@ -1070,6 +974,38 @@ operator == (
 	String &s_data2
 ) {
 	return String_IsEqual(&s_data1, s_data2.value, s_data2.len);
+}
+
+bool
+operator < (
+	String &s_data1,
+	String &s_data2
+) {
+	if (s_data1.len < s_data2.len)  return true;
+	if (s_data1.len > s_data2.len)  return false;
+
+	FOR(s_data1.len, it) {
+		if (s_data1.value[it] < s_data2.value[it]) return true;
+		if (s_data1.value[it] > s_data2.value[it]) return false;
+	}
+
+	return false;
+}
+
+bool
+operator > (
+	String &s_data1,
+	String &s_data2
+) {
+	if (s_data1.len > s_data2.len)  return true;
+	if (s_data1.len < s_data2.len)  return false;
+
+	FOR(s_data1.len, it) {
+		if (s_data1.value[it] > s_data2.value[it]) return true;
+		if (s_data1.value[it] < s_data2.value[it]) return false;
+	}
+
+	return false;
 }
 
 
@@ -1199,14 +1135,14 @@ Array_Remove(
 	}
 
 	array->count -= 1;
-	array->size  -= sizeof(array->memory);
+	array->size  -= sizeof(T);
 
 	return result;
 }
 
 /// Will copy string values, so array content has to be free'd
 instant Array<String>
-String_Split(
+Array_Split(
 	String *s_data,
 	const char *delimiter,
 	bool exclude_delim = true
@@ -1226,8 +1162,132 @@ String_Split(
 	}
 
 	if (s_data_it.len > 0) {
-		Array_Add(&as_result, s_data_it);
+		String s_element;
+		String_Append(&s_element, s_data_it.value, s_data_it.len);
+		Array_Add(&as_result, s_element);
 	}
 
 	return as_result;
+}
+
+template <typename T>
+instant void
+Array_Sort_Quick_Ascending(
+	T *begin,
+	T *end
+) {
+	Assert(begin);
+	Assert(end);
+
+	if (begin == end)
+		return;
+
+    T *pivot = begin;
+    T *next  = begin;
+
+#if 1
+    while(++next <= end) {
+		if (*next < *pivot) {
+			Swap(next, pivot);
+
+			/// next will be past pivot in next loop
+			if (pivot < next) {
+                ++pivot;
+                --next;
+			}
+		}
+    }
+#else
+	++next;
+    while(next <= end) {
+		if (*next < *pivot) {
+			Swap(next, pivot);
+			++next;
+
+			if (pivot < next) {
+                ++pivot;
+                --next;
+			}
+		}
+		else {
+			++next;
+		}
+    }
+#endif
+
+    if (begin < pivot)  Array_Sort_Quick_Ascending(begin    , pivot - 1);
+	if (end   > pivot)  Array_Sort_Quick_Ascending(pivot + 1, end      );
+}
+
+template <typename T>
+instant void
+Array_Sort_Quick_Descending(
+	T *begin,
+	T *end
+) {
+	Assert(begin);
+	Assert(end);
+
+	if (begin == end)
+		return;
+
+    T *pivot = begin;
+    T *next  = begin;
+
+#if 1
+    while(++next <= end) {
+		if (*next > *pivot) {
+			Swap(next, pivot);
+
+			/// next will be past pivot in next loop
+			if (pivot < next) {
+                ++pivot;
+                --next;
+			}
+		}
+    }
+#else
+	++next;
+    while(next <= end) {
+		if (*next > *pivot) {
+			Swap(next, pivot);
+			++next;
+
+			if (pivot < next) {
+                ++pivot;
+                --next;
+			}
+		}
+		else {
+			++next;
+		}
+    }
+#endif
+
+    if (begin < pivot)  Array_Sort_Quick_Descending(begin    , pivot - 1);
+	if (end   > pivot)  Array_Sort_Quick_Descending(pivot + 1, end      );
+}
+
+template <typename T>
+instant void
+Array_Sort_Ascending(
+	Array<T> *array
+) {
+	Assert(array);
+	Assert(array->count);
+
+	Array_Sort_Quick_Ascending( &array->memory[0], &array->memory[array->count - 1]);
+}
+
+
+
+template <typename T>
+instant void
+Array_Sort_Descending(
+	Array<T> *array
+) {
+	Assert(array);
+	Assert(array->count);
+
+	Array_Sort_Quick_Descending(&array->memory[0], &array->memory[array->count - 1]);
 }

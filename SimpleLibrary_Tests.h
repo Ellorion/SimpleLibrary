@@ -14,9 +14,9 @@ Test_Strings(
 	AssertMessage(String_Length(&s_data) == 0, "Empty string destruction failed");
 
 	String_Destroy(&s_data);
-	AssertMessage(String_Length(&s_data) == 0, "Multiple mpty string destruction failed");
+	AssertMessage(String_Length(&s_data) == 0, "Multiple empty string destruction failed");
 
-	s_data << "Hello";
+	String_Append(&s_data, "Hello");
 	To_CString(buffer, 100, &s_data);
 	AssertMessage(String_IsEqual(buffer,  "Hello", 5), "C_String data does not match");
 	AssertMessage(String_IsEqual(&s_data, "Hello", 5), "String data does not match (truncated)");
@@ -27,14 +27,10 @@ Test_Strings(
 	String_Destroy(&s_data);
 	AssertMessage(String_Length(&s_data) == 0, "Clearing existing data failed");
 
-	s_data << "Hello";
-	s_data << " World";
+	String_Append(&s_data, "Hello");
+	String_Append(&s_data, " World");
 	AssertMessage(String_IsEqual(&s_data, "Hello World"), "String data does not match (append c_string)");
 	AssertMessage(String_Length(&s_data) == 11, "Appending on existing data failed");
-
-	s_data << '!';
-	AssertMessage(String_IsEqual(&s_data, "Hello World!"), "String data does not match (append char)");
-	AssertMessage(String_Length(&s_data) == 12, "Appending single character on existing data failed");
 
 	To_CString(buffer, 6, &s_data);
 	AssertMessage(String_Length(buffer) == 5, "Buffer overflow when converting string to c_string");
@@ -44,10 +40,10 @@ Test_Strings(
 	String s_hello;
 	String s_world;
 
-	s_hello << "Hello";
-	s_world << " World!";
+	String_Append(&s_hello, "Hello");
+	String_Append(&s_world, " World!");
 
-	s_hello << s_world;
+	String_Append(&s_hello, s_world.value, s_world.len);
 	AssertMessage(String_IsEqual(&s_hello, "Hello World!"), "String data does not match (append string)");
 	AssertMessage(String_Length(&s_hello) == 12, "Length error on appending two strings.");
 
@@ -71,7 +67,7 @@ Test_Strings(
 
 	Memory_Set(buffer, 0, 100);
 
-	s_buffer << "copy_test";
+	String_Append(&s_buffer, "copy_test");
 	To_CString(buffer, 100, &s_buffer);
 	String_Copy(buffer + 9, buffer);
 	To_String(&s_buffer, buffer);
@@ -79,7 +75,7 @@ Test_Strings(
 
 	String_Destroy(&s_buffer);
 
-	s_buffer << "xxx_test_xxx";
+	String_Append(&s_buffer, "xxx_test_xxx");
 	AssertMessage(String_IndexOf(&s_buffer, "test") == 4, "String indexof failed.");
 	AssertMessage(String_StartWith(&s_buffer, "xxx_"), "String startwidth failed.");
 
@@ -102,12 +98,13 @@ Test_Strings(
 
 	String_Destroy(&s_buffer);
 
-	s_buffer << "aaa_test_bbb";
+
+	String_Append(&s_buffer, "aaa_test_bbb");
 	AssertMessage(String_IndexOfRev(&s_buffer, "bbb") == 9, "String indexofrev failed.");
 
 	String_Destroy(&s_buffer);
 
-	s_buffer << "AbCDeFG";
+	String_Append(&s_buffer, "AbCDeFG");
 	String_ToLower(&s_buffer);
 	AssertMessage(String_IsEqual(&s_buffer, "abcdefg"), "String_ToLower failed.");
 
@@ -119,7 +116,7 @@ Test_Strings(
 
 	String_Destroy(&s_buffer);
 
-	s_buffer << "   test   ";
+	String_Append(&s_buffer, "   test   ");
 	String ts_buffer = s_buffer;
 	String_TrimLeft(&ts_buffer);
 	String_TrimRight(&ts_buffer);
@@ -127,7 +124,7 @@ Test_Strings(
 
 	String_Destroy(&s_buffer);
 
-	s_buffer << "aaa__ccc";
+	String_Append(&s_buffer, "aaa__ccc");
     String_Insert(&s_buffer, "bbb", 4);
     AssertMessage(String_IsEqual(&s_buffer, "aaa_bbb_ccc"), "String insertion failed.");
 
@@ -135,7 +132,7 @@ Test_Strings(
 	AssertMessage(String_IsEqual(&s_buffer, "aaa__ccc"), "String removal failed.");
 
 	String s_replace;
-	s_replace << "_bbb_";
+	String_Append(&s_replace, "_bbb_");
 	String_Replace(&s_buffer, "__", &s_replace);
 	AssertMessage(String_IsEqual(&s_buffer, "aaa_bbb_ccc"), "String replacing failed.");
 
@@ -148,7 +145,7 @@ Test_Arrays(
 ) {
 	{
 		String s_data;
-		s_data << "test";
+		String_Append(&s_data, "test");
 
 		Array<String> as_test;
 		Array_Add(&as_test, s_data);
@@ -173,7 +170,7 @@ Test_Arrays(
 		String *s_item = 0;
 
 		s_item = Array_AddEmpty(&as_test);
-		*s_item << "bla";
+		String_Append(s_item, "bla");
 
 		FOR_ARRAY(as_test, it) {
 			String s_data_it = ARRAY_IT(as_test, it);
@@ -181,7 +178,7 @@ Test_Arrays(
 		}
 
 		s_item = Array_AddEmpty(&as_test);
-		*s_item << "blub";
+		String_Append(s_item, "blub");
 
 		u64 index_found = 0;
 		Array_Find(&as_test, *s_item, &index_found);
@@ -197,7 +194,7 @@ Test_Arrays(
 
 	{
 		String s_split;
-		s_split << "aaa";
+		String_Append(&s_split, "aaa");
 
 		Array<String> as_split;
 		as_split = String_Split(&s_split, "\n", true);
@@ -214,7 +211,7 @@ Test_Arrays(
 
 	{
 		String s_split;
-		s_split << "aaa\nbbb";
+		String_Append(&s_split, "aaa\nbbb");
 
 		Array<String> as_split;
 		as_split = String_Split(&s_split, "\n", true);
@@ -228,5 +225,110 @@ Test_Arrays(
 			String_Destroy(&s_data_it);
 		}
 		Array_Destroy(&as_split);
+		String_Destroy(&s_split);
+	}
+
+	{
+		Array<String> as_data;
+		String s_data1;
+		String s_data2;
+		String s_data3;
+		String s_data4;
+
+		String_Append(&s_data3, "3");
+		String_Append(&s_data2, "2");
+		String_Append(&s_data4, "4");
+		String_Append(&s_data1, "1");
+
+		Array_Add(&as_data, s_data3);
+		Array_Add(&as_data, s_data2);
+		Array_Add(&as_data, s_data4);
+		Array_Add(&as_data, s_data1);
+
+		Array_Sort_Ascending(&as_data);
+
+		AssertMessage(		String_IsEqual(ARRAY_IT(as_data, 0).value, "1")
+						AND String_IsEqual(ARRAY_IT(as_data, 1).value, "2")
+						AND String_IsEqual(ARRAY_IT(as_data, 2).value, "3")
+						AND String_IsEqual(ARRAY_IT(as_data, 3).value, "4")
+							, "String array sorting failed (ascending).");
+
+		Array_Sort_Descending(&as_data);
+
+		AssertMessage(		String_IsEqual(ARRAY_IT(as_data, 0).value, "4")
+						AND String_IsEqual(ARRAY_IT(as_data, 1).value, "3")
+						AND String_IsEqual(ARRAY_IT(as_data, 2).value, "2")
+						AND String_IsEqual(ARRAY_IT(as_data, 3).value, "1")
+							, "String array sorting failed (descending).");
+
+		while(as_data.count) {
+			String s_data_it = Array_Remove(&as_data, 0);
+			String_Destroy(&s_data_it);
+			///@Info: don't free s_data1, s_data2, since
+	        ///       since string->value is already free'd
+		}
+		Array_Destroy(&as_data);
+	}
+
+	{
+		Array<s32> a_sort;
+
+		Array_Add(&a_sort, 3);
+		Array_Add(&a_sort, 1);
+		Array_Add(&a_sort, 4);
+		Array_Add(&a_sort, 1);
+		Array_Add(&a_sort, 5);
+		Array_Add(&a_sort, 9);
+		Array_Add(&a_sort, 2);
+		Array_Add(&a_sort, 6);
+		Array_Add(&a_sort, 5);
+		Array_Add(&a_sort, 2);
+		Array_Add(&a_sort, 12);
+
+		Array_Sort_Ascending(&a_sort);
+
+		AssertMessage(		ARRAY_IT(a_sort, 0)  == 1
+						AND ARRAY_IT(a_sort, 1)  == 1
+						AND ARRAY_IT(a_sort, 2)  == 2
+						AND ARRAY_IT(a_sort, 3)  == 2
+						AND ARRAY_IT(a_sort, 4)  == 3
+						AND ARRAY_IT(a_sort, 5)  == 4
+						AND ARRAY_IT(a_sort, 6)  == 5
+						AND ARRAY_IT(a_sort, 7)  == 5
+						AND ARRAY_IT(a_sort, 8)  == 6
+						AND ARRAY_IT(a_sort, 9)  == 9
+						AND ARRAY_IT(a_sort, 10) == 12
+							, "Integer array sorting failed (ascending).");
+
+		Array_Sort_Descending(&a_sort);
+
+		AssertMessage(		ARRAY_IT(a_sort, 0)  == 12
+						AND ARRAY_IT(a_sort, 1)  == 9
+						AND ARRAY_IT(a_sort, 2)  == 6
+						AND ARRAY_IT(a_sort, 3)  == 5
+						AND ARRAY_IT(a_sort, 4)  == 5
+						AND ARRAY_IT(a_sort, 5)  == 4
+						AND ARRAY_IT(a_sort, 6)  == 3
+						AND ARRAY_IT(a_sort, 7)  == 2
+						AND ARRAY_IT(a_sort, 8)  == 2
+						AND ARRAY_IT(a_sort, 9)  == 1
+						AND ARRAY_IT(a_sort, 10) == 1
+							, "Integer array sorting failed (descending).");
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
