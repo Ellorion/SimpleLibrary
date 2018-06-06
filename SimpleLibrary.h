@@ -1555,6 +1555,8 @@ File_Exists(
 
 	char *c_search_file = String_CreateCBufferCopy(&ts_filename);
 
+	String_Destroy(&ts_filename);
+
 	bool result = false;
 
 	if (FindFirstFile(c_search_file, &file_data) != INVALID_HANDLE_VALUE)
@@ -1819,6 +1821,10 @@ File_ReadDirectory(
 
 /// ::: Windows (OpenGL)
 /// ===========================================================================
+#define Windows_Main 	\
+	APIENTRY			\
+	WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_text, int nCmdShow)
+
 #define LOG_ERROR(text) std::cerr << "[Error] " << text << std::endl
 
 #define Window_IsCreated(window) (window->hWnd != 0)
@@ -2044,6 +2050,12 @@ Window_InitOpenGL(
 		glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
 		Window_InitOpenGL_Ext();
+
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		glEnable(GL_POINT_SMOOTH);
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_POLYGON_SMOOTH);
 	}
 }
 
@@ -2146,3 +2158,123 @@ Window_Clear(
 
 	glColor4f(1.f, 1.f, 1.f, 1.f);
 }
+
+instant void
+Window_AlwaysOnTop(
+	Window *window
+) {
+	Assert(window);
+
+	RECT rctClient;
+	GetWindowRect(window->hWnd, &rctClient);
+
+	SetWindowPos(
+		window->hWnd,
+		HWND_TOPMOST,
+		rctClient.left,
+		rctClient.top,
+		rctClient.right - rctClient.left,
+		rctClient.bottom - rctClient.top,
+		SWP_SHOWWINDOW
+	);
+}
+
+/// Has to be used after Window_Show
+/// or that function will turn fullscreen off but keeps
+/// the missing borders
+instant void
+Window_ToggleFullscreen(
+	Window *window
+) {
+	Assert(window);
+
+	if (!window->isFullscreen) {
+		DWORD dwStyle = (DWORD)GetWindowLong(window->hWnd, GWL_STYLE);
+
+		dwStyle = dwStyle | WS_POPUP;
+		dwStyle = dwStyle & ~WS_OVERLAPPEDWINDOW;
+
+		SetWindowLong(window->hWnd, GWL_STYLE, dwStyle);
+
+		ShowWindow(window->hWnd, SW_RESTORE);
+		ShowWindow(window->hWnd, SW_MAXIMIZE);
+
+		window->isFullscreen = true;
+	}
+	else {
+		DWORD dwStyle = (DWORD)GetWindowLong(window->hWnd, GWL_STYLE);
+
+		dwStyle = dwStyle & ~WS_POPUP;
+		dwStyle = dwStyle |  WS_OVERLAPPEDWINDOW;
+
+		SetWindowLong(window->hWnd, GWL_STYLE, dwStyle);
+
+		ShowWindow(window->hWnd, SW_RESTORE);
+
+		window->isFullscreen = false;
+	}
+}
+
+instant void
+Window_SetSize(
+	Window *window,
+	s32 width,
+	s32 height
+) {
+	Assert(window);
+
+	if (window->isFullscreen)
+		Window_ToggleFullscreen(window);
+
+	RECT rc = {};
+	DWORD dwStyle   = (DWORD)GetWindowLong(window->hWnd, GWL_STYLE);
+	DWORD dwExStyle = (DWORD)GetWindowLong(window->hWnd, GWL_EXSTYLE);
+
+	bool success = AdjustWindowRectEx(&rc, dwStyle, 0, dwExStyle);
+
+	if (success) {
+		width  += (rc.right  - rc.left);
+		height += (rc.bottom - rc.top);
+
+		rc = {};
+		GetWindowRect(window->hWnd, &rc);
+
+		s32 x = rc.left + (rc.right  - rc.left - width)  / 2;
+		s32 y = rc.top  + (rc.bottom - rc.top  - height) / 2;
+
+		SetWindowPos(window->hWnd, HWND_TOP, x, y, width, height, 0);
+	}
+}
+
+instant void
+Window_SetTitle(
+	Window *window,
+	const char *title
+) {
+	Assert(window);
+	Assert(title);
+
+	window->title = title;
+
+	SetWindowText(window->hWnd, window->title);
+}
+
+/// ::: OpenGL
+/// ===========================================================================
+instant void
+OpenGL_SetVSync(
+	Window *window,
+	bool enable
+) {
+	Assert(window);
+
+	if(wglSwapIntervalEXT)
+		wglSwapIntervalEXT(enable);
+
+	window->useVSync = enable;
+
+	LOG_DEBUG("VSync: " << (enable
+							? "enabled."
+							: "disabled."));
+}
+
