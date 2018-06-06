@@ -481,6 +481,19 @@ To_CString(
 	c_buffer[c_length - 1] = '\0';
 }
 
+instant char *
+String_CreateCBuffer(
+	String *s_data
+) {
+	Assert(s_data);
+	Assert(s_data->length);
+
+	char *c_buffer = Memory_Create(char, s_data->length + 1);
+	To_CString(c_buffer, s_data->length + 1, s_data);
+
+	return c_buffer;
+}
+
 instant bool
 String_IsEqual(
 	const char *c_text1,
@@ -903,16 +916,15 @@ instant void
 String_Replace(
 	String     *s_data,
 	const char *find,
-	String     *replace
+	String     *s_replace
 ) {
 	Assert(s_data);
 	Assert(find);
-	Assert(replace);
+	Assert(s_replace);
 
-	char *c_data = Memory_Create(char, replace->length + 1);
-	To_CString(c_data, replace->length + 1, replace);
-	String_Replace(s_data, find, c_data);
-	Memory_Free(c_data);
+	char *c_replace = String_CreateCBuffer(s_replace);
+	String_Replace(s_data, find, c_replace);
+	Memory_Free(c_replace);
 }
 
 instant char *
@@ -1456,8 +1468,7 @@ File_Exists(
 	String_Append(&ts_filename, "/", 1);
 	String_Append(&ts_filename, s_filename->value, s_filename->length);
 
-	char *c_search_file = Memory_Create(char, ts_filename.length + 1);
-	To_CString(c_search_file, ts_filename.length + 1, &ts_filename);
+	char *c_search_file = String_CreateCBuffer(&ts_filename);
 
 	bool result = false;
 
@@ -1485,8 +1496,7 @@ File_CreateDirectory(
 
 	String_Append(&s_path_relative, s_directory->value, s_directory->length);
 
-	char *c_path_relative = Memory_Create(char, s_path_relative.length + 1);
-	To_CString(c_path_relative, s_path_relative.length + 1, &s_path_relative);
+	char *c_path_relative = String_CreateCBuffer(&s_path_relative);
 
 	bool success = (CreateDirectory(c_path_relative, 0) != 0);
 
@@ -1515,8 +1525,7 @@ File_Open(
 	*file = {};
 
 	if (s_filename->length) {
-		char *c_filename = Memory_Create(char, s_filename->length + 1);
-		To_CString(c_filename, s_filename->length + 1, s_filename);
+		char *c_filename = String_CreateCBuffer(s_filename);
 
 		file->fp = fopen(c_filename, mode);
 
@@ -1553,8 +1562,7 @@ File_Execute(
 ) {
 	Assert(s_filename);
 
-	char *c_filename = Memory_Create(char, s_filename->length + 1);
-	To_CString(c_filename, s_filename->length + 1, s_filename);
+	char *c_filename = String_CreateCBuffer(s_filename);
 
 	ShellExecute(GetDesktopWindow(), "open", c_filename, 0, 0, SW_SHOWNORMAL);
 
@@ -1588,3 +1596,70 @@ File_Read(
 	s_data->length = length;
 	fread(s_data->value, sizeof(char), sizeof(char) * length, file->fp);
 }
+
+
+struct File_Watcher {
+	String *s_filename = 0;
+	HANDLE file = 0;
+	bool exists = false;
+	FILETIME lastWriteTime = {};
+};
+
+instant void
+File_Watch(
+	File_Watcher *file_watcher,
+	String *s_filename
+) {
+	Assert(file_watcher);
+
+	*file_watcher = {};
+
+	char *c_filename = String_CreateCBuffer(s_filename);
+
+	file_watcher->file = CreateFile(
+			c_filename,
+			0,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL
+		);
+
+	if (file_watcher->file)
+		file_watcher->exists = true;
+
+	Memory_Free(c_filename);
+}
+
+instant bool
+File_HasChanged(
+	File_Watcher *file_watcher
+) {
+	Assert(file_watcher);
+
+	bool has_changed = false;
+
+	if (!file_watcher->exists)  return false;
+
+	FILETIME *lwt = &file_watcher->lastWriteTime;
+
+	FILETIME prevWriteTime = *lwt;
+	GetFileTime(file_watcher->file, 0, 0, lwt);
+
+	if (0) {}
+	else if (lwt->dwHighDateTime != prevWriteTime.dwHighDateTime)
+		has_changed = true;
+	else if (lwt->dwLowDateTime  != prevWriteTime.dwLowDateTime )
+		has_changed = true;
+
+	return has_changed;
+}
+
+
+
+
+
+
+
+
