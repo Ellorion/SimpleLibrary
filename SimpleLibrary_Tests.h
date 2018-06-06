@@ -189,7 +189,7 @@ Test_Arrays(
 			String_Destroy(&s_data_it);
 		}
 		AssertMessage(as_test.count == 0, "Array_Remove failed.");
-		Array_Destroy(&as_test);
+		Array_Destroy(&as_test, true);
 	}
 
 	{
@@ -202,10 +202,6 @@ Test_Arrays(
 		AssertMessage(as_split.count == 1, "Incorrect amount of items split from string (1).");
 		AssertMessage(String_IsEqual(&ARRAY_IT(as_split, 0), "aaa"), "First Array item does not match.");
 
-		while(as_split.count) {
-			String s_data_it = Array_Remove(&as_split, 0);
-			String_Destroy(&s_data_it);
-		}
 		Array_Destroy(&as_split);
 	}
 
@@ -233,10 +229,6 @@ Test_Arrays(
 		AssertMessage(String_IsEqual(&ARRAY_IT(as_split, 0), "aaa"), "First Array item does not match.");
 		AssertMessage(String_IsEqual(&ARRAY_IT(as_split, 1), "bbb"), "Second Array item does not match.");
 
-		while(as_split.count) {
-			String s_data_it = Array_Remove(&as_split, 0);
-			String_Destroy(&s_data_it);
-		}
 		Array_Destroy(&as_split);
 		String_Destroy(&s_split);
 	}
@@ -260,26 +252,20 @@ Test_Arrays(
 
 		Array_Sort_Ascending(&as_data);
 
-		AssertMessage(		String_IsEqual(ARRAY_IT(as_data, 0).value, "1")
-						AND String_IsEqual(ARRAY_IT(as_data, 1).value, "2")
-						AND String_IsEqual(ARRAY_IT(as_data, 2).value, "3")
-						AND String_IsEqual(ARRAY_IT(as_data, 3).value, "4")
+		AssertMessage(		String_IsEqual(&ARRAY_IT(as_data, 0), "1")
+						AND String_IsEqual(&ARRAY_IT(as_data, 1), "2")
+						AND String_IsEqual(&ARRAY_IT(as_data, 2), "3")
+						AND String_IsEqual(&ARRAY_IT(as_data, 3), "4")
 							, "String array sorting failed (ascending).");
 
 		Array_Sort_Descending(&as_data);
 
-		AssertMessage(		String_IsEqual(ARRAY_IT(as_data, 0).value, "4")
-						AND String_IsEqual(ARRAY_IT(as_data, 1).value, "3")
-						AND String_IsEqual(ARRAY_IT(as_data, 2).value, "2")
-						AND String_IsEqual(ARRAY_IT(as_data, 3).value, "1")
+		AssertMessage(		String_IsEqual(&ARRAY_IT(as_data, 0), "4")
+						AND String_IsEqual(&ARRAY_IT(as_data, 1), "3")
+						AND String_IsEqual(&ARRAY_IT(as_data, 2), "2")
+						AND String_IsEqual(&ARRAY_IT(as_data, 3), "1")
 							, "String array sorting failed (descending).");
 
-		while(as_data.count) {
-			String s_data_it = Array_Remove(&as_data, 0);
-			String_Destroy(&s_data_it);
-			///@Info: don't free s_data1, s_data2, since
-	        ///       since string->value is already free'd
-		}
 		Array_Destroy(&as_data);
 	}
 
@@ -330,8 +316,58 @@ Test_Arrays(
 	}
 }
 
+instant void
+Test_Files(
+) {
+    {
+    	String s_file;
+    	String s_extension;
+    	String_Append(&s_file, "C:/test.cpp");
+    	String_Append(&s_extension, ".cpp|.h");
 
+        bool has_ext = File_HasExtension(&s_file, &s_extension);
+        AssertMessage(has_ext, "File extension finding failed (1).");
 
+        String_Destroy(&s_file);
+        String_Destroy(&s_extension);
+    }
+
+    {
+    	String s_file;
+    	String s_extension;
+    	String_Append(&s_file, "C:/test.cpp");
+    	String_Append(&s_extension, ".cp|.h");
+
+        bool has_ext = File_HasExtension(&s_file, &s_extension);
+        AssertMessage(!has_ext, "File extension finding failed (2).");
+
+        String_Destroy(&s_file);
+        String_Destroy(&s_extension);
+    }
+
+    {
+		s64 pos_found;
+		String s_pathfile;
+
+		String_Append(&s_pathfile, __FILE__);
+		String_Replace(&s_pathfile, "\\", "/");
+
+		if (String_FindRev(&s_pathfile, "/", &pos_found)) {
+			String s_path;
+			s_path.value = s_pathfile.value;
+			s_path.len   = pos_found;
+
+			String s_file;
+			s_file.value = s_pathfile.value + pos_found + 1;
+			s_file.len   = s_pathfile.len - pos_found - 1;
+
+			bool file_exists = File_Exists(&s_path, &s_file);
+			AssertMessage(file_exists, "File existence check failed.");
+		}
+
+		String_Destroy(&s_pathfile);
+    }
+}
 
 
 

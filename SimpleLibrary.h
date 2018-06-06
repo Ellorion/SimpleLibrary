@@ -715,18 +715,19 @@ String_Cut(
 instant bool
 String_EndWith(
 	String *s_data,
-	const char *endwith
+	const char *endwith,
+	u64 len = 0
 ) {
-	u64 len_chunk = String_Length(endwith);
+	if (!len)  len = String_Length(endwith);
 
-	if (len_chunk > s_data->len)
+	if (len > s_data->len)
 		return false;
 
 	String ts_data = *s_data;
-	ts_data.value = ts_data.value + (ts_data.len - len_chunk);
-	ts_data.len = len_chunk;
+	ts_data.value = ts_data.value + (ts_data.len - len);
+	ts_data.len = len;
 
-	return String_IsEqual(&ts_data, endwith);
+	return String_IsEqual(&ts_data, endwith, len);
 }
 
 instant void
@@ -1109,10 +1110,6 @@ Array_Reserve(
 	Assert(array);
 
 	if (array->size + sizeof(T) * count > array->limit) {
-//		if (clear_zero) {
-//			Memory_Set(array->memory + array->limit, 0, sizeof(T) * count);
-//		}
-
 		array->limit += sizeof(T) * count;
 		array->memory = (T *)_Memory_Resize(array->memory, array->limit);
 	}
@@ -1163,6 +1160,20 @@ Array_Remove(
 	array->size  -= sizeof(T);
 
 	return result;
+}
+
+template<typename T>
+instant void
+Array_Destroy(
+	Array<String> *array
+) {
+	Assert(array);
+
+ 	while(array->count) {
+		String s_data_it = Array_Remove(array, 0);
+		String_Destroy(&s_data_it);
+    }
+    Array_Destroy(array);
 }
 
 /// Will copy string values, so array content has to be free'd
@@ -1409,4 +1420,66 @@ CPU_GetFeatures(
 
 	if (cpu_features._3dnow)     Array_Add(a_features, "3DNow");
 	if (cpu_features._3dnow_ext) Array_Add(a_features, "3DNow Ext");
+}
+
+/// Files
+/// ===========================================================================
+struct File {
+	FILE *fp;
+};
+
+instant bool
+File_HasExtension(
+	String *s_filename,
+	String *s_extension
+) {
+	Assert(s_filename);
+	Assert(s_extension);
+
+	bool result = false;
+
+	if (!s_extension->len)  return result;
+
+	Array<String> as_extentions = Array_Split(s_extension, "|");
+
+    FOR_ARRAY(as_extentions, it) {
+    	String s_data_it = ARRAY_IT(as_extentions, it);
+
+		if (String_EndWith(s_filename, s_data_it.value, s_data_it.len)) {
+			result = true;
+			break;
+		}
+    }
+
+    Array_Destroy(&as_extentions);
+
+	return result;
+}
+
+instant bool
+File_Exists(
+	String *s_path,
+	String *s_filename
+) {
+	Assert(s_path);
+	Assert(s_filename);
+
+	WIN32_FIND_DATA file_data;
+
+	String ts_filename;
+	String_Append(&ts_filename, s_path->value, s_path->len);
+	String_Append(&ts_filename, "/", 1);
+	String_Append(&ts_filename, s_filename->value, s_filename->len);
+
+	char *c_search_file = Memory_Create(char, ts_filename.len + 1);
+	To_CString(c_search_file, ts_filename.len + 1, &ts_filename);
+
+	bool result = false;
+
+	if (FindFirstFile(c_search_file, &file_data) != INVALID_HANDLE_VALUE)
+		result = true;
+
+	Memory_Free(c_search_file);
+
+	return result;
 }
