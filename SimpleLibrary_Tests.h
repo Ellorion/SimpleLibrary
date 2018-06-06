@@ -367,6 +367,24 @@ Test_Files(
 
 		String_Destroy(&s_pathfile);
     }
+
+    {
+    	String s_filename;
+    	String_Append(&s_filename, __FILE__);
+
+		File file;
+		File_Open(&file, &s_filename, "r");
+		AssertMessage(file.fp          , "File could not be opened.");
+		AssertMessage(File_Size(&file) , "Could not read file size.");
+
+		String s_data;
+		File_Read(&s_data, &file);
+		AssertMessage(s_data.length    , "Could not read file content.");
+
+		String_Destroy(&s_data);
+
+		AssertMessage(File_Close(&file), "File could not be closed.");
+    }
 }
 
 

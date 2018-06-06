@@ -1469,14 +1469,14 @@ File_Exists(
 	return result;
 }
 
-instant void
+instant bool
 File_CreateDirectory(
 	String *s_directory,
 	bool make_path_relative = true
 ) {
 	Assert(s_directory);
 
-	if (!s_directory->length)  return;
+	if (!s_directory->length)  return false;
 
 	String s_path_relative;
 
@@ -1488,8 +1488,103 @@ File_CreateDirectory(
 	char *c_path_relative = Memory_Create(char, s_path_relative.length + 1);
 	To_CString(c_path_relative, s_path_relative.length + 1, &s_path_relative);
 
-	CreateDirectory(c_path_relative, 0);
+	bool success = (CreateDirectory(c_path_relative, 0) != 0);
+
+	if (!success) {
+		/// you wanted it, you got it -> success
+		if (GetLastError() == ERROR_ALREADY_EXISTS)
+			success = true;
+	}
 
 	Memory_Free(c_path_relative);
 	String_Destroy(&s_path_relative);
+
+	return success;
+}
+
+instant void
+File_Open(
+	File *file,
+	String *s_filename,
+	const char *mode
+) {
+	Assert(file);
+	Assert(s_filename);
+	Assert(mode);
+
+	*file = {};
+
+	if (s_filename->length) {
+		char *c_filename = Memory_Create(char, s_filename->length + 1);
+		To_CString(c_filename, s_filename->length + 1, s_filename);
+
+		file->fp = fopen(c_filename, mode);
+
+		Memory_Free(c_filename);
+	}
+}
+
+instant bool
+File_Close(
+	File *file
+) {
+	Assert(file);
+
+	/// Returns 0 on success
+	return (fclose(file->fp) == 0);
+}
+
+instant u64
+File_Size(
+	File *file
+) {
+	Assert(file);
+
+	fseek (file->fp, 0 ,SEEK_END);
+	u64 size = ftell(file->fp);
+	rewind(file->fp);
+
+	return size;
+}
+
+instant void
+File_Execute(
+	String *s_filename
+) {
+	Assert(s_filename);
+
+	char *c_filename = Memory_Create(char, s_filename->length + 1);
+	To_CString(c_filename, s_filename->length + 1, s_filename);
+
+	ShellExecute(GetDesktopWindow(), "open", c_filename, 0, 0, SW_SHOWNORMAL);
+
+	Memory_Free(c_filename);
+}
+
+instant void
+File_Write(
+	File *file,
+	const char *data,
+	u64 length = 0
+) {
+	Assert(file);
+
+	if (!length)
+		length = String_Length(data);
+
+    fwrite(data, sizeof(char), sizeof(char) * length, file->fp);
+}
+
+instant void
+File_Read(
+	String *s_data,
+	File *file
+) {
+	Assert(s_data);
+
+	u64 length = File_Size(file);
+
+	s_data->value  = Memory_Resize(s_data->value, char, length);
+	s_data->length = length;
+	fread(s_data->value, sizeof(char), sizeof(char) * length, file->fp);
 }

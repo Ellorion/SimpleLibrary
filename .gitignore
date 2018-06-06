@@ -18,6 +18,9 @@
 *.save
 *.cbp
 
+# Others
+*.txt
+
 # Object directory
 obj/
 
