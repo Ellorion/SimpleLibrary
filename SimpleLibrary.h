@@ -101,8 +101,8 @@ Swap(
 
 /// Memory
 /// ===========================================================================
-#define Memory_Create(type, len) (type *)_Memory_Alloc_Empty(sizeof(type) * len)
-#define Memory_Resize(buffer, type, len) (buffer ? (type *) _Memory_Resize(buffer, sizeof(type) * len) : (type *) Memory_Create(type, len));
+#define Memory_Create(type, length) (type *)_Memory_Alloc_Empty(sizeof(type) * length)
+#define Memory_Resize(buffer, type, length) (buffer ? (type *) _Memory_Resize(buffer, sizeof(type) * length) : (type *) Memory_Create(type, length));
 
 #define MEMORY_SIGNATURE 123456
 
@@ -179,20 +179,20 @@ instant void
 Memory_Copy(
 	const void *dest,
 	const void *src,
-	u64 len
+	u64 length
 ) {
-	if (!dest OR !src OR !len)  return;
+	if (!dest OR !src OR !length)  return;
 	if (dest == src)            return;
 
     char *c_dest = (char *)dest;
     char *c_src  = (char *)src;
 
     if (dest > src) {
-		while(len-- > 0)
-			c_dest[len] = c_src[len];
+		while(length-- > 0)
+			c_dest[length] = c_src[length];
     }
     else {
-		FOR(len, it) {
+		FOR(length, it) {
 			c_dest[it] = c_src[it];
 		}
     }
@@ -202,14 +202,14 @@ instant void *
 Memory_Set(
 	void *dest,
 	int data,
-	u64 len
+	u64 length
 ) {
 	if (dest == 0) return 0;
 
 	u8 *cDest = (u8*)dest;
 	u8  cData = data;
 
-	while (len-- > 0)
+	while (length-- > 0)
 		*cDest++ = cData;
 
 	return dest;
@@ -357,33 +357,24 @@ Time_Move(
 #define String_Split Array_Split
 
 struct String {
-	u64  len    = 0;
+	u64  length = 0;
 	char *value = 0;
 };
-
-instant u64
-String_Length(
-	String *s_data
-) {
-	if (!s_data)  return 0;
-
-	return s_data->len;
-}
 
 /// does NOT support UTF-8
 instant u64
 String_Length(
 	const char *c_data
 ) {
-	u64 len = 0;
+	u64 length = 0;
 
 	if (c_data == 0)
-		return len;
+		return length;
 
 	while (*c_data++)
-		++len;
+		++length;
 
-	return len;
+	return length;
 }
 
 instant void
@@ -397,40 +388,65 @@ String_Destroy(
 instant void
 String_Resize(
 	String *s_data,
-	s64 len_delta
+	s64 length_delta
 ) {
 	Assert(s_data);
 
-	s_data->value = Memory_Resize(s_data->value, char, s_data->len + len_delta);
+	s_data->value = Memory_Resize(s_data->value, char, s_data->length + length_delta);
 }
 
 instant void
 String_Append(
 	String *s_data,
 	const char *c_data,
-	u64 len_append = 0
+	u64 length_append = 0
 ) {
     Assert(s_data);
 
-    if (len_append == 0)  len_append = String_Length(c_data);
-    if (len_append == 0)  return;
+    if (length_append == 0)  length_append = String_Length(c_data);
+    if (length_append == 0)  return;
 
-	String_Resize(s_data, len_append);
-	Memory_Copy(s_data->value + s_data->len, (char *)c_data, len_append);
-	s_data->len += len_append;
+	String_Resize(s_data, length_append);
+	Memory_Copy(s_data->value + s_data->length, (char *)c_data, length_append);
+	s_data->length += length_append;
+}
+
+instant u64
+String_Insert(
+	String *s_data,
+	u64 index_start,
+	const char *c_data,
+	u64 c_length = 0
+) {
+	if (!s_data)  return 0;
+	if (!c_data)  return 0;
+
+	if (!c_length)
+		c_length = String_Length(c_data);
+
+    s_data->value = Memory_Resize(s_data->value, char, s_data->length + c_length);
+	Memory_Copy(s_data->value + index_start + c_length, s_data->value + index_start, s_data->length - index_start);
+
+	FOR_START(index_start, index_start + c_length, it) {
+		s_data->value[index_start + (it - index_start)] = *c_data++;
+	}
+
+	s_data->length += c_length;
+
+	return c_length;
 }
 
 instant void
 To_String(
 	String *s_data,
 	const char *c_data,
-	u64 len = 0
+	u64 c_length = 0
 ) {
 	Assert(s_data);
 	Assert(c_data);
 
 	*s_data = {};
-	String_Append(s_data, c_data, len);
+	String_Append(s_data, c_data, c_length);
 }
 
 /// does NOT add memory for '\0'
@@ -439,37 +455,37 @@ To_String(
 instant void
 To_CString(
 	char *c_buffer,
-	u64 buffer_len,
+	u64 c_length,
 	String *s_data
 ) {
 	Assert(s_data);
 
-	if (!buffer_len)  return;
+	if (!c_length)  return;
 
-	if (!s_data->len) {
+	if (!s_data->length) {
 		c_buffer[0] = '\0';
 		return;
 	}
 
 	/// stop copying memory after '\0'
-	if (buffer_len > s_data->len + 1) {
-		buffer_len = s_data->len + 1;
+	if (c_length > s_data->length + 1) {
+		c_length = s_data->length + 1;
 	}
 
 	/// stop before '\0'
-	FOR(buffer_len - 1, it) {
+	FOR(c_length - 1, it) {
 		c_buffer[it] = s_data->value[it];
 	}
 
 	/// set final '\0'
-	c_buffer[buffer_len - 1] = '\0';
+	c_buffer[c_length - 1] = '\0';
 }
 
 instant bool
 String_IsEqual(
 	const char *c_text1,
 	const char *c_text2,
-	u64 len = 0
+	u64 length = 0
 ) {
 	bool result = true;
 
@@ -494,8 +510,8 @@ String_IsEqual(
 
 		/// abort checking, if
 		/// length is specified
-		if (len)
-			if (--len <= 0) break;
+		if (length)
+			if (--length <= 0) break;
 	}
 
 	return result;
@@ -505,7 +521,7 @@ instant bool
 String_IsEqual(
 	String     *s_data,
 	const char *c_data,
-	u64 len = 0
+	u64 length = 0
 ) {
 	/// check if both have equally nothing
 	if (!s_data AND !c_data)
@@ -517,19 +533,19 @@ String_IsEqual(
 
 	u64 len_c = String_Length(c_data);
 
-	if (!len) {
+	if (!length) {
 		/// different lengths
-		if (s_data->len != len_c)
+		if (s_data->length != len_c)
 			return false;
 	}
 
 	/// check min length needed to check
 	u64 len_min = 0;
-	u64 len_max = (len_c < s_data->len)
+	u64 len_max = (len_c < s_data->length)
 						? len_c
-						: s_data->len;
+						: s_data->length;
 
-	if (len > 0 AND len > len_max)  len_max = len;
+	if (length > 0 AND length > len_max)  len_max = length;
 
 	while(len_min < len_max) {
 		if (s_data->value[len_min] != c_data[len_min])
@@ -544,41 +560,41 @@ String_IsEqual(
 instant void
 String_Copy(
 	String *s_dest,
-	String *s_source,
-	u32 len = 0
+	const char *c_source,
+	u32 length = 0
 ) {
 	Assert(s_dest);
-	Assert(s_source);
+	Assert(c_source);
 
 	/// overwrite protection check
 	Assert(!s_dest->value);
 
-	if (len == 0)
-		len = s_source->len;
+	if (length == 0)
+		length = String_Length(c_source);
 
-	s_dest->value = Memory_Create(char, len);
-	Memory_Copy(s_dest->value, s_source->value, len);
-	s_dest->len = len;
+	s_dest->value = Memory_Create(char, length);
+	Memory_Copy(s_dest->value, c_source, length);
+	s_dest->length = length;
 }
 
 instant void
 String_Copy(
 	char *dest,
 	const char *src,
-	u32 len = 0
+	u32 length = 0
 ) {
 	if (!src)
 		return;
 
 	char *result = dest;
 
-	if (!len)
-		len = String_Length(src);
+	if (!length)
+		length = String_Length(src);
 
 	/// for '0'-terminator
-	++len;
+	++length;
 
-	while (*src AND --len > 0)
+	while (*src AND --length > 0)
 		*dest++ = *src++;
 
 	*dest = '\0';
@@ -594,20 +610,20 @@ String_IndexOf(
 ) {
 	int result = -1;
 
-	if (!s_data OR !s_data->len)
+	if (!s_data OR !s_data->length)
 		return result;
 
-	int len_key  = String_Length(key);
+	int length_key  = String_Length(key);
 
-	if (len_key == 0)
+	if (length_key == 0)
 		return result;
 
-	u64 len_text = s_data->len;
+	u64 length_data = s_data->length;
 
 	if (index_start < 0) index_start = 0;
 
-	FOR_START(index_start, len_text, index) {
-		if (String_IsEqual(s_data->value + index, key, len_key)) {
+	FOR_START(index_start, length_data, index) {
+		if (String_IsEqual(s_data->value + index, key, length_key)) {
 			return index;
 		}
 	}
@@ -623,7 +639,7 @@ String_IndexOfRev(
 ) {
 	int result = -1;
 
-	if (!s_data OR !s_data->len)
+	if (!s_data OR !s_data->length)
 		return result;
 
 	int len_key  = String_Length(key);
@@ -631,8 +647,8 @@ String_IndexOfRev(
 	if (len_key == 0)
 		return result;
 
-	if (index_start > (s64)s_data->len OR index_start < 0)
-		index_start = (s64)s_data->len;
+	if (index_start > (s64)s_data->length OR index_start < 0)
+		index_start = (s64)s_data->length;
 
 	for(s64 it = index_start; it >= 0; --it) {
 		if (String_IsEqual(s_data->value + it, key, len_key)) {
@@ -648,7 +664,7 @@ String_StartWith(
 	String *s_data,
 	const char* start_with
 ) {
-	if (!start_with OR !s_data OR !s_data->len)
+	if (!start_with OR !s_data OR !s_data->length)
 		return false;
 
 	return String_IsEqual(s_data->value, start_with, String_Length(start_with));
@@ -707,27 +723,27 @@ String_FindRev(
 instant void
 String_Cut(
 	String *s_data,
-	u32 len
+	u32 length
 ) {
-	if (s_data AND len < s_data->len)  s_data->len = len;
+	if (s_data AND length < s_data->length)  s_data->length = length;
 }
 
 instant bool
 String_EndWith(
 	String *s_data,
 	const char *endwith,
-	u64 len = 0
+	u64 length = 0
 ) {
-	if (!len)  len = String_Length(endwith);
+	if (!length)  length = String_Length(endwith);
 
-	if (len > s_data->len)
+	if (length > s_data->length)
 		return false;
 
 	String ts_data = *s_data;
-	ts_data.value = ts_data.value + (ts_data.len - len);
-	ts_data.len = len;
+	ts_data.value = ts_data.value + (ts_data.length - length);
+	ts_data.length = length;
 
-	return String_IsEqual(&ts_data, endwith, len);
+	return String_IsEqual(&ts_data, endwith, length);
 }
 
 instant void
@@ -738,7 +754,7 @@ String_ToLower(
 		return;
 
 	u64 index = 0;
-	u64 len_max = s_data->len + 1;
+	u64 len_max = s_data->length + 1;
 
 	while(index < len_max) {
 		if (s_data->value[index] >= 'A' AND s_data->value[index] <= 'Z') {
@@ -756,7 +772,7 @@ String_ToUpper(
 		return;
 
 	u64 index = 0;
-	u64 len_max = s_data->len + 1;
+	u64 len_max = s_data->length + 1;
 
 	while(index < len_max) {
 		if (s_data->value[index] >= 'a' AND s_data->value[index] <= 'z') {
@@ -773,13 +789,13 @@ String_Reverse(
 	if (!s_data)
 		return;
 
-	u64 len = s_data->len;
+	u64 length = s_data->length;
 
-	for(u64 it = 0; it < (len >> 1); ++it) {
+	for(u64 it = 0; it < (length >> 1); ++it) {
 		char temp = s_data->value[it];
 		/// don't reverse the '\0'!
-		s_data->value[it] = s_data->value[len - it - 1];
-		s_data->value[len - it - 1] = temp;
+		s_data->value[it] = s_data->value[length - it - 1];
+		s_data->value[length - it - 1] = temp;
 	}
 }
 
@@ -791,71 +807,40 @@ String_TrimLeft(
 	if (!s_data)
 		return 0;
 
-	u64 len = 0;
-	u64 len_max = s_data->len;
+	u64 length = 0;
+	u64 len_max = s_data->length;
 
 	/// does not skip '\0'
-    while(len <= len_max) {
-		if (s_data->value[len] <= 32 AND s_data->value[len] != 127) ++len;
+    while(length <= len_max) {
+		if (s_data->value[length] <= 32 AND s_data->value[length] != 127) ++length;
 		else												   break;
     }
 
     if (move_pointer) {
-		s_data->value += len;
-		s_data->len   -= len;
+		s_data->value  += length;
+		s_data->length -= length;
     }
 
-    return len;
+    return length;
 }
 
 instant void
 String_TrimRight(
 	String *s_data
 ) {
-	if (!s_data OR !s_data->len)
+	if (!s_data OR !s_data->length)
 		return;
 
-	u64 len = s_data->len - 1;
+	u64 length = s_data->length - 1;
 
-    while(len > 0) {
-		if (s_data->value[len] <= 32 AND s_data->value[len] != 127)
-			--len;
+    while(length > 0) {
+		if (s_data->value[length] <= 32 AND s_data->value[length] != 127)
+			--length;
 		else
 			break;
     }
 
-    s_data->len = len + 1;
-}
-
-instant u64
-String_Insert(
-	String *s_data,
-	const char *c_data,
-	u64 index_start
-) {
-	if (!s_data)  return 0;
-	if (!c_data)  return 0;
-
-	u64 len = String_Length(c_data);
-
-	if (s_data->value) {
-		Memory_Resize(s_data->value, char, s_data->len + len);
-
-		/// move memory
-		Memory_Copy(s_data->value + index_start + len, s_data->value + index_start, s_data->len - index_start);
-	}
-	else {
-		s_data->value = Memory_Create(char, index_start + len);
-		Memory_Set(s_data->value, ' ', index_start + len);
-	}
-
-	FOR_START(index_start, index_start + len, it) {
-		s_data->value[index_start + (it - index_start)] = *c_data++;
-	}
-
-	s_data->len += len;
-
-	return len;
+    s_data->length = length + 1;
 }
 
 instant u64
@@ -871,14 +856,14 @@ String_Remove(
 	if (index_start > index_end)
 		Swap(&index_start, &index_end);
 
-	if (index_end > s_data->len)
-		index_end = s_data->len;
+	if (index_end > s_data->length)
+		index_end = s_data->length;
 
-	u64 len = s_data->len - index_end;
+	u64 length = s_data->length - index_end;
 	u64 rm_count = (index_end - index_start);
 
-	Memory_Copy(s_data->value + index_start, s_data->value + index_end, len);
-	s_data->len -= rm_count;
+	Memory_Copy(s_data->value + index_start, s_data->value + index_end, length);
+	s_data->length -= rm_count;
 
 	return rm_count;
 }
@@ -889,7 +874,7 @@ String_Clear(
 ) {
 	if (!s_data)  return;
 
-	s_data->len = 0;
+	s_data->length = 0;
 }
 
 instant void
@@ -904,13 +889,13 @@ String_Replace(
 
 	s64 pos_found = 0;
 	s64 pos_start = 0;
-	s64 find_len     = String_Length(find);
-	s64 replace_len  = String_Length(replace);
+	s64 find_length     = String_Length(find);
+	s64 replace_length  = String_Length(replace);
 
 	while(String_Find(s_data, find, &pos_found, pos_start)) {
-		String_Remove(s_data, pos_found, pos_found + find_len);
-		String_Insert(s_data, replace, pos_found);
-		pos_start += pos_found + replace_len;
+		String_Remove(s_data, pos_found, pos_found + find_length);
+		String_Insert(s_data, pos_found, replace);
+		pos_start += pos_found + replace_length;
 	}
 }
 
@@ -924,8 +909,8 @@ String_Replace(
 	Assert(find);
 	Assert(replace);
 
-	char *c_data = Memory_Create(char, replace->len + 1);
-	To_CString(c_data, replace->len + 1, replace);
+	char *c_data = Memory_Create(char, replace->length + 1);
+	To_CString(c_data, replace->length + 1, replace);
 	String_Replace(s_data, find, c_data);
 	Memory_Free(c_data);
 }
@@ -937,11 +922,11 @@ String_Encode64(
 	const char encodingTable[] =
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-	int len = String_Length(text);
-	char *encoded = Memory_Create(char, (len + 2) / 3 * 4 + 1);
+	int length = String_Length(text);
+	char *encoded = Memory_Create(char, (length + 2) / 3 * 4 + 1);
 	int enc_index = -1;
 
-	for (int index = 0; index < len; index += 3) {
+	for (int index = 0; index < length; index += 3) {
 		u32 buffer =  (text[index + 0] << 16)
 					| (text[index + 1] <<  8)
 					| (text[index + 2]);
@@ -974,7 +959,7 @@ operator == (
 	String &s_data1,
 	String &s_data2
 ) {
-	return String_IsEqual(&s_data1, s_data2.value, s_data2.len);
+	return String_IsEqual(&s_data1, s_data2.value, s_data2.length);
 }
 
 bool
@@ -982,10 +967,10 @@ operator < (
 	String &s_data1,
 	String &s_data2
 ) {
-	if (s_data1.len < s_data2.len)  return true;
-	if (s_data1.len > s_data2.len)  return false;
+	if (s_data1.length < s_data2.length)  return true;
+	if (s_data1.length > s_data2.length)  return false;
 
-	FOR(s_data1.len, it) {
+	FOR(s_data1.length, it) {
 		if (s_data1.value[it] < s_data2.value[it]) return true;
 		if (s_data1.value[it] > s_data2.value[it]) return false;
 	}
@@ -998,10 +983,10 @@ operator > (
 	String &s_data1,
 	String &s_data2
 ) {
-	if (s_data1.len > s_data2.len)  return true;
-	if (s_data1.len < s_data2.len)  return false;
+	if (s_data1.length > s_data2.length)  return true;
+	if (s_data1.length < s_data2.length)  return false;
 
-	FOR(s_data1.len, it) {
+	FOR(s_data1.length, it) {
 		if (s_data1.value[it] > s_data2.value[it]) return true;
 		if (s_data1.value[it] < s_data2.value[it]) return false;
 	}
@@ -1046,17 +1031,17 @@ Array_Add(
 ) {
 	Assert(array);
 
-	constexpr u64 len = 1;
+	constexpr u64 length = 1;
 
-	if (array->size + sizeof(T) * len > array->limit) {
-		array->limit += sizeof(T) * len;
+	if (array->size + sizeof(T) * length > array->limit) {
+		array->limit += sizeof(T) * length;
 		array->memory = (T *)_Memory_Resize(array->memory, array->limit);;
 	}
 
 	u64 target = array->size / sizeof(T);
 
 	array->memory[target] = element;
-	array->size += sizeof(T) * len;
+	array->size += sizeof(T) * length;
 
 	++array->count;
 
@@ -1194,12 +1179,12 @@ Array_Split(
 		String_Append(&s_element, s_data_it.value, pos_found);
 		Array_Add(&as_result, s_element);
 		s_data_it.value += pos_found + len_delim;
-		s_data_it.len   -= pos_found + len_delim;
+		s_data_it.length   -= pos_found + len_delim;
 	}
 
-	if (s_data_it.len > 0) {
+	if (s_data_it.length > 0) {
 		String s_element;
-		String_Append(&s_element, s_data_it.value, s_data_it.len);
+		String_Append(&s_element, s_data_it.value, s_data_it.length);
 		Array_Add(&as_result, s_element);
 	}
 
@@ -1438,14 +1423,14 @@ File_HasExtension(
 
 	bool result = false;
 
-	if (!s_extension->len)  return result;
+	if (!s_extension->length)  return result;
 
 	Array<String> as_extentions = Array_Split(s_extension, "|");
 
     FOR_ARRAY(as_extentions, it) {
     	String s_data_it = ARRAY_IT(as_extentions, it);
 
-		if (String_EndWith(s_filename, s_data_it.value, s_data_it.len)) {
+		if (String_EndWith(s_filename, s_data_it.value, s_data_it.length)) {
 			result = true;
 			break;
 		}
@@ -1467,12 +1452,12 @@ File_Exists(
 	WIN32_FIND_DATA file_data;
 
 	String ts_filename;
-	String_Append(&ts_filename, s_path->value, s_path->len);
+	String_Append(&ts_filename, s_path->value, s_path->length);
 	String_Append(&ts_filename, "/", 1);
-	String_Append(&ts_filename, s_filename->value, s_filename->len);
+	String_Append(&ts_filename, s_filename->value, s_filename->length);
 
-	char *c_search_file = Memory_Create(char, ts_filename.len + 1);
-	To_CString(c_search_file, ts_filename.len + 1, &ts_filename);
+	char *c_search_file = Memory_Create(char, ts_filename.length + 1);
+	To_CString(c_search_file, ts_filename.length + 1, &ts_filename);
 
 	bool result = false;
 
@@ -1482,4 +1467,29 @@ File_Exists(
 	Memory_Free(c_search_file);
 
 	return result;
+}
+
+instant void
+File_CreateDirectory(
+	String *s_directory,
+	bool make_path_relative = true
+) {
+	Assert(s_directory);
+
+	if (!s_directory->length)  return;
+
+	String s_path_relative;
+
+	if (make_path_relative)
+		String_Append(&s_path_relative, "./", 2);
+
+	String_Append(&s_path_relative, s_directory->value, s_directory->length);
+
+	char *c_path_relative = Memory_Create(char, s_path_relative.length + 1);
+	To_CString(c_path_relative, s_path_relative.length + 1, &s_path_relative);
+
+	CreateDirectory(c_path_relative, 0);
+
+	Memory_Free(c_path_relative);
+	String_Destroy(&s_path_relative);
 }

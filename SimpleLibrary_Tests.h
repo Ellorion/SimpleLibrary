@@ -8,13 +8,13 @@ Test_Strings(
 	char buffer[100];
 	String s_data;
 
-	AssertMessage(String_Length(&s_data) == 0, "Initial string length not zero");
+	AssertMessage(s_data.length == 0, "Initial string length not zero");
 
 	String_Destroy(&s_data);
-	AssertMessage(String_Length(&s_data) == 0, "Empty string destruction failed");
+	AssertMessage(s_data.length == 0, "Empty string destruction failed");
 
 	String_Destroy(&s_data);
-	AssertMessage(String_Length(&s_data) == 0, "Multiple empty string destruction failed");
+	AssertMessage(s_data.length == 0, "Multiple empty string destruction failed");
 
 	String_Append(&s_data, "Hello");
 	To_CString(buffer, 100, &s_data);
@@ -22,15 +22,15 @@ Test_Strings(
 	AssertMessage(String_IsEqual(&s_data, "Hello", 5), "String data does not match (truncated)");
 	AssertMessage(String_IsEqual(&s_data, "Hello")   , "String data does not match (autosize)");
 	AssertMessage(String_IsEqual(&s_data, "Hel", 3)  , "String data does not match (substring)");
-	AssertMessage(String_Length(&s_data) == 5, "Appending c_string to empty string failed");
+	AssertMessage(s_data.length == 5, "Appending c_string to empty string failed");
 
 	String_Destroy(&s_data);
-	AssertMessage(String_Length(&s_data) == 0, "Clearing existing data failed");
+	AssertMessage(s_data.length == 0, "Clearing existing data failed");
 
 	String_Append(&s_data, "Hello");
 	String_Append(&s_data, " World");
 	AssertMessage(String_IsEqual(&s_data, "Hello World"), "String data does not match (append c_string)");
-	AssertMessage(String_Length(&s_data) == 11, "Appending on existing data failed");
+	AssertMessage(s_data.length == 11, "Appending on existing data failed");
 
 	To_CString(buffer, 6, &s_data);
 	AssertMessage(String_Length(buffer) == 5, "Buffer overflow when converting string to c_string");
@@ -43,9 +43,9 @@ Test_Strings(
 	String_Append(&s_hello, "Hello");
 	String_Append(&s_world, " World!");
 
-	String_Append(&s_hello, s_world.value, s_world.len);
+	String_Append(&s_hello, s_world.value, s_world.length);
 	AssertMessage(String_IsEqual(&s_hello, "Hello World!"), "String data does not match (append string)");
-	AssertMessage(String_Length(&s_hello) == 12, "Length error on appending two strings.");
+	AssertMessage(s_hello.length == 12, "Length error on appending two strings.");
 
 	String_Destroy(&s_data);
 
@@ -55,11 +55,11 @@ Test_Strings(
 	AssertMessage(String_IsEqual(&s_buffer, "buffer"), "String data does not match (buffer)");
 
 	String s_buffer_copy;
-	String_Copy(&s_buffer_copy, &s_buffer);
+	String_Copy(&s_buffer_copy, s_buffer.value, s_buffer.length);
 	AssertMessage(String_IsEqual(&s_buffer_copy, "buffer"), "String copy failed (autosize");
 	String_Destroy(&s_buffer_copy);
 
-	String_Copy(&s_buffer_copy, &s_buffer, 3);
+	String_Copy(&s_buffer_copy, s_buffer.value, 3);
 	AssertMessage(String_IsEqual(&s_buffer_copy, "buf"), "String copy failed (substring)");
 	String_Destroy(&s_buffer_copy);
 
@@ -120,12 +120,12 @@ Test_Strings(
 	String ts_buffer = s_buffer;
 	String_TrimLeft(&ts_buffer);
 	String_TrimRight(&ts_buffer);
-	AssertMessage(ts_buffer.len == 4, "Trimming test failed.");
+	AssertMessage(ts_buffer.length == 4, "Trimming test failed.");
 
 	String_Destroy(&s_buffer);
 
 	String_Append(&s_buffer, "aaa__ccc");
-    String_Insert(&s_buffer, "bbb", 4);
+    String_Insert(&s_buffer, 4, "bbb");
     AssertMessage(String_IsEqual(&s_buffer, "aaa_bbb_ccc"), "String insertion failed.");
 
 	String_Remove(&s_buffer, 4, 7);
@@ -355,11 +355,11 @@ Test_Files(
 		if (String_FindRev(&s_pathfile, "/", &pos_found)) {
 			String s_path;
 			s_path.value = s_pathfile.value;
-			s_path.len   = pos_found;
+			s_path.length   = pos_found;
 
 			String s_file;
-			s_file.value = s_pathfile.value + pos_found + 1;
-			s_file.len   = s_pathfile.len - pos_found - 1;
+			s_file.value  = s_pathfile.value  + pos_found + 1;
+			s_file.length = s_pathfile.length - pos_found - 1;
 
 			bool file_exists = File_Exists(&s_path, &s_file);
 			AssertMessage(file_exists, "File existence check failed.");
