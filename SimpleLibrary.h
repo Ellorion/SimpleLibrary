@@ -1,9 +1,50 @@
 #pragma once
 
 /// Compiler: g++
+///
+/// Linker flags:
+///		-lopengl32
+///		-lgdi32
+///
+/// Compiler options:
+///		-fexceptions
+///		-Wno-unknown-pragmas
+///		-Wno-unused-function
+///		-Wno-unused-but-set-variable
+///		-Wno-comment
+///		-Wno-unused-variable
+
+
+/// Usage: Window Event Handler
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(Window *window) {
+//	MSG msg;
+//	bool running = true;
+//	bool ui_zoom_enabled = false;
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		Window_AdjustScale(window, ui_zoom_enabled);
+//
+//		/// Render
+//		/// ===================================================================
+//		Window_Clear();
+//
+//		Window_Update(window);
+//	}
+//}
+/// ===========================================================================
 
 #include <iostream>
+#include <math.h>
 #include <windows.h>
+#include <GL/gl.h>
+#include "SimpleLibrary_OpenGLExt.h"
 
 __attribute__((gnu_inline, always_inline))
 __inline__ static void debug_break(void)
@@ -26,7 +67,7 @@ __inline__ static void debug_break(void)
 
 #define instant static inline
 
-/// Iterators
+/// ::: Iterators
 /// ===========================================================================
 #define FOR(_max, _it)				\
 	for(u64 _it = 0;				\
@@ -36,7 +77,7 @@ __inline__ static void debug_break(void)
 #define FOR_START(_start, _max, _it)	\
 	for(u64 _it = _start; _it < _max; ++_it)
 
-/// Assert
+/// ::: Assert
 /// ===========================================================================
 #define	Assert(EX) \
 	(void)((EX) OR (_Assert(#EX, __FILE__, __LINE__), 0))
@@ -73,11 +114,11 @@ _AssertMessage(
 	debug_break();
 }
 
-/// Debug
+/// ::: Debug
 /// ===========================================================================
 #define LOG_DEBUG(text) std::cout << text << std::endl;
 
-/// Utilities
+/// ::: Utilities
 /// ===========================================================================
 #define MIN(val_1, val_2) ((val_1 < val_2) ? val_1 : val_2)
 #define MAX(val_1, val_2) ((val_1 < val_2) ? val_2 : val_1)
@@ -99,7 +140,53 @@ Swap(
 	*second = temp;
 }
 
-/// Memory
+instant void
+Rect_GetAspect(
+	s32 width_src,
+	s32 height_src,
+	s32 *width_dst,
+	s32 *height_dst,
+	float *off_x,
+	float *off_y,
+	float *scale_x = 0,
+	float *scale_y = 0,
+	bool scale_to_dest = false
+) {
+	Assert(width_dst);
+	Assert(height_dst);
+
+	float aspect_src = (float) width_src /  height_src;
+    float aspect_dst = (float)*width_dst / *height_dst;
+
+	if (0) {}
+    else if (aspect_dst > aspect_src) {
+		float ratio = (aspect_dst / aspect_src);
+		float offset = *width_dst / ratio;
+
+		if (off_x)  *off_x = floor((*width_dst - offset) / 2);
+		if (scale_x)  *scale_x = ratio;
+		if (scale_y)  *scale_y = 1;
+
+		*width_dst = floor(offset);
+    }
+    else if (aspect_dst < aspect_src) {
+		float ratio = (aspect_src / aspect_dst);
+		float offset = *height_dst / ratio;
+
+		if (off_y)  *off_y = floor((*height_dst - offset) / 2);
+		if (scale_x)  *scale_x = 1;
+		if (scale_y)  *scale_y = ratio;
+
+		*height_dst = floor(offset);
+    }
+
+    if (scale_to_dest) {
+		if (scale_x)  *scale_x = (float)*width_dst  / width_src;
+		if (scale_y)  *scale_y = (float)*height_dst / height_src;
+    }
+}
+
+/// ::: Memory
 /// ===========================================================================
 #define Memory_Create(type, length) (type *)_Memory_Alloc_Empty(sizeof(type) * length)
 #define Memory_Resize(buffer, type, length) (buffer ? (type *) _Memory_Resize(buffer, sizeof(type) * length) : (type *) Memory_Create(type, length));
@@ -215,9 +302,8 @@ Memory_Set(
 	return dest;
 }
 
-/// Time
+/// ::: Time
 /// ===========================================================================
-
 struct Timer {
 	u32 lo_timer  = 0;
 	u64 hi_timer  = 0;
@@ -352,7 +438,7 @@ Time_Move(
 }
 
 
-/// String
+/// ::: String
 /// ===========================================================================
 #define String_Split Array_Split
 
@@ -482,7 +568,7 @@ To_CString(
 }
 
 instant char *
-String_CreateCBuffer(
+String_CreateCBufferCopy(
 	String *s_data
 ) {
 	Assert(s_data);
@@ -922,7 +1008,7 @@ String_Replace(
 	Assert(find);
 	Assert(s_replace);
 
-	char *c_replace = String_CreateCBuffer(s_replace);
+	char *c_replace = String_CreateCBufferCopy(s_replace);
 	String_Replace(s_data, find, c_replace);
 	Memory_Free(c_replace);
 }
@@ -1007,9 +1093,8 @@ operator > (
 }
 
 
-/// Array
+/// :::Array
 /// ===========================================================================
-
 #define ARRAY_IT(_array, _it) \
 	((_array).memory)[_it]
 
@@ -1296,7 +1381,7 @@ Array_Sort_Descending(
 }
 
 
-/// CPU
+/// ::: CPU
 /// ===========================================================================
 struct CPU_ID {
 	u32 EAX;
@@ -1419,7 +1504,7 @@ CPU_GetFeatures(
 	if (cpu_features._3dnow_ext) Array_Add(a_features, "3DNow Ext");
 }
 
-/// Files
+/// ::: Files
 /// ===========================================================================
 struct File {
 	FILE *fp;
@@ -1435,7 +1520,7 @@ File_HasExtension(
 
 	bool result = false;
 
-	if (!s_extension->length)  return result;
+	if (!s_extension->length)  return true;
 
 	Array<String> as_extentions = Array_Split(s_extension, "|");
 
@@ -1468,7 +1553,7 @@ File_Exists(
 	String_Append(&ts_filename, "/", 1);
 	String_Append(&ts_filename, s_filename->value, s_filename->length);
 
-	char *c_search_file = String_CreateCBuffer(&ts_filename);
+	char *c_search_file = String_CreateCBufferCopy(&ts_filename);
 
 	bool result = false;
 
@@ -1496,7 +1581,7 @@ File_CreateDirectory(
 
 	String_Append(&s_path_relative, s_directory->value, s_directory->length);
 
-	char *c_path_relative = String_CreateCBuffer(&s_path_relative);
+	char *c_path_relative = String_CreateCBufferCopy(&s_path_relative);
 
 	bool success = (CreateDirectory(c_path_relative, 0) != 0);
 
@@ -1525,7 +1610,7 @@ File_Open(
 	*file = {};
 
 	if (s_filename->length) {
-		char *c_filename = String_CreateCBuffer(s_filename);
+		char *c_filename = String_CreateCBufferCopy(s_filename);
 
 		file->fp = fopen(c_filename, mode);
 
@@ -1562,7 +1647,7 @@ File_Execute(
 ) {
 	Assert(s_filename);
 
-	char *c_filename = String_CreateCBuffer(s_filename);
+	char *c_filename = String_CreateCBufferCopy(s_filename);
 
 	ShellExecute(GetDesktopWindow(), "open", c_filename, 0, 0, SW_SHOWNORMAL);
 
@@ -1614,7 +1699,7 @@ File_Watch(
 
 	*file_watcher = {};
 
-	char *c_filename = String_CreateCBuffer(s_filename);
+	char *c_filename = String_CreateCBufferCopy(s_filename);
 
 	file_watcher->file = CreateFile(
 			c_filename,
@@ -1656,10 +1741,408 @@ File_HasChanged(
 	return has_changed;
 }
 
+/// does not list or includes subdirectories
+instant void
+File_ReadDirectory(
+	Array<String> *as_files,
+	const char *c_path,
+	u64 c_length = 0,
+	bool prefix_path = true,
+	const char *extension_filter = 0,
+	const char *name_filter = 0
+) {
+	Assert(as_files);
+
+	Array_Clear(as_files);
+
+	if (!c_length)
+		c_length = String_Length(c_path);
+
+	if (!c_length)   return;
+
+	HANDLE id_directory;
+	WIN32_FIND_DATA file_data;
+
+	String s_search_path;
+	String_Append(&s_search_path, c_path, c_length);
+	String_Append(&s_search_path, "/*");
+
+	String s_extension_filter;
+	String_Append(&s_extension_filter, extension_filter);
+
+	char *c_search_path = String_CreateCBufferCopy(&s_search_path);
+
+	if ((id_directory = FindFirstFile(c_search_path, &file_data)) != INVALID_HANDLE_VALUE) {
+		do {
+			const bool is_directory = (file_data.dwFileAttributes &
+									   FILE_ATTRIBUTE_DIRECTORY)  != 0;
+
+			if (is_directory)
+				continue;
+
+			String s_filename;
+			String_Append(&s_filename, file_data.cFileName);
+
+			bool has_extension = File_HasExtension(&s_filename, &s_extension_filter);
+
+			bool found_name = true;
+
+			/// exclude if filter does not match
+			if (name_filter)
+				found_name = String_Find(&s_filename, name_filter);
+
+			if (has_extension AND found_name) {
+				String ts_filename;
+
+				if (prefix_path) {
+					String_Append(&ts_filename, c_path, c_length);
+					if (!String_EndWith(&ts_filename, "/") AND !String_EndWith(&ts_filename, "\\"))
+						String_Append(&ts_filename, "\\");
+				}
+
+				String_Append(&ts_filename, file_data.cFileName);
+				Array_Add(as_files, ts_filename);
+			}
+
+			String_Destroy(&s_filename);
+		} while (FindNextFile(id_directory, &file_data));
+
+		FindClose(id_directory);
+	}
+
+	String_Destroy(&s_extension_filter);
+
+	Memory_Free(c_search_path);
+	String_Destroy(&s_search_path);
+}
 
 
+/// ::: Windows (OpenGL)
+/// ===========================================================================
+#define LOG_ERROR(text) std::cerr << "[Error] " << text << std::endl
+
+#define Window_IsCreated(window) (window->hWnd != 0)
+
+#define Window_ReadMessage(_msg, _running, _ptr_window)             				\
+	while (PeekMessage(&_msg, _ptr_window->hWnd, 0, 0, PM_REMOVE)) {				\
+		switch (msg.message) {									\
+			case WM_QUIT: {										\
+				_msg.wParam = 0;								\
+				_running = false;								\
+			} break;											\
+																\
+			default: {											\
+				TranslateMessage(&_msg);						\
+				DispatchMessage(&_msg);							\
+			}													\
+		}														\
+	}
+
+static const char *class_name = "OpenGL";
+
+struct Mouse;
+struct Keyboard;
+
+struct Window {
+	const char  *title	 	  = 0;
+	HWND   		 hWnd         = 0;
+	HDC    		 hDC          = 0;
+	HGLRC  		 hRC          = 0;
+	float		 x_viewport   = 0;
+	float		 y_viewport   = 0;
+	s32    		 width        = 0;
+	s32    		 height       = 0;
+	bool   		 isFullscreen = false;
+	bool   		 useVSync     = false;
+	Keyboard    *keyboard     = 0;
+	Mouse       *mouse        = 0;
+	float        scale_x      = 1;
+	float        scale_y      = 1;
+};
+
+LONG WINAPI WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	switch (uMsg) {
+		case WM_ACTIVATE: {
+
+		} break;
+
+		case WM_CLOSE: {
+			PostQuitMessage(0);
+			return 0;
+		} break;
+
+		case WM_SYSCOMMAND: {
+			switch (wParam) {
+				case SC_SCREENSAVE:
+				case SC_MONITORPOWER:
+				return 0;
+			}
+		 } break;
+	}
+
+	return DefWindowProc(hWnd, uMsg, wParam, lParam);
+}
+
+instant void
+Window_Destroy(
+	Window *window
+) {
+	if (window->isFullscreen) {
+		ChangeDisplaySettings(0, 0);
+	}
+
+	if (window->hRC) {
+		wglMakeCurrent(0, 0);
+		wglDeleteContext(window->hRC);
+	}
+
+	if (Window_IsCreated(window)) {
+		if (window->hDC)
+			ReleaseDC(window->hWnd, window->hDC);
+
+		DestroyWindow(window->hWnd);
+	}
+
+	if (!UnregisterClass(class_name, GetModuleHandle(0))) {
+		LOG_ERROR("UnregisterClass() failed.");
+	}
+}
+
+instant bool
+Window_Create(
+	Window *window,
+	const char *title,
+	s32 width,
+	s32 height,
+	s32 bits = 32
+) {
+	Assert(window);
+	*window = {};
+
+	/// register window class
+	/// -------------------------------------
+	HINSTANCE hInstance = GetModuleHandle(0);
+
+	WNDCLASS wc 	 = {};
+	wc.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS;
+	wc.lpfnWndProc   = (WNDPROC)WindowProc;
+	wc.cbClsExtra    = 0;
+	wc.cbWndExtra    = 0;
+	wc.hInstance     = hInstance;
+	wc.hIcon         = LoadIcon(0, IDI_WINLOGO);
+	wc.hCursor       = LoadCursor(0, IDC_ARROW);
+	wc.hbrBackground = 0;
+	wc.lpszMenuName  = 0;
+	wc.lpszClassName = class_name;
+
+	if (!RegisterClass(&wc)) {
+		LOG_ERROR("RegisterClass() failed: Cannot register window class.");
+		return false;
+	}
+
+	/// default position for fullscreen
+	s32 x = 0;
+	s32 y = 0;
+
+	RECT windowRect = {};
+	GetClientRect(GetDesktopWindow(), &windowRect);
+
+	/// get desktop window center
+	/// -------------------------------------
+	x = (windowRect.right  - width)  >> 1;
+	y = (windowRect.bottom - height) >> 1;
+
+	windowRect.right  = width;
+	windowRect.bottom = height;
+
+	u32 dwExStyle = WS_EX_APPWINDOW;
+	u32 dwStyle   = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+
+	if (window->isFullscreen) {
+		dwStyle  |= WS_POPUP;
+	}
+	else {
+		dwExStyle |= WS_EX_WINDOWEDGE;
+		dwStyle   |= WS_OVERLAPPEDWINDOW;
+	}
+
+	AdjustWindowRectEx(&windowRect, dwStyle, false, dwExStyle);
+
+	/// create window
+	/// -------------------------------------
+	HWND hWnd = CreateWindowEx(	dwExStyle,
+								class_name, title,
+								dwStyle,
+								x, y,
+								windowRect.right - windowRect.left,
+								windowRect.bottom - windowRect.top,
+								0, 0, hInstance, 0);
+	if (!hWnd) {
+		LOG_ERROR("CreateWindow() failed: Cannot create a window.");
+		Window_Destroy(window);
+		return false;
+	}
+
+	window->hWnd = hWnd;
+
+	/// set pixel format
+	/// -------------------------------------
+	HDC hDC = GetDC(hWnd);
+
+	PIXELFORMATDESCRIPTOR pfd = {};
+	pfd.nSize        = sizeof(pfd);
+	pfd.nVersion     = 1;
+	pfd.dwFlags      = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+	pfd.iPixelType   = PFD_TYPE_RGBA;
+	pfd.cColorBits   = bits;
+
+	s32 pf = ChoosePixelFormat(hDC, &pfd);
+
+	if (!pf) {
+		LOG_ERROR("ChoosePixelFormat() failed: Cannot find a suitable pixel format.");
+		Window_Destroy(window);
+		return false;
+	}
+
+	if (!SetPixelFormat(hDC, pf, &pfd)) {
+		LOG_ERROR("SetPixelFormat() failed: Cannot set format specified.");
+		Window_Destroy(window);
+		return false;
+	}
+
+	if (!DescribePixelFormat(hDC, pf, sizeof(PIXELFORMATDESCRIPTOR), &pfd)) {
+		LOG_ERROR("DescribePixelFormat() failed: " << GetLastError());
+		Window_Destroy(window);
+		return false;
+	}
+
+	window->hDC = hDC;
+
+	window->title = title;
+	window->width = width;
+	window->height = height;
+
+	return true;
+}
+
+instant void
+Window_InitOpenGL(
+	Window *window
+) {
+	if (!window)
+		return;
+
+	if (window->hDC) {
+		window->hRC = wglCreateContext(window->hDC);
+		wglMakeCurrent(window->hDC, window->hRC);
+
+		glShadeModel(GL_SMOOTH);
+		glClearColor(0.0f, 0.0f, 0.0f, 0.5f);
+		glClearDepth(1.0f);
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LEQUAL);
+		glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+
+		Window_InitOpenGL_Ext();
+	}
+}
+
+instant bool
+Window_AdjustScale(
+	Window *window,
+	bool zooming = true
+) {
+	Assert(window);
+
+	RECT rctWindow;
+	GetClientRect(window->hWnd, &rctWindow);
+	s32 new_width  = rctWindow.right  - rctWindow.left;
+	s32 new_height = rctWindow.bottom - rctWindow.top;
+
+	float x = 0.f;
+	float y = 0.f;
+
+	if (!zooming) {
+		bool result = window->width != new_width OR window->height != new_height;
+
+		glViewport(x, y, new_width, new_height);
+		window->scale_x = 1.0f;
+		window->scale_y = 1.0f;
+		window->width = new_width;
+		window->height = new_height;
+
+		return result;
+	}
+
+	Rect_GetAspect(
+		window->width,
+		window->height,
+		&new_width,
+		&new_height,
+		&x,
+		&y
+	);
+
+    window->x_viewport = x;
+    window->y_viewport = y;
+
+	float prev_scale_x = window->scale_x;
+	float prev_scale_y = window->scale_y;
+
+	if (window->width > new_width)
+		window->scale_x = (float)new_width / window->width;
+	else
+		window->scale_x = (float)window->width / new_width;
 
 
+	if (window->height > new_height)
+		window->scale_y = (float)new_height / window->height;
+	else
+		window->scale_y = (float)window->height / new_height;
 
+	glViewport(x, y, new_width, new_height);
 
+    if (prev_scale_x != window->scale_x) return true;
+    if (prev_scale_y != window->scale_y) return true;
 
+    return false;
+}
+
+instant void
+Window_Show(
+	Window *window,
+	int nCmdShow = 10
+) {
+	Assert(window);
+
+	ShowWindow(window->hWnd, nCmdShow);
+
+	SetForegroundWindow(window->hWnd);
+	SetFocus(window->hWnd);
+
+	Window_AdjustScale(window);
+}
+
+instant void
+Window_Update(
+	Window *window
+) {
+	Assert(window);
+
+	SwapBuffers(window->hDC);
+}
+
+instant void
+Window_Clear(
+	float r = 0.f,
+	float g = 0.f,
+	float b = 0.f,
+	float a = 0.f
+) {
+	glClearColor(r, g, b, a);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	glColor4f(1.f, 1.f, 1.f, 1.f);
+}
