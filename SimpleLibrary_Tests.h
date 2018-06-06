@@ -210,6 +210,19 @@ Test_Arrays(
 	}
 
 	{
+		Array<String> as_data;
+		String s_data;
+		String_Append(&s_data, "demo");
+		Array_Add(&as_data, s_data);
+		AssertMessage(as_data.limit == 8, "Data size missmatch.");
+		/// Will result in 1 (existing) + 3 (new empty) slots
+		Array_Reserve(&as_data, 3);
+		AssertMessage(as_data.limit == 32 AND as_data.count == 1, "Array reservation failed.");
+		String_Destroy(&s_data);
+		Array_Destroy(&as_data);
+	}
+
+	{
 		String s_split;
 		String_Append(&s_split, "aaa\nbbb");
 

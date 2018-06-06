@@ -1071,7 +1071,7 @@ Array_AddEmpty(
 	return Array_Add(array, element);
 }
 
-///@Info: does NOT take ownership and clears/destroys
+///@Info: does NOT have ownership and clears/destroys
 ///       dynamic data inside structs and such.
 ///       the same thing applies for inserting data
 ///       into empty array slots (created with addempty)
@@ -1096,6 +1096,31 @@ Array_Destroy(
 ) {
 	Memory_Free(array->memory);
 	*array = {};
+}
+
+/// Will add memory slots on top of existing ones and add to that count
+template <typename T>
+instant void
+Array_Reserve(
+	Array<T> *array,
+	u64 count,
+	bool clear_zero = false
+) {
+	Assert(array);
+
+	if (array->size + sizeof(T) * count > array->limit) {
+//		if (clear_zero) {
+//			Memory_Set(array->memory + array->limit, 0, sizeof(T) * count);
+//		}
+
+		array->limit += sizeof(T) * count;
+		array->memory = (T *)_Memory_Resize(array->memory, array->limit);
+	}
+
+	if (clear_zero) {
+		Memory_Set(array->memory, 0, array->limit);
+		array->count = 0;
+	}
 }
 
 template <typename T>
@@ -1184,36 +1209,21 @@ Array_Sort_Quick_Ascending(
 
     T *pivot = begin;
     T *next  = begin;
+	++next;
 
-#if 1
-    while(++next <= end) {
+	while(next <= end) {
 		if (*next < *pivot) {
 			Swap(next, pivot);
 
 			/// next will be past pivot in next loop
+			/// pivot will follow next, but never catches up
 			if (pivot < next) {
                 ++pivot;
-                --next;
+                continue;
 			}
 		}
+		++next;
     }
-#else
-	++next;
-    while(next <= end) {
-		if (*next < *pivot) {
-			Swap(next, pivot);
-			++next;
-
-			if (pivot < next) {
-                ++pivot;
-                --next;
-			}
-		}
-		else {
-			++next;
-		}
-    }
-#endif
 
     if (begin < pivot)  Array_Sort_Quick_Ascending(begin    , pivot - 1);
 	if (end   > pivot)  Array_Sort_Quick_Ascending(pivot + 1, end      );
@@ -1233,36 +1243,21 @@ Array_Sort_Quick_Descending(
 
     T *pivot = begin;
     T *next  = begin;
+	++next;
 
-#if 1
-    while(++next <= end) {
+	while(next <= end) {
 		if (*next > *pivot) {
 			Swap(next, pivot);
 
 			/// next will be past pivot in next loop
+			/// pivot will follow next, but never catches up
 			if (pivot < next) {
                 ++pivot;
-                --next;
+                continue;
 			}
 		}
+		++next;
     }
-#else
-	++next;
-    while(next <= end) {
-		if (*next > *pivot) {
-			Swap(next, pivot);
-			++next;
-
-			if (pivot < next) {
-                ++pivot;
-                --next;
-			}
-		}
-		else {
-			++next;
-		}
-    }
-#endif
 
     if (begin < pivot)  Array_Sort_Quick_Descending(begin    , pivot - 1);
 	if (end   > pivot)  Array_Sort_Quick_Descending(pivot + 1, end      );
