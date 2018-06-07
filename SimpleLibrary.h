@@ -21,6 +21,9 @@
 ///    as_ -> Array<String> ...
 ///     t_ -> temporary local variable (which might overlap in name with
 ///           a parameter) and will not be used as return value
+///
+/// Return types: if a function returns a struct, it's memory needs to
+///               be free'd to prevent memory leaks
 
 /// Usage: Window Event Handler
 /// ===========================================================================
@@ -53,10 +56,13 @@
 //Window_HandleEvents(Window *window) {
 //	MSG msg;
 //	bool running = true;
-//	bool ui_zoom_enabled = false;
+//	bool ui_zoom_enabled = true;
 //
-//	Timer timer_fps     = Time_Reset();
-//	Timer timer_fps_log = Time_Reset();
+//	Timer timer_fps;
+//	Time_Reset(&timer_fps);
+//
+//	Timer timer_fps_log;
+//	Time_Reset(&timer_fps_log);
 //
 //	String s_file_image;
 //	String_Append(&s_file_image, "32_bit_(rgba)_bitmap.bmp");
@@ -68,15 +74,15 @@
 //
 //	String_Destroy(&s_file_image);
 //
-//    Texture texture_link;
-//    Texture_Load(&texture_link, image.data, image.width, image.height, false, false);
-//    Image_Destroy(&image);
+//	Texture texture;
+//	Texture_Load(&texture, image.data, image.width, image.height, false, false);
+//	Image_Destroy(&image);
 //
 //	ShaderSet shader_set;
 //	ShaderSet_Load(&shader_set, &shader_texture, window);
 //
 //	Vertex vertex;
-//	Vertex_Create(&shader_set, &vertex, &texture_link, {});
+//	Vertex_Create(&shader_set, &vertex, &texture, {});
 //
 //	while(running) {
 //		msg = {};
@@ -107,6 +113,12 @@
 //}
 //
 //int main() {
+//	Test_Strings();
+//	Test_Arrays();
+//	Test_Files();
+//
+//	Test_Windows();
+//
 //	Window window;
 //	Window_Create(&window, "Hello, World!", 800, 480);
 //	Window_Show(&window);
@@ -293,15 +305,17 @@ struct Memory_Header {
 	u32 sig;
 };
 
-instant Memory_Header
+instant void
 Memory_GetHeader(
+	Memory_Header *header,
 	void *mem
 ) {
+	Assert(header);
 	Assert(mem);
 
 	mem = (char *)mem - sizeof(Memory_Header);
 
-	return (*(Memory_Header *)mem);
+	*header = (*(Memory_Header *)mem);
 }
 
 instant void *
@@ -324,7 +338,9 @@ _Memory_Resize(
 ) {
 	if (!mem)  return _Memory_Alloc_Empty(size);
 
-	Memory_Header mem_header = Memory_GetHeader(mem);
+	Memory_Header mem_header;
+	Memory_GetHeader(&mem_header, mem);
+
 	if (mem_header.sig != MEMORY_SIGNATURE) {
 		return _Memory_Alloc_Empty(size);
 	}
@@ -345,7 +361,8 @@ Memory_Free(
 ) {
 	if (data == 0)  return;
 
-	Memory_Header mem_header = Memory_GetHeader(data);
+	Memory_Header mem_header;
+	Memory_GetHeader(&mem_header, data);
 
 	if (mem_header.sig == MEMORY_SIGNATURE) {
 		void *mem = (char *)data - sizeof(Memory_Header);
@@ -381,21 +398,19 @@ Memory_Copy(
     }
 }
 
-instant void *
+instant void
 Memory_Set(
 	void *dest,
 	int data,
 	u64 length
 ) {
-	if (dest == 0) return 0;
+	if (dest == 0) return;
 
 	u8 *cDest = (u8*)dest;
 	u8  cData = data;
 
 	while (length-- > 0)
 		*cDest++ = cData;
-
-	return dest;
 }
 
 /// ::: Time
@@ -422,15 +437,6 @@ Time_Reset(
 
 	timer->hi_timer = largeCounter.QuadPart;
 	timer->counter = 0;
-}
-
-instant Timer
-Time_Reset() {
-	Timer result;
-
-	Time_Reset(&result);
-
-	return result;
 }
 
 instant u32
@@ -1216,7 +1222,7 @@ struct Array {
 ///       to a pointer (clone) or don't free the
 ///       passed / connected data
 template <typename T>
-instant T *
+instant void
 Array_Add(
 	Array<T> *array,
 	T element
@@ -1236,19 +1242,20 @@ Array_Add(
 	array->size += sizeof(T) * length;
 
 	++array->count;
-
-	return &ARRAY_IT(*array, target);
 }
 
 template <typename T>
-instant T *
+instant void
 Array_AddEmpty(
-	Array<T> *array
+	Array<T> *array,
+	T **element_empty
 ) {
 	Assert(array);
+	Assert(element_empty);
 
-	T element = {};
-	return Array_Add(array, element);
+	T t_element_empty = {};
+	Array_Add(array, t_element_empty);
+	*element_empty = &ARRAY_IT(*array, array->count - 1);
 }
 
 ///@Info: does NOT have ownership and clears/destroys
@@ -1518,24 +1525,24 @@ struct CPU_Features {
 	bool _3dnow_ext;
 };
 
-instant CPU_ID
+instant void
 CPU_GetID(
-	u32 id
+	u32 id,
+	CPU_ID *cpu_id
 ) {
-	CPU_ID cpu_regs;
+	Assert(cpu_id);
 
 	asm volatile
 		("cpuid" :
-		 "=a" (cpu_regs.EAX), "=b" (cpu_regs.EBX),
-		 "=c" (cpu_regs.ECX), "=d" (cpu_regs.EDX)
+		 "=a" (cpu_id->EAX), "=b" (cpu_id->EBX),
+		 "=c" (cpu_id->ECX), "=d" (cpu_id->EDX)
 		: "a" (id), "c" (0));
-
-	return cpu_regs;
 }
 
 instant char *
 CPU_GetVendor() {
-	CPU_ID cpu_id = CPU_GetID(0);
+	CPU_ID cpu_id;
+	CPU_GetID(0, &cpu_id);
 
 	char *vendor = Memory_Create(char, 13);
 	String_Copy(vendor + 0, (char*)&cpu_id.EBX, 4);
@@ -1547,7 +1554,9 @@ CPU_GetVendor() {
 
 instant CPU_Type
 CPU_GetInfo() {
-	CPU_ID   cpu_id = CPU_GetID(1);
+	CPU_ID cpu_id;
+	CPU_GetID(1, &cpu_id);
+
 	CPU_Type cpu_type = {0};
 
 	cpu_type.stepping    = (cpu_id.EAX >>  0) & 0xF;
@@ -1567,7 +1576,9 @@ CPU_GetFeatures() {
 	bool is_Intel 	= String_IsEqual(vendor_name, "GenuineIntel");
 	bool is_AMD 	= String_IsEqual(vendor_name, "AuthenticAMD");
 
-	CPU_ID       cpu_id = CPU_GetID(1);
+	CPU_ID cpu_id;
+	CPU_GetID(1, &cpu_id);
+
 	CPU_Features cpu_features = {0};
 
 	if (is_Intel OR is_AMD) {
@@ -1682,16 +1693,7 @@ File_Exists(
 
 	bool result = File_Exists(&ts_filename);
 
-//	char *c_search_file = String_CreateCBufferCopy(&ts_filename);
-
 	String_Destroy(&ts_filename);
-
-//	bool result = false;
-//
-//	if (FindFirstFile(c_search_file, &file_data) != INVALID_HANDLE_VALUE)
-//		result = true;
-//
-//	Memory_Free(c_search_file);
 
 	return result;
 }

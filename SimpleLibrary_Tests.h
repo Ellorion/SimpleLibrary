@@ -169,7 +169,7 @@ Test_Arrays(
 		Array<String> as_test;
 		String *s_item = 0;
 
-		s_item = Array_AddEmpty(&as_test);
+		Array_AddEmpty(&as_test, &s_item);
 		String_Append(s_item, "bla");
 
 		FOR_ARRAY(as_test, it) {
@@ -177,7 +177,7 @@ Test_Arrays(
 			AssertMessage(String_IsEqual(&s_data_it, "bla"), "Array_AddEmpty failed.");
 		}
 
-		s_item = Array_AddEmpty(&as_test);
+		Array_AddEmpty(&as_test, &s_item);
 		String_Append(s_item, "blub");
 
 		u64 index_found = 0;
