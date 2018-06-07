@@ -13,7 +13,14 @@
 ///		-Wno-unused-but-set-variable
 ///		-Wno-comment
 ///		-Wno-unused-variable
-
+///
+/// Convention:
+/// 	a_ -> Array
+///     s_ -> String
+///     c_ -> C-String (when String with the same name might also be used)
+///    as_ -> Array<String> ...
+///     t_ -> temporary local variable (which might overlap in name with
+///           a parameter) and will not be used as return value
 
 /// Usage: Window Event Handler
 /// ===========================================================================
@@ -37,6 +44,81 @@
 //
 //		Window_Update(window);
 //	}
+//}
+/// ===========================================================================
+
+/// Example: display a texture
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(Window *window) {
+//	MSG msg;
+//	bool running = true;
+//	bool ui_zoom_enabled = false;
+//
+//	Timer timer_fps     = Time_Reset();
+//	Timer timer_fps_log = Time_Reset();
+//
+//	String s_file_image;
+//	String_Append(&s_file_image, "32_bit_(rgba)_bitmap.bmp");
+//
+//	Image image;
+//	if (!Image_LoadBMP32(&image, &s_file_image)) {
+//		AssertMessage(0, "Image not found or failed to load.");
+//	}
+//
+//	String_Destroy(&s_file_image);
+//
+//    Texture texture_link;
+//    Texture_Load(&texture_link, image.data, image.width, image.height, false, false);
+//    Image_Destroy(&image);
+//
+//	ShaderSet shader_set;
+//	ShaderSet_Load(&shader_set, &shader_texture, window);
+//
+//	Vertex vertex;
+//	Vertex_Create(&shader_set, &vertex, &texture_link, {});
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		Vertex_Render(&shader_set, &vertex);
+//
+//		u32 fps = Time_GetFPS(&timer_fps);
+//
+//		if (Time_HasElapsed(&timer_fps_log, 1000)) {
+//			LOG_DEBUG(fps << " fps");
+//		}
+//
+//		Window_Update(window);
+//	}
+//
+//	/// will destroy the linked texture
+//	Vertex_Destroy(&vertex);
+//	ShaderSet_Destroy(&shader_set);
+//}
+//
+//int main() {
+//	Window window;
+//	Window_Create(&window, "Hello, World!", 800, 480);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//    return 0;
 //}
 /// ===========================================================================
 
@@ -125,6 +207,20 @@ _AssertMessage(
 
 #define SetIfValid(_element)	\
 	if (&(_element)) (_element)
+
+struct Rect {
+	float x;
+	float y;
+	s32 w;
+	s32 h;
+};
+
+struct RectF {
+	float x;
+	float y;
+	float w;
+	float h;
+};
 
 template <typename T>
 instant void
@@ -345,18 +441,18 @@ Time_Get() {
 instant bool
 Time_HasElapsed(
 	Timer *timer,
-	u32 intervalMS,
-	bool resetElapsed = true
+	u32 interval_in_ms,
+	bool reset_elapsed = true
 ) {
 	Assert(timer);
 
 	bool result = true;
 
-	if (Time_Get() - timer->lo_timer < intervalMS)
+	if (Time_Get() - timer->lo_timer < interval_in_ms)
 		result = false;
 	else {
 		/// update timer when time has passed
-		if (resetElapsed)
+		if (reset_elapsed)
 			timer->lo_timer = Time_Get();
 	}
 
@@ -394,10 +490,11 @@ Time_Measure(
 	return diff;
 }
 
+/// has to be used every frame or the calculation will be wrong
 instant u32
 Time_GetFPS(
 	Timer *timer,
-	bool getWorst = false
+	bool get_worst = false
 ) {
 	if (!timer)
 		return 0;
@@ -418,7 +515,7 @@ Time_GetFPS(
 		timer->lo_timer = Time_Get();
 	}
 
-	return (getWorst ? timer->fps_worst : timer->fps);
+	return (get_worst ? timer->fps_worst : timer->fps);
 }
 
 /// Reach the end (from the start) in the timespan of the duration
@@ -426,14 +523,14 @@ Time_GetFPS(
 instant float
 Time_Move(
 	Timer *timer,
-	u32 timespanMS,
+	u32 timespan_in_ms,
 	float distance
 ) {
 	Assert(timer);
 
-	if (!timespanMS)  return 0.0f;
+	if (!timespan_in_ms)  return 0.0f;
 
-	double step_size = Time_Measure(timer) / timespanMS;
+	double step_size = Time_Measure(timer) / timespan_in_ms;
 	return distance * step_size;
 }
 
@@ -443,8 +540,8 @@ Time_Move(
 #define String_Split Array_Split
 
 struct String {
-	u64  length = 0;
-	char *value = 0;
+	u64   length = 0;
+	char *value  = 0;
 };
 
 /// does NOT support UTF-8
@@ -898,13 +995,12 @@ String_Reverse(
 	}
 }
 
-instant u64
+instant void
 String_TrimLeft(
 	String *s_data,
 	bool move_pointer = true
 ) {
-	if (!s_data)
-		return 0;
+	Assert(s_data);
 
 	u64 length = 0;
 	u64 len_max = s_data->length;
@@ -919,16 +1015,13 @@ String_TrimLeft(
 		s_data->value  += length;
 		s_data->length -= length;
     }
-
-    return length;
 }
 
 instant void
 String_TrimRight(
 	String *s_data
 ) {
-	if (!s_data OR !s_data->length)
-		return;
+	Assert(s_data);
 
 	u64 length = s_data->length - 1;
 
@@ -971,7 +1064,7 @@ instant void
 String_Clear(
 	String *s_data
 ) {
-	if (!s_data)  return;
+	Assert(s_data);
 
 	s_data->length = 0;
 }
@@ -1116,10 +1209,12 @@ struct Array {
 	u64   count    = 0;
 };
 
-///@Info: will copy the elements memory pointers (inside a struct)
-///       so make sure you make a new memory location
-///       in case the array is supposed to handle the data
-///       or the pointers might end up becoming invalid later (cloning)
+///@Info: will copy the struct element pointers only
+///
+///       if the array should take ownership of all data
+///       make sure you copy every data that is connected
+///       to a pointer (clone) or don't free the
+///       passed / connected data
 template <typename T>
 instant T *
 Array_Add(
@@ -1150,6 +1245,8 @@ instant T *
 Array_AddEmpty(
 	Array<T> *array
 ) {
+	Assert(array);
+
 	T element = {};
 	return Array_Add(array, element);
 }
@@ -1159,6 +1256,8 @@ Array_AddEmpty(
 ///       the same thing applies for inserting data
 ///       into empty array slots (created with addempty)
 ///       into dynamic pointers inside a struct element
+///    -> non-generic overlap functions might exist that
+///       do that
 template<typename T>
 instant void
 Array_Clear(
@@ -1177,6 +1276,8 @@ Array_Destroy(
 	Array<T> *array,
 	bool use_generic = false
 ) {
+	Assert(array);
+
 	Memory_Free(array->memory);
 	*array = {};
 }
@@ -1186,19 +1287,21 @@ template <typename T>
 instant void
 Array_Reserve(
 	Array<T> *array,
-	u64 count,
+	u64 count_delta,
 	bool clear_zero = false
 ) {
 	Assert(array);
 
-	if (array->size + sizeof(T) * count > array->limit) {
-		array->limit += sizeof(T) * count;
+	u64 old_limit = array->limit;
+
+	if (array->size + sizeof(T) * count_delta > array->limit) {
+		array->limit += sizeof(T) * count_delta;
 		array->memory = (T *)_Memory_Resize(array->memory, array->limit);
 	}
 
 	if (clear_zero) {
-		Memory_Set(array->memory, 0, array->limit);
-		array->count = 0;
+		/// only clear new reserved data
+		Memory_Set(array->memory + array->count, 0, array->limit - old_limit);
 	}
 }
 
@@ -1209,6 +1312,8 @@ Array_Find(
 	T find,
 	u64 *index = 0
 ) {
+	Assert(array);
+
 	FOR_ARRAY(*array, it) {
 		if (ARRAY_IT(*array, it) == find) {
 			SetIfValid(*index) = it;
@@ -1265,6 +1370,8 @@ Array_Split(
 	const char *delimiter,
 	bool exclude_delim = true
 ) {
+	Assert(s_data);
+
 	Array<String> as_result;
 
 	String s_data_it = *s_data;
@@ -1540,6 +1647,26 @@ File_HasExtension(
 
 instant bool
 File_Exists(
+	String *s_pathfile
+) {
+	Assert(s_pathfile);
+
+	WIN32_FIND_DATA file_data;
+
+	char *c_search_file = String_CreateCBufferCopy(s_pathfile);
+
+	bool result = false;
+
+	if (FindFirstFile(c_search_file, &file_data) != INVALID_HANDLE_VALUE)
+		result = true;
+
+	Memory_Free(c_search_file);
+
+	return result;
+}
+
+instant bool
+File_Exists(
 	String *s_path,
 	String *s_filename
 ) {
@@ -1553,16 +1680,18 @@ File_Exists(
 	String_Append(&ts_filename, "/", 1);
 	String_Append(&ts_filename, s_filename->value, s_filename->length);
 
-	char *c_search_file = String_CreateCBufferCopy(&ts_filename);
+	bool result = File_Exists(&ts_filename);
+
+//	char *c_search_file = String_CreateCBufferCopy(&ts_filename);
 
 	String_Destroy(&ts_filename);
 
-	bool result = false;
-
-	if (FindFirstFile(c_search_file, &file_data) != INVALID_HANDLE_VALUE)
-		result = true;
-
-	Memory_Free(c_search_file);
+//	bool result = false;
+//
+//	if (FindFirstFile(c_search_file, &file_data) != INVALID_HANDLE_VALUE)
+//		result = true;
+//
+//	Memory_Free(c_search_file);
 
 	return result;
 }
@@ -1897,11 +2026,6 @@ Window_Destroy(
 		ChangeDisplaySettings(0, 0);
 	}
 
-	if (window->hRC) {
-		wglMakeCurrent(0, 0);
-		wglDeleteContext(window->hRC);
-	}
-
 	if (Window_IsCreated(window)) {
 		if (window->hDC)
 			ReleaseDC(window->hWnd, window->hDC);
@@ -2031,95 +2155,7 @@ Window_Create(
 	return true;
 }
 
-instant void
-Window_InitOpenGL(
-	Window *window
-) {
-	if (!window)
-		return;
-
-	if (window->hDC) {
-		window->hRC = wglCreateContext(window->hDC);
-		wglMakeCurrent(window->hDC, window->hRC);
-
-		glShadeModel(GL_SMOOTH);
-		glClearColor(0.0f, 0.0f, 0.0f, 0.5f);
-		glClearDepth(1.0f);
-		glEnable(GL_DEPTH_TEST);
-		glDepthFunc(GL_LEQUAL);
-		glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-
-		Window_InitOpenGL_Ext();
-
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		glEnable(GL_POINT_SMOOTH);
-		glEnable(GL_LINE_SMOOTH);
-		glEnable(GL_POLYGON_SMOOTH);
-	}
-}
-
-instant bool
-Window_AdjustScale(
-	Window *window,
-	bool zooming = true
-) {
-	Assert(window);
-
-	RECT rctWindow;
-	GetClientRect(window->hWnd, &rctWindow);
-	s32 new_width  = rctWindow.right  - rctWindow.left;
-	s32 new_height = rctWindow.bottom - rctWindow.top;
-
-	float x = 0.f;
-	float y = 0.f;
-
-	if (!zooming) {
-		bool result = window->width != new_width OR window->height != new_height;
-
-		glViewport(x, y, new_width, new_height);
-		window->scale_x = 1.0f;
-		window->scale_y = 1.0f;
-		window->width = new_width;
-		window->height = new_height;
-
-		return result;
-	}
-
-	Rect_GetAspect(
-		window->width,
-		window->height,
-		&new_width,
-		&new_height,
-		&x,
-		&y
-	);
-
-    window->x_viewport = x;
-    window->y_viewport = y;
-
-	float prev_scale_x = window->scale_x;
-	float prev_scale_y = window->scale_y;
-
-	if (window->width > new_width)
-		window->scale_x = (float)new_width / window->width;
-	else
-		window->scale_x = (float)window->width / new_width;
-
-
-	if (window->height > new_height)
-		window->scale_y = (float)new_height / window->height;
-	else
-		window->scale_y = (float)window->height / new_height;
-
-	glViewport(x, y, new_width, new_height);
-
-    if (prev_scale_x != window->scale_x) return true;
-    if (prev_scale_y != window->scale_y) return true;
-
-    return false;
-}
-
+/// nCmdShow = 10 => Normal window size (not min/max)
 instant void
 Window_Show(
 	Window *window,
@@ -2131,8 +2167,6 @@ Window_Show(
 
 	SetForegroundWindow(window->hWnd);
 	SetFocus(window->hWnd);
-
-	Window_AdjustScale(window);
 }
 
 instant void
@@ -2142,21 +2176,6 @@ Window_Update(
 	Assert(window);
 
 	SwapBuffers(window->hDC);
-}
-
-instant void
-Window_Clear(
-	float r = 0.f,
-	float g = 0.f,
-	float b = 0.f,
-	float a = 0.f
-) {
-	glClearColor(r, g, b, a);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	glColor4f(1.f, 1.f, 1.f, 1.f);
 }
 
 instant void
@@ -2226,21 +2245,21 @@ Window_SetSize(
 	if (window->isFullscreen)
 		Window_ToggleFullscreen(window);
 
-	RECT rc = {};
+	RECT rect = {};
 	DWORD dwStyle   = (DWORD)GetWindowLong(window->hWnd, GWL_STYLE);
 	DWORD dwExStyle = (DWORD)GetWindowLong(window->hWnd, GWL_EXSTYLE);
 
-	bool success = AdjustWindowRectEx(&rc, dwStyle, 0, dwExStyle);
+	bool success = AdjustWindowRectEx(&rect, dwStyle, 0, dwExStyle);
 
 	if (success) {
-		width  += (rc.right  - rc.left);
-		height += (rc.bottom - rc.top);
+		width  += (rect.right  - rect.left);
+		height += (rect.bottom - rect.top);
 
-		rc = {};
-		GetWindowRect(window->hWnd, &rc);
+		rect = {};
+		GetWindowRect(window->hWnd, &rect);
 
-		s32 x = rc.left + (rc.right  - rc.left - width)  / 2;
-		s32 y = rc.top  + (rc.bottom - rc.top  - height) / 2;
+		s32 x = rect.left + (rect.right  - rect.left - width)  / 2;
+		s32 y = rect.top  + (rect.bottom - rect.top  - height) / 2;
 
 		SetWindowPos(window->hWnd, HWND_TOP, x, y, width, height, 0);
 	}
@@ -2262,6 +2281,46 @@ Window_SetTitle(
 /// ::: OpenGL
 /// ===========================================================================
 instant void
+OpenGL_Init(
+	Window *window
+) {
+	Assert(window);
+
+	if (window->hDC) {
+		window->hRC = wglCreateContext(window->hDC);
+		wglMakeCurrent(window->hDC, window->hRC);
+
+		glShadeModel(GL_SMOOTH);
+		glClearColor(0.0f, 0.0f, 0.0f, 0.5f);
+		glClearDepth(1.0f);
+		glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LEQUAL);
+		glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+
+		Window_InitOpenGL_Ext();
+
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		glEnable(GL_POINT_SMOOTH);
+		glEnable(GL_LINE_SMOOTH);
+		glEnable(GL_POLYGON_SMOOTH);
+	}
+}
+
+/// call before Window_Destroy
+instant void
+OpenGL_Destroy(
+	Window *window
+) {
+	Assert(window);
+
+	if (window->hRC) {
+		wglMakeCurrent(0, 0);
+		wglDeleteContext(window->hRC);
+	}
+}
+
+instant void
 OpenGL_SetVSync(
 	Window *window,
 	bool enable
@@ -2278,3 +2337,876 @@ OpenGL_SetVSync(
 							: "disabled."));
 }
 
+instant void
+OpenGL_ClearScreen(
+	float r = 0.f,
+	float g = 0.f,
+	float b = 0.f,
+	float a = 0.f
+) {
+	glClearColor(r, g, b, a);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	glColor4f(1.f, 1.f, 1.f, 1.f);
+}
+
+/// keeps aspect ratio by changing the viewport,
+/// or ignores aspect ratio and sets the viewport
+/// to the current window size
+instant bool
+OpenGL_AdjustScaleViewport(
+	Window *window,
+	bool zooming = true
+) {
+	Assert(window);
+
+	RECT rctWindow;
+	GetClientRect(window->hWnd, &rctWindow);
+	s32 new_width  = rctWindow.right  - rctWindow.left;
+	s32 new_height = rctWindow.bottom - rctWindow.top;
+
+	float x = 0.f;
+	float y = 0.f;
+
+	if (!zooming) {
+		bool result =    window->width  != new_width
+		              OR window->height != new_height;
+
+		glViewport(x, y, new_width, new_height);
+		window->scale_x = 1.0f;
+		window->scale_y = 1.0f;
+		window->width = new_width;
+		window->height = new_height;
+
+		return result;
+	}
+
+	Rect_GetAspect(
+		window->width,
+		window->height,
+		&new_width,
+		&new_height,
+		&x,
+		&y
+	);
+
+    window->x_viewport = x;
+    window->y_viewport = y;
+
+	float prev_scale_x = window->scale_x;
+	float prev_scale_y = window->scale_y;
+
+	if (window->width > new_width)
+		window->scale_x = (float)new_width / window->width;
+	else
+		window->scale_x = (float)window->width / new_width;
+
+
+	if (window->height > new_height)
+		window->scale_y = (float)new_height / window->height;
+	else
+		window->scale_y = (float)window->height / new_height;
+
+	glViewport(x, y, new_width, new_height);
+
+    if (prev_scale_x != window->scale_x) return true;
+    if (prev_scale_y != window->scale_y) return true;
+
+    return false;
+}
+
+instant s32
+OpenGL_GetTextureSizeMax() {
+	s32 max = 0;
+	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max);
+	return max;
+}
+
+instant void
+OpenGL_Scissor(
+	Window *window,
+	float x,
+	float y,
+	s32 w,
+	s32 h
+) {
+	Assert(window);
+
+	/// convert to right-hand coordinate system
+	float t_x = x / window->scale_x + window->x_viewport;
+	float t_y = (window->height - y - h) / window->scale_y + window->y_viewport;
+	s32   t_w = w / window->scale_x;
+	s32   t_h = h / window->scale_y;
+
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(t_x, t_y, t_w, t_h);
+}
+
+instant void
+OpenGL_Scissor_Disable() {
+	glDisable(GL_SCISSOR_TEST);
+}
+
+
+/// ::: Image
+/// ===========================================================================
+struct Image {
+	s32   width  = 0;
+	s32   height = 0;
+	u32   bits   = 0;
+	u8   *data   = 0;
+};
+
+/// 32-bit BMP only!
+instant bool
+Image_LoadBMP32(
+	Image  *image,
+	String *s_filename
+) {
+	Assert(image);
+	Assert(!image->data);
+	Assert(s_filename);
+
+	bool result = false;
+
+	*image = {};
+
+	if (!File_Exists(s_filename)) {
+		return result;
+	}
+
+	File file;
+	File_Open(&file, s_filename, "rb");
+
+	String s_data;
+	File_Read(&s_data, &file);
+
+	File_Close(&file);
+
+    String s_data_it = s_data;
+
+    if (String_StartWith(&s_data_it, "BM")) {
+		BITMAPFILEHEADER *bmp_header = (BITMAPFILEHEADER *)s_data_it.value;
+		s_data_it.value  += sizeof(BITMAPFILEHEADER);
+		s_data_it.length -= sizeof(BITMAPFILEHEADER);
+		BITMAPINFOHEADER *bmp_info = (BITMAPINFOHEADER *)s_data_it.value;
+
+		///@Info: make sure you free the memory after usage!
+		image->data   = Memory_Create(u8, bmp_info->biSizeImage);
+		image->width  = bmp_info->biWidth;
+		image->height = bmp_info->biHeight;
+		image->bits   = bmp_info->biBitCount / 8;
+
+		s_data_it = s_data;
+		s_data_it.value  += bmp_header->bfOffBits;
+		s_data_it.length -= bmp_header->bfOffBits;
+		Memory_Copy(image->data, s_data_it.value, bmp_info->biSizeImage);
+
+		result = true;
+	}
+
+	String_Destroy(&s_data);
+
+	return result;
+}
+
+instant void
+Image_Destroy(
+	Image *image
+) {
+	Assert(image);
+
+	Memory_Free(image->data);
+}
+
+/// ::: Textures
+/// ===========================================================================
+struct Texture {
+	u32 ID = 0;
+};
+
+instant void
+Texture_GetSizeAndBind(
+	Texture *texture,
+	s32 *width,
+	s32 *height
+) {
+    Assert(texture);
+
+    glBindTexture(GL_TEXTURE_2D, texture->ID);
+    if (width)  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH , width);
+	if (height) glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, height);
+}
+
+instant void
+Texture_Load(
+	Texture *texture,
+	const u8 *data,
+	s32 width,
+	s32 height,
+	bool greyscale = false,
+	bool linearFilter = false
+) {
+	Assert(texture);
+
+	/// check for potential memory leak
+	Assert(texture->ID == 0);
+
+    u32 id_texture;
+
+    glGenTextures(1, &id_texture);
+    glBindTexture(GL_TEXTURE_2D, id_texture);
+
+    if (greyscale) {
+		/// useful for fonts
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glTexImage2D(	GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0,
+						GL_ALPHA, GL_UNSIGNED_BYTE, data);
+    }
+    else {
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glTexImage2D(	GL_TEXTURE_2D, 0, GL_RGBA , width, height, 0,
+						GL_ABGR_EXT, GL_UNSIGNED_BYTE, data);
+    }
+
+    if (linearFilter) {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    }
+    else {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    }
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRROR_CLAMP_TO_EDGE);
+
+    texture->ID = id_texture;
+}
+
+instant void
+Texture_Destroy(
+	Texture *texture
+) {
+	Assert(texture);
+
+	glDeleteTextures(1, &texture->ID);
+	texture->ID = 0;
+}
+
+instant void
+Texture_Create(
+	Texture *texture,
+	s32 width,
+	s32 height
+) {
+	Texture_Load(texture, 0, width, height);
+}
+
+instant bool
+Texture_IsEqual(
+	Texture data1,
+	Texture data2
+) {
+	return (data1.ID == data2.ID);
+}
+
+/// ::: GLSL
+/// ===========================================================================
+
+struct Shader {
+	const char *code[3];
+};
+
+static const Shader shader_texture = {
+R"(
+	#version 330 core
+
+	uniform vec4 viewport = vec4(0, 0, 800, 480);
+	in vec4 vertex_position;
+
+	float left   = 0.0f;
+	float right  = viewport.z;
+	float top    = 0.0f;
+	float bottom = viewport.w;
+
+    mat4 proj_matrix = mat4(
+		 2.0f / (right - left), 0                    ,  0,  0,
+		 0                    , 2.0f / (top - bottom),  0,  0,
+		 0                    , 0                    ,  1,  0,
+		-(right + left)   / (right - left),
+		-(top   + bottom) / (top   - bottom),
+		 0,
+		 1
+	);
+
+	out Vertex_Data {
+		mat4 proj_matrix;
+	} o_Vertex;
+
+	void main() {
+		gl_Position = vertex_position;
+		o_Vertex.proj_matrix = proj_matrix;
+	}
+)",
+
+R"(
+	#version 330 core
+
+	layout(points) in;
+	layout(triangle_strip, max_vertices = 4) out;
+
+	uniform sampler2D fragment_texture;
+	vec2 size = textureSize(fragment_texture, 0);
+
+	uniform float scale_x = 1.0f;
+	uniform float scale_y = 1.0f;
+	uniform bool  flip_h = false;
+
+	in Vertex_Data {
+		mat4 proj_matrix;
+	} i_Vertex[];
+
+	out Vertex_Data {
+		vec2 tex_coords;
+		vec4 position;
+	} o_Vertex;
+
+	mat4 scale_matrix = mat4(
+		scale_x, 0      , 0, 0,
+		0      , scale_y, 0, 0,
+		0      , 0      , 1, 0,
+		0      , 0      , 0, 1
+	);
+
+	void main() {
+		vec4 point       = gl_in[0].gl_Position;
+		mat4 proj_matrix = i_Vertex[0].proj_matrix;
+
+		mat4 matrix_mod = proj_matrix;
+
+		if (!flip_h) {
+			/// v1
+			gl_Position = matrix_mod * (point + vec4(0     , 0     , 0, 0) * scale_matrix);
+			o_Vertex.tex_coords = vec2(0, 0);
+			EmitVertex();
+
+			/// v3
+			gl_Position = matrix_mod * (point + vec4(size.x, 0     , 0, 0) * scale_matrix);
+			o_Vertex.tex_coords = vec2(1, 0);
+			EmitVertex();
+
+			/// v2
+			gl_Position = matrix_mod * (point + vec4(0     , size.y, 0, 0) * scale_matrix);
+			o_Vertex.tex_coords = vec2(0, 1);
+			EmitVertex();
+
+			/// v4
+			gl_Position = matrix_mod * (point + vec4(size.x, size.y, 0, 0) * scale_matrix);
+			o_Vertex.tex_coords = vec2(1, 1);
+			EmitVertex();
+		}
+
+		if (flip_h) {
+			/// v1
+			gl_Position = matrix_mod * (point + vec4(0     , 0     , 0, 0) * scale_matrix);
+			o_Vertex.tex_coords = vec2(0, 1);
+			EmitVertex();
+
+			/// v3
+			gl_Position = matrix_mod * (point + vec4(size.x, 0     , 0, 0) * scale_matrix);
+			o_Vertex.tex_coords = vec2(1, 1);
+			EmitVertex();
+
+			/// v2
+			gl_Position = matrix_mod * (point + vec4(0     , size.y, 0, 0) * scale_matrix);
+			o_Vertex.tex_coords = vec2(0, 0);
+			EmitVertex();
+
+			/// v4
+			gl_Position = matrix_mod * (point + vec4(size.x, size.y, 0, 0) * scale_matrix);
+			o_Vertex.tex_coords = vec2(1, 0);
+			EmitVertex();
+		}
+
+		EndPrimitive();
+	}
+)",
+
+R"(
+	#version 330 core
+
+	uniform sampler2D fragment_texture;
+
+	in Vertex_Data {
+		vec2 tex_coords;
+	} i_Vertex;
+
+	void main() {
+		gl_FragColor = texture2D(fragment_texture, i_Vertex.tex_coords);
+	}
+)"};
+
+/// ::: Shader
+/// ===========================================================================
+struct ShaderSet {
+	u32 program_id    = 0;
+	u32 vertex_id     = 0;
+	u32 geometry_id   = 0;
+	u32 fragment_id   = 0;
+	Window *window = 0;
+};
+
+instant void
+ShaderSet_Add(
+	ShaderSet *shader_set,
+	u32 type,
+	const char *code
+) {
+	Assert(shader_set);
+
+    u32 id_shader = glCreateShader(type);
+
+	glShaderSource(id_shader, 1, &code, 0);
+	glCompileShader(id_shader);
+
+	GLint result = GL_FALSE;
+	s32 length_info_log;
+
+	glGetShaderiv(id_shader, GL_COMPILE_STATUS, &result);
+	glGetShaderiv(id_shader, GL_INFO_LOG_LENGTH, &length_info_log);
+
+	if (length_info_log) {
+		/// make space for '\0'
+		char *c_error_msg = Memory_Create(char, length_info_log + 1);
+		glGetShaderInfoLog(id_shader, length_info_log, 0, c_error_msg);
+		LOG_DEBUG(c_error_msg);
+		Memory_Free(c_error_msg);
+	}
+
+	switch (type) {
+		case GL_VERTEX_SHADER:   { shader_set->vertex_id   = id_shader; } break;
+		case GL_GEOMETRY_SHADER: { shader_set->geometry_id = id_shader; } break;
+		case GL_FRAGMENT_SHADER: { shader_set->fragment_id = id_shader; } break;
+		default: {
+			LOG_DEBUG("Unimplemented shader type");
+		}
+	}
+}
+
+inline void
+ShaderSet_Use(
+	ShaderSet *shader_set,
+	const Shader *shader
+) {
+	Assert(shader_set);
+	Assert(shader);
+
+	if (shader->code[0])  ShaderSet_Add(shader_set, GL_VERTEX_SHADER  , shader->code[0]);
+	if (shader->code[1])  ShaderSet_Add(shader_set, GL_GEOMETRY_SHADER, shader->code[1]);
+	if (shader->code[2])  ShaderSet_Add(shader_set, GL_FRAGMENT_SHADER, shader->code[2]);
+
+	if (shader_set->program_id)
+		glDeleteProgram(shader_set->program_id);
+
+	shader_set->program_id = glCreateProgram();
+
+	if (shader->code[0])  glAttachShader(shader_set->program_id, shader_set->vertex_id);
+	if (shader->code[1])  glAttachShader(shader_set->program_id, shader_set->geometry_id);
+	if (shader->code[2])  glAttachShader(shader_set->program_id, shader_set->fragment_id);
+	glLinkProgram(shader_set->program_id);
+
+	GLint result = GL_FALSE;
+	s32 length_info_log;
+	glGetProgramiv(shader_set->program_id, GL_LINK_STATUS, &result);
+	glGetProgramiv(shader_set->program_id, GL_INFO_LOG_LENGTH, &length_info_log);
+
+	if (length_info_log) {
+		/// make space for '\0'
+		char *c_error_msg = Memory_Create(char, length_info_log + 1);
+		glGetProgramInfoLog(shader_set->program_id, length_info_log, 0, c_error_msg);
+		LOG_DEBUG(c_error_msg);
+		Memory_Free(c_error_msg);
+	}
+
+	glDeleteShader(shader_set->vertex_id);
+	glDeleteShader(shader_set->geometry_id);
+	glDeleteShader(shader_set->fragment_id);
+}
+
+inline void
+ShaderSet_Destroy(
+	ShaderSet *shader_set
+) {
+	Assert(shader_set);
+
+    if (shader_set->program_id) {
+		glDeleteProgram(shader_set->program_id);
+		shader_set->program_id = 0;
+    }
+}
+
+inline void
+Shader_SetValue(
+	ShaderSet *shader_set,
+	const char *name,
+	const float buffer
+) {
+	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+
+	if (loc_id >= 0)
+		glProgramUniform1f(shader_set->program_id, loc_id, buffer);
+}
+
+inline void
+Shader_SetValue(
+	ShaderSet   *shader_set,
+	const char  *name,
+	const float *buffer,
+	u32 count
+) {
+	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+
+	if (loc_id >= 0) {
+		switch (count) {
+			case 3: {
+				glProgramUniform3fv(shader_set->program_id, loc_id, 1, buffer);
+			} break;
+
+			case 4: {
+				glProgramUniform4fv(shader_set->program_id, loc_id, 1, buffer);
+			} break;
+
+			default: {
+				Assert(!"Unknown uniform passing parameter count.");
+			} break;
+		}
+	}
+}
+
+inline void
+Shader_SetValue(
+	ShaderSet *shader_set,
+	const char *name,
+	int value
+) {
+	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+
+	if (loc_id >= 0)
+		glProgramUniform1i(shader_set->program_id, loc_id, value);
+}
+
+inline void
+Shader_SetValue(
+	ShaderSet *shader_set,
+	const char *name,
+	int value_a,
+	int value_b
+) {
+	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+
+	if (loc_id >= 0) {
+		glProgramUniform2i(shader_set->program_id, loc_id, value_a, value_b);
+	}
+}
+
+inline void
+Shader_SetValue(
+	ShaderSet *shader_set,
+	const char *name,
+	float value_a,
+	float value_b
+) {
+	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+
+	if (loc_id >= 0) {
+		glProgramUniform2f(shader_set->program_id, loc_id, value_a, value_b);
+	}
+}
+
+inline void
+Shader_BindAndUseIndex0(
+	ShaderSet *shader_set,
+	const char *name,
+	Texture *texture
+) {
+	Assert(shader_set);
+	Assert(name);
+	Assert(texture);
+
+	glBindTexture(GL_TEXTURE_2D, texture->ID);
+	Shader_SetValue(shader_set, name, 0);
+}
+
+inline void
+ShaderSet_Load(
+	ShaderSet *shader_set,
+	const Shader *shader,
+	Window *window = 0
+) {
+	Assert(shader_set);
+
+	if (window)  shader_set->window = window;
+
+	Assert(shader_set->window);
+
+	if (shader_set->program_id)
+		ShaderSet_Destroy(shader_set);
+
+	ShaderSet_Use(shader_set, shader);
+	glUseProgram(shader_set->program_id);
+
+	if (shader_set->window) {
+		RectF viewport = {shader_set->window->x_viewport, shader_set->window->y_viewport, (float)shader_set->window->width, (float)shader_set->window->height};
+		Shader_SetValue(shader_set, "viewport", (float *)&viewport, 4);
+		glDisable(GL_BLEND);
+	}
+}
+
+/// ::: Vertex
+/// ===========================================================================
+template <typename T>
+struct Vertex_Buffer {
+	const char *name;
+	u32 id;
+	const T *data;
+	u32 size;
+	u32 group_count;
+};
+
+struct Vertex_Settings {
+	bool flip = false;
+	float scale_x = 1.0f;
+	float scale_y = 1.0f;
+};
+
+struct Vertex {
+	u32 array_id = 0;
+	Array<Vertex_Buffer<float>> a_attributes;
+	Texture *texture = 0;
+	Vertex_Settings settings;
+};
+
+template <typename T>
+bool
+operator == (
+	Vertex_Buffer<T> &b1,
+	Vertex_Buffer<T> &b2
+) {
+	return String_IsEqual(b1.name, b2.name);
+}
+
+instant void
+Vertex_GetTextureSize(
+	Vertex *vertex,
+	s32 *width,
+	s32 *height
+) {
+	Assert(vertex);
+    Assert(vertex->texture);
+
+    if (width)  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH , width);
+	if (height) glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, height);
+}
+
+instant void
+Vertex_AddAttribute(
+	Vertex *vertex,
+	u32 group_count,
+	const char *name,
+	const float *data,
+	u32 size
+) {
+	Assert(vertex);
+	Assert(vertex->array_id > 0);
+
+	Vertex_Buffer<float> vertex_buffer;
+	glBindVertexArray(vertex->array_id);
+
+	vertex_buffer.name = name;
+	vertex_buffer.group_count = group_count;
+	vertex_buffer.data = data;
+	vertex_buffer.size = size;
+
+	u64 find_it;
+	bool found_entry = Array_Find(&vertex->a_attributes, vertex_buffer, &find_it);
+
+	if (!found_entry) {
+		/// new attribute
+		glGenBuffers(1, &vertex_buffer.id);
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer.id);
+		glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW);
+
+		Array_Add(&vertex->a_attributes, vertex_buffer);
+	}
+	else {
+		/// update opengl attribute data
+		Vertex_Buffer<float> *t_buffer = &ARRAY_IT(vertex->a_attributes, find_it);
+		vertex_buffer.id = t_buffer->id;
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer.id);
+		glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW);
+
+		/// update data in vertex->a_attribute
+		*t_buffer = vertex_buffer;
+	}
+}
+
+inline void
+Vertex_Destroy(
+	Vertex *vertex
+) {
+	Assert(vertex);
+
+	if (!vertex->array_id)  return;
+
+	FOR_ARRAY(vertex->a_attributes, it) {
+		Vertex_Buffer<float> *vertex_buffer = &ARRAY_IT(vertex->a_attributes, it);
+		glDeleteBuffers(1, &vertex_buffer->id);
+	}
+
+	Array_Destroy(&vertex->a_attributes);
+
+	glDeleteVertexArrays(1, &vertex->array_id);
+
+	Texture_Destroy(vertex->texture);
+
+	*vertex = {};
+}
+
+inline void
+Vertex_Create(
+	Vertex *vertex,
+	u8 point_count,
+	const float *vertex_data,
+	u32 vertex_size
+) {
+	Assert(vertex);
+
+	if (!vertex->array_id)
+		glGenVertexArrays(1, &vertex->array_id);
+
+	///@Info: make sure this attribute exists in the shader
+	Vertex_AddAttribute(vertex, point_count, "vertex_position", vertex_data, vertex_size);
+}
+
+inline void
+Vertex_UseTextureIndex(
+	ShaderSet *shader_set,
+	Vertex *vertex,
+	Texture *texture
+) {
+	Assert(shader_set);
+	Assert(vertex);
+	Assert(texture);
+
+	/// use this uniform in a shader, if the texture index has to change
+	Shader_BindAndUseIndex0(shader_set, "fragment_texture", vertex->texture);
+}
+
+inline void
+Vertex_SetTexture(
+	ShaderSet *shader_set,
+	Vertex *vertex,
+	Texture *texture
+) {
+	Assert(shader_set);
+	Assert(vertex);
+	Assert(texture);
+
+	vertex->texture = texture;
+
+	Vertex_UseTextureIndex(shader_set, vertex, texture);
+}
+
+instant void
+Vertex_Load(
+	ShaderSet *shader_set,
+	Vertex *vertex
+) {
+	Assert(shader_set);
+	Assert(vertex);
+	Assert(shader_set->program_id);
+
+	FOR_ARRAY(vertex->a_attributes, it) {
+		Vertex_Buffer<float> *entry = &ARRAY_IT(vertex->a_attributes, it);
+		s32 attrib_position = glGetAttribLocation(shader_set->program_id, entry->name);
+
+		if (attrib_position < 0)
+			continue;
+
+		glEnableVertexAttribArray(attrib_position);
+		glBindBuffer(GL_ARRAY_BUFFER, entry->id);
+		glVertexAttribPointer(
+			attrib_position,
+			entry->group_count,
+			GL_FLOAT,
+			false,
+			0,
+			0
+		);
+	}
+
+	if (vertex->texture) {
+		Vertex_SetTexture(shader_set, vertex, vertex->texture);
+	}
+}
+
+inline void
+Vertex_Render(
+	ShaderSet *shader_set,
+	Vertex *vertex
+) {
+	Assert(shader_set);
+	Assert(vertex);
+	Assert(vertex->a_attributes.count);
+
+	Vertex_Buffer<float> a_vertices = ARRAY_IT(vertex->a_attributes, 0);
+
+	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip);
+	Shader_SetValue(shader_set, "scale_x", vertex->settings.scale_x);
+	Shader_SetValue(shader_set, "scale_y", vertex->settings.scale_y);
+
+	Vertex_Load(shader_set, vertex);
+	glDrawArrays(GL_POINTS, 0,  a_vertices.size / sizeof(GLfloat) / a_vertices.group_count);
+}
+
+instant bool
+Vertex_Create(
+	ShaderSet *shader_set,
+	Vertex *vertex,
+	Texture *texture,
+	Rect rect
+) {
+	Assert(vertex);
+	Assert(texture);
+
+	if (!texture->ID)
+		return false;
+
+	s32 width, height;
+
+	Vertex_SetTexture(shader_set, vertex, texture);
+	Vertex_GetTextureSize(vertex, &width, &height);
+
+	if (!rect.w)  rect.w = width;
+	if (!rect.h)  rect.h = height;
+
+	float x_off = 0, y_off = 0, scale_x, scale_y;
+	Rect_GetAspect(width, height, &rect.w, &rect.h, &x_off, &y_off, &scale_x, &scale_y, true);
+
+	vertex->settings.flip = true;
+	vertex->settings.scale_x = scale_x;
+	vertex->settings.scale_y = scale_y;
+
+	if (scale_y > scale_x)
+		rect.x += x_off;
+	else
+		rect.y += y_off;
+
+	/// only use x, y -> will show full texture
+	Vertex_Create(vertex, 2, (float *)&rect, sizeof(float) * 2);
+
+	return true;
+}

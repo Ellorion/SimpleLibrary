@@ -212,7 +212,7 @@ Test_Arrays(
 		Array_Add(&as_data, s_data);
 		AssertMessage(as_data.limit == 8, "Data size missmatch.");
 		/// Will result in 1 (existing) + 3 (new empty) slots
-		Array_Reserve(&as_data, 3);
+		Array_Reserve(&as_data, 3, true);
 		AssertMessage(as_data.limit == 32 AND as_data.count == 1, "Array reservation failed.");
 		String_Destroy(&s_data);
 		Array_Destroy(&as_data);
@@ -408,12 +408,3 @@ instant void
 Test_Windows(
 ) {
 }
-
-
-
-
-
-
-
-
-
