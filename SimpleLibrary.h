@@ -25,6 +25,7 @@
 /// Return types: if a function returns a struct, it's memory needs to
 ///               be free'd to prevent memory leaks
 
+
 /// Usage: Window Event Handler
 /// ===========================================================================
 //instant void
@@ -43,7 +44,7 @@
 //
 //		/// Render
 //		/// ===================================================================
-//		Window_Clear();
+//		OpenGL_ClearScreen();
 //
 //		Window_Update(window);
 //	}
@@ -53,7 +54,9 @@
 /// Example: display a texture
 /// ===========================================================================
 //instant void
-//Window_HandleEvents(Window *window) {
+//Window_HandleEvents(
+//	Window *window
+//) {
 //	MSG msg;
 //	bool running = true;
 //	bool ui_zoom_enabled = true;
@@ -113,13 +116,8 @@
 //}
 //
 //int main() {
-//	Test_Strings();
-//	Test_Arrays();
-//	Test_Files();
-//
-//	Test_Windows();
-//
 //	Window window;
+//
 //	Window_Create(&window, "Hello, World!", 800, 480);
 //	Window_Show(&window);
 //
@@ -130,7 +128,61 @@
 //	OpenGL_Destroy(&window);
 //	Window_Destroy(&window);
 //
-//    return 0;
+//	return 0;
+//}
+/// ===========================================================================
+
+/// Example: show mouse position
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(
+//	Window *window
+//) {
+//	MSG msg;
+//	bool running = true;
+//
+//	Timer timer_mouse_move;
+//	Time_Reset(&timer_mouse_move);
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		if (Time_HasElapsed(&timer_mouse_move, 100)) {
+//			Point t_point;
+//
+//			if (window->mouse)
+//				t_point = window->mouse->point;
+//
+//			LOG_DEBUG("Mouse pos: x = " << t_point.x << " - y: " << t_point.y);
+//		}
+//
+//		Window_Update(window);
+//	}
+//}
+//
+//int main() {
+//	Mouse mouse;
+//	Window window;
+//
+//	Window_Create(&window, "Hello, World!", 800, 480, 32, &mouse);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//	return 0;
 //}
 /// ===========================================================================
 
@@ -221,17 +273,22 @@ _AssertMessage(
 	if (&(_element)) (_element)
 
 struct Rect {
-	float x;
-	float y;
-	s32 w;
-	s32 h;
+	float x = 0.0f;
+	float y = 0.0f;
+	s32 w = 0;
+	s32 h = 0;
 };
 
 struct RectF {
-	float x;
-	float y;
-	float w;
-	float h;
+	float x = 0.0f;
+	float y = 0.0f;
+	float w = 0.0f;
+	float h = 0.0f;
+};
+
+struct Point {
+	float x = 0.0f;
+	float y = 0.0f;
 };
 
 template <typename T>
@@ -1962,6 +2019,7 @@ File_ReadDirectory(
 
 #define Window_ReadMessage(_msg, _running, _ptr_window)             				\
 	while (PeekMessage(&_msg, _ptr_window->hWnd, 0, 0, PM_REMOVE)) {				\
+		if (Mouse_Update(_ptr_window->mouse, _ptr_window, &_msg))	continue;	\
 		switch (msg.message) {									\
 			case WM_QUIT: {										\
 				_msg.wParam = 0;								\
@@ -2046,7 +2104,8 @@ Window_Create(
 	const char *title,
 	s32 width,
 	s32 height,
-	s32 bits = 32
+	s32 bits = 32,
+	Mouse *mouse = 0
 ) {
 	Assert(window);
 	*window = {};
@@ -2154,6 +2213,9 @@ Window_Create(
 	window->width = width;
 	window->height = height;
 
+	if (mouse)
+		window->mouse = mouse;
+
 	return true;
 }
 
@@ -2171,6 +2233,8 @@ Window_Show(
 	SetFocus(window->hWnd);
 }
 
+instant void Mouse_Reset(Mouse *mouse);
+
 instant void
 Window_Update(
 	Window *window
@@ -2178,6 +2242,8 @@ Window_Update(
 	Assert(window);
 
 	SwapBuffers(window->hDC);
+
+	Mouse_Reset(window->mouse);
 }
 
 instant void
@@ -2278,6 +2344,29 @@ Window_SetTitle(
 	window->title = title;
 
 	SetWindowText(window->hWnd, window->title);
+}
+
+instant bool
+Window_UnAdjustRect(
+	HWND hWnd,
+	RECT *rect
+) {
+	Assert(rect);
+
+	RECT t_rect = {};
+
+	DWORD dwStyle   = (DWORD)GetWindowLong(hWnd, GWL_STYLE);
+	DWORD dwExStyle = (DWORD)GetWindowLong(hWnd, GWL_EXSTYLE);
+
+	bool success = AdjustWindowRectEx(&t_rect, dwStyle, 0, dwExStyle);
+
+	if (success) {
+		rect->left   -= t_rect.left;
+		rect->top    -= t_rect.top;
+		rect->right  -= t_rect.right;
+		rect->bottom -= t_rect.bottom;
+	}
+	return success;
 }
 
 /// ::: OpenGL
@@ -3211,4 +3300,199 @@ Vertex_Create(
 	Vertex_Create(vertex, 2, (float *)&rect, sizeof(float) * 2);
 
 	return true;
+}
+
+/// ::: Mouse
+/// ===========================================================================
+#define MOUSE_WHEEL_GET_DELTA(value) GET_WHEEL_DELTA_WPARAM(value) / 120
+
+#define MOUSE_BUTTON_COUNT 3
+
+struct Mouse {
+	Point point          = {};
+	Point point_relative = {};
+
+	bool up[MOUSE_BUTTON_COUNT];
+	bool down[MOUSE_BUTTON_COUNT];
+	bool pressing[MOUSE_BUTTON_COUNT];
+	s32  wheel = 0;
+	bool double_click[MOUSE_BUTTON_COUNT];
+
+	bool is_up;
+	bool is_down;
+};
+
+instant void
+Mouse_AutoHide(
+	u32 msg_message = 0,
+	u32 millisec = 2000
+) {
+    static Timer timer_mouse_move;
+    static bool is_cursor_visible = true;
+
+    /// reset timer on mouse move window event
+    if (msg_message == WM_MOUSEMOVE) {
+		Time_Reset(&timer_mouse_move);
+		if (!is_cursor_visible) {
+			is_cursor_visible = true;
+			ShowCursor(true);
+		}
+		return;
+    }
+
+    /// auto-hide mouse cursor after x millisec. of no mouse movement
+	if (is_cursor_visible) {
+		if (Time_Get() - timer_mouse_move.lo_timer >= millisec) {
+			is_cursor_visible = false;
+			ShowCursor(false);
+		}
+	}
+}
+
+instant void
+Mouse_Reset(
+	Mouse *mouse
+) {
+	if (!mouse)
+		return;
+
+	mouse->wheel = 0;
+
+	FOR(MOUSE_BUTTON_COUNT, it) {
+		mouse->double_click[it] = false;
+		mouse->down[it] = false;
+		mouse->up[it]   = false;
+	}
+
+	mouse->is_up   = false;
+	mouse->is_down = false;
+
+	mouse->point_relative = {};
+}
+
+instant void
+Mouse_GetPos(
+	float *x,
+	float *y
+) {
+	POINT point;
+
+	GetCursorPos(&point);
+
+	if (x) *x = point.x;
+	if (y) *y = point.y;
+}
+
+instant void
+Mouse_GetPos(
+	Mouse *mouse,
+	Window *window
+) {
+	Assert(window);
+	Assert(mouse);
+
+	RECT rect_active;
+	GetWindowRect(window->hWnd, &rect_active);
+	Window_UnAdjustRect(window->hWnd, &rect_active);
+
+	Mouse t_mouse = *mouse;
+
+	Mouse_GetPos(&mouse->point.x, &mouse->point.y);
+
+	RectF rect_viewport;
+
+	glGetFloatv(GL_VIEWPORT, (GLfloat *)&rect_viewport);
+
+	float scale_x = window->width  / rect_viewport.w;
+	float scale_y = window->height / rect_viewport.h;
+
+	mouse->point.x = (mouse->point.x - (rect_active.left + rect_viewport.x)) * scale_x;
+	mouse->point.y = (mouse->point.y - (rect_active.top  + rect_viewport.y)) * scale_y;
+
+	mouse->point_relative.x = mouse->point.x - t_mouse.point.x;
+	mouse->point_relative.y = mouse->point.y - t_mouse.point.y;
+}
+
+instant bool
+Mouse_Update(
+	Mouse *mouse,
+	Window *window,
+	MSG *msg
+) {
+	if (!mouse)
+		return false;
+
+	Mouse_Reset(mouse);
+
+	if (window AND msg->message == WM_MOUSEMOVE) {
+		Mouse_GetPos(mouse, window);
+		return true;
+	}
+
+	if (!msg)
+		return false;
+
+    switch(msg->message) {
+		case WM_LBUTTONDOWN: {
+			mouse->pressing[0] = true;
+			mouse->down[0] = true;
+			mouse->is_down = true;
+		} break;
+
+		case WM_MBUTTONDOWN: {
+			mouse->pressing[1] = true;
+			mouse->down[1] = true;
+			mouse->is_down = true;
+		} break;
+
+		case WM_RBUTTONDOWN: {
+			mouse->pressing[2] = true;
+			mouse->down[2] = true;
+			mouse->is_down = true;
+		} break;
+
+		case WM_LBUTTONUP:   {
+			mouse->pressing[0] = false;
+			mouse->up[0] = true;
+			mouse->is_up = true;
+		} break;
+
+		case WM_MBUTTONUP:   {
+			mouse->pressing[1] = false;
+			mouse->up[1] = true;
+			mouse->is_up = true;
+		} break;
+
+		case WM_RBUTTONUP:   {
+			mouse->pressing[2] = false;
+			mouse->up[2] = true;
+			mouse->is_up = true;
+		} break;
+
+		case WM_LBUTTONDBLCLK: {
+			mouse->double_click[0] = true;
+			mouse->is_down = true;
+			mouse->is_up = true;
+		} break;
+
+		case WM_MBUTTONDBLCLK: {
+			mouse->double_click[1] = true;
+			mouse->is_down = true;
+			mouse->is_up = true;
+		} break;
+
+		case WM_RBUTTONDBLCLK: {
+			mouse->double_click[2] = true;
+			mouse->is_down = true;
+			mouse->is_up = true;
+		} break;
+
+		case WM_MOUSEWHEEL: {
+			mouse->wheel = MOUSE_WHEEL_GET_DELTA(msg->wParam) * 16;
+		} break;
+
+		default: { return false; } break;
+    }
+
+    return true;
 }
