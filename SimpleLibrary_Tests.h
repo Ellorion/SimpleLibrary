@@ -138,6 +138,30 @@ Test_Strings(
 
     String_Destroy(&s_replace);
     String_Destroy(&s_buffer);
+
+    {
+		String s_data;
+		String_Append(&s_data, "\r\na\n\r");
+		String_Insert(&s_data, 'c', s_data.length);
+		AssertMessage(String_IsEqual(&s_data, "\r\na\n\rc"), "Insert String failed (1).");
+
+		String_Insert(&s_data, '\b', s_data.length);
+		AssertMessage(String_IsEqual(&s_data, "\r\na\n\r" ), "Insert String failed (2).");
+
+		String_Insert(&s_data, '\b', s_data.length);
+		AssertMessage(String_IsEqual(&s_data, "\r\na\n"   ), "Insert String failed (3).");
+
+		String_Insert(&s_data, '\b', s_data.length);
+		AssertMessage(String_IsEqual(&s_data, "\r\na"     ), "Insert String failed (4).");
+
+		String_Insert(&s_data, '\b', s_data.length);
+		AssertMessage(String_IsEqual(&s_data, "\r\n"      ), "Insert String failed (5).");
+
+		String_Insert(&s_data, '\b', s_data.length);
+		AssertMessage(String_IsEqual(&s_data, ""          ), "Insert String failed (6).");
+
+		String_Destroy(&s_data);
+    }
 }
 
 void

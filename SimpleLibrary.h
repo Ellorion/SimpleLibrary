@@ -3,6 +3,7 @@
 /// Compiler: g++
 ///
 /// Linker flags:
+///		-lcomdlg32
 ///		-lopengl32
 ///		-lgdi32
 ///
@@ -186,6 +187,65 @@
 //}
 /// ===========================================================================
 
+/// Example: reading keyboard input
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(Window *window) {
+//	MSG msg;
+//	bool running = true;
+//	bool ui_zoom_enabled = true;
+//
+//	Keyboard *keyboard = window->keyboard;
+//	String s_keyboard;
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		if (keyboard) {
+//			if (0) {}
+//			else if (keyboard->is_up) {
+//				if (keyboard->up[VK_ESCAPE])
+//					running = false;
+//			}
+//			else if (keyboard->is_down) {
+//				Keyboard_Insert(keyboard, &s_keyboard);
+//				char *c_buffer = String_CreateCBufferCopy(&s_keyboard);
+//				LOG_DEBUG(c_buffer);
+//				Memory_Free(c_buffer);
+//			}
+//		}
+//
+//		Window_Update(window);
+//	}
+//}
+//
+//int main() {
+//	Keyboard keyboard;
+//	Window window;
+//
+//	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//	return 0;
+//}
+/// ===========================================================================
+
 #include <iostream>
 #include <math.h>
 #include <windows.h>
@@ -269,8 +329,11 @@ _AssertMessage(
 #define MIN(val_1, val_2) ((val_1 < val_2) ? val_1 : val_2)
 #define MAX(val_1, val_2) ((val_1 < val_2) ? val_2 : val_1)
 
-#define SetIfValid(_element)	\
-	if (&(_element)) (_element)
+//#define LOBYTE(x) ((x) & 0xFF)
+//#define HIBYTE(x) LOBYTE((x) >> 8)
+
+#define GETBYTE(x, bit_start) LOBYTE((x) >> (bit_start))
+#define GETBIT(x, bit_start) (((x) >> (bit_start)) & 0x1)
 
 struct Rect {
 	float x = 0.0f;
@@ -732,7 +795,6 @@ String_CreateCBufferCopy(
 	String *s_data
 ) {
 	Assert(s_data);
-	Assert(s_data->length);
 
 	char *c_buffer = Memory_Create(char, s_data->length + 1);
 	To_CString(c_buffer, s_data->length + 1, s_data);
@@ -1169,6 +1231,32 @@ String_Replace(
 	Memory_Free(c_replace);
 }
 
+instant s64
+String_Insert(
+	String *s_data,
+	const char c_data,
+	u64 index_start
+) {
+	Assert(s_data);
+
+	s32 length = 0;
+
+	if (c_data == '\b') {
+		length = 0;
+		if (s_data->value[index_start + length - 1] == '\n')  --length;
+		if (s_data->value[index_start + length - 1] == '\r')  --length;
+		if (!length) --length;
+
+		String_Remove(s_data, index_start + length, index_start);
+	}
+	else {
+		length = 1;
+		String_Insert(s_data, index_start, &c_data, length);
+	}
+
+	return length;
+}
+
 instant char *
 String_Encode64(
 	const char *text
@@ -1380,7 +1468,7 @@ Array_Find(
 
 	FOR_ARRAY(*array, it) {
 		if (ARRAY_IT(*array, it) == find) {
-			SetIfValid(*index) = it;
+			if (index) *index = it;
 			return true;
 		}
 	}
@@ -2006,7 +2094,6 @@ File_ReadDirectory(
 	String_Destroy(&s_search_path);
 }
 
-
 /// ::: Windows (OpenGL)
 /// ===========================================================================
 #define Windows_Main 	\
@@ -2019,7 +2106,9 @@ File_ReadDirectory(
 
 #define Window_ReadMessage(_msg, _running, _ptr_window)             				\
 	while (PeekMessage(&_msg, _ptr_window->hWnd, 0, 0, PM_REMOVE)) {				\
-		if (Mouse_Update(_ptr_window->mouse, _ptr_window, &_msg))	continue;	\
+		if (Mouse_Update(_ptr_window->mouse, _ptr_window, &_msg))	continue;		\
+		if (Keyboard_Update(_ptr_window->keyboard, &_msg))          continue;		\
+																\
 		switch (msg.message) {									\
 			case WM_QUIT: {										\
 				_msg.wParam = 0;								\
@@ -2032,6 +2121,34 @@ File_ReadDirectory(
 			}													\
 		}														\
 	}
+
+instant bool
+Dialog_OpenFile(
+	String *s_file
+) {
+	Assert(s_file);
+
+	bool result = false;
+
+	static char filename[MAX_PATH + 1] = {};
+	OPENFILENAME ofn = {};
+
+    ofn.lStructSize  = sizeof(OPENFILENAME);
+    /// If there is a window to center over, put hWND here
+    ofn.hwndOwner    = 0;
+    ofn.lpstrFilter  = "Any File\0*.*\0";
+    ofn.lpstrFile    = filename;
+    ofn.nMaxFile     = MAX_PATH;
+    ofn.lpstrTitle   = "Open file...!";
+    ofn.Flags        = 0x02000000 | OFN_FILEMUSTEXIST;
+
+    if (GetOpenFileNameA(&ofn)) {
+		To_String(s_file, filename);
+		result = true;
+    }
+
+    return result;
+}
 
 static const char *class_name = "OpenGL";
 
@@ -2105,6 +2222,7 @@ Window_Create(
 	s32 width,
 	s32 height,
 	s32 bits = 32,
+	Keyboard *keyboard = 0,
 	Mouse *mouse = 0
 ) {
 	Assert(window);
@@ -2216,6 +2334,9 @@ Window_Create(
 	if (mouse)
 		window->mouse = mouse;
 
+	if (keyboard)
+		window->keyboard = keyboard;
+
 	return true;
 }
 
@@ -2234,6 +2355,7 @@ Window_Show(
 }
 
 instant void Mouse_Reset(Mouse *mouse);
+instant void Keyboard_Reset(Keyboard *keyboard);
 
 instant void
 Window_Update(
@@ -2244,6 +2366,7 @@ Window_Update(
 	SwapBuffers(window->hDC);
 
 	Mouse_Reset(window->mouse);
+	Keyboard_Reset(window->keyboard);
 }
 
 instant void
@@ -3371,7 +3494,7 @@ Mouse_Reset(
 }
 
 instant void
-Mouse_GetPos(
+Mouse_GetPosition(
 	float *x,
 	float *y
 ) {
@@ -3384,7 +3507,7 @@ Mouse_GetPos(
 }
 
 instant void
-Mouse_GetPos(
+Mouse_GetPosition(
 	Mouse *mouse,
 	Window *window
 ) {
@@ -3397,7 +3520,7 @@ Mouse_GetPos(
 
 	Mouse t_mouse = *mouse;
 
-	Mouse_GetPos(&mouse->point.x, &mouse->point.y);
+	Mouse_GetPosition(&mouse->point.x, &mouse->point.y);
 
 	RectF rect_viewport;
 
@@ -3422,15 +3545,15 @@ Mouse_Update(
 	if (!mouse)
 		return false;
 
+	if (!msg)
+		return false;
+
 	Mouse_Reset(mouse);
 
 	if (window AND msg->message == WM_MOUSEMOVE) {
-		Mouse_GetPos(mouse, window);
+		Mouse_GetPosition(mouse, window);
 		return true;
 	}
-
-	if (!msg)
-		return false;
 
     switch(msg->message) {
 		case WM_LBUTTONDOWN: {
@@ -3495,4 +3618,161 @@ Mouse_Update(
     }
 
     return true;
+}
+
+/// ::: Keyboard
+/// ===========================================================================
+#define KEYBOARD_KEYCOUNT 0xFFFF
+
+struct Keyboard {
+    bool up[KEYBOARD_KEYCOUNT] 			= {};
+    bool down[KEYBOARD_KEYCOUNT] 		= {};
+    bool pressing[KEYBOARD_KEYCOUNT] 	= {};
+    bool repeating[KEYBOARD_KEYCOUNT] 	= {};
+
+    /// last_key_virtual = msg.wParam = SL_KEYBOARD_KEYCOUNT (max.)
+	u32  last_key_virtual	= 0;
+	u16  key_sym			= 0;		/// translated key (incl. shift + alt)
+	u32  key_scan			= 0;		/// scancode
+    bool is_down			= false;	/// "any" key is down
+    bool is_up				= false;	/// "any" key is up
+    bool is_key_sym			= false;	/// key could be translated
+    u8   key_states[256]	= {};
+};
+
+instant void
+Keyboard_Reset(
+	Keyboard *keyboard
+) {
+	if (!keyboard)
+		return;
+
+	u32 vkey = keyboard->last_key_virtual;
+
+	if (keyboard->down[vkey]) {
+		keyboard->down[vkey] 		= false;
+		keyboard->is_down 			= false;
+		keyboard->is_key_sym 		= false;
+		keyboard->key_sym 			= 0;
+		keyboard->key_scan			= 0;
+		keyboard->last_key_virtual	= 0;
+	}
+
+	if (keyboard->up[vkey]) {
+		keyboard->up[vkey] 			= false;
+		keyboard->is_up 			= false;
+		keyboard->is_key_sym 		= false;
+		keyboard->key_scan			= 0;
+		keyboard->key_sym 			= 0;
+		keyboard->last_key_virtual	= 0;
+	}
+}
+
+instant void
+Keyboard_GetKeySym(
+	Keyboard *keyboard,
+	MSG *msg
+) {
+	Assert(keyboard);
+	Assert(msg);
+
+	u16 ch = 0;
+	GetKeyboardState(keyboard->key_states);
+
+	keyboard->is_key_sym	= false;
+	keyboard->key_sym		= 0;
+
+	if (ToAscii(msg->wParam,
+				MapVirtualKey(msg->wParam, 0),
+				keyboard->key_states, &ch, 0) > 0)
+	{
+		if (ch == VK_ESCAPE)  return;
+
+		keyboard->is_key_sym 	= true;
+		keyboard->key_sym 		= ch; // (char)LOBYTE(ch);
+	}
+}
+
+instant void
+Keyboard_SetDown(
+	Keyboard *keyboard,
+	MSG *msg
+) {
+	Assert(keyboard);
+	Assert(msg);
+
+	keyboard->key_scan = MapVirtualKey(msg->wParam, 0);
+
+	keyboard->down[msg->wParam] 		= true;
+	keyboard->up[msg->wParam] 			= false;
+	keyboard->pressing[msg->wParam] 	= true;
+	keyboard->repeating[msg->wParam] 	= GETBIT(msg->lParam, 30);
+
+	Keyboard_GetKeySym(keyboard, msg);
+
+	keyboard->last_key_virtual 	= msg->wParam;
+	keyboard->is_down 			= true;
+	keyboard->is_up				= false;
+}
+
+instant void
+Keyboard_SetUp(
+	Keyboard *keyboard,
+	MSG *msg
+) {
+	Assert(keyboard);
+	Assert(msg);
+
+	keyboard->key_scan = MapVirtualKey(msg->wParam, 0);
+
+	keyboard->down[msg->wParam] 		= false;
+	keyboard->up[msg->wParam] 			= true;
+	keyboard->pressing[msg->wParam] 	= false;
+	keyboard->repeating[msg->wParam] 	= false;
+
+	Keyboard_GetKeySym(keyboard, msg);
+
+	keyboard->last_key_virtual 	= msg->wParam;
+	keyboard->is_down 			= false;
+	keyboard->is_up				= true;
+}
+
+instant bool
+Keyboard_Update(
+	Keyboard *keyboard,
+	MSG *msg
+) {
+	bool result = false;
+
+	if (!keyboard)
+		return result;
+
+	Assert(msg);
+
+	switch (msg->message) {
+		case WM_SYSKEYDOWN:
+		case WM_KEYDOWN: {
+			Keyboard_SetDown(keyboard, msg);
+			result = true;
+		} break;
+
+		case WM_SYSKEYUP:
+		case WM_KEYUP: {
+			Keyboard_SetUp(keyboard, msg);
+			result = true;
+		} break;
+	}
+
+	return result;
+}
+
+instant void
+Keyboard_Insert(
+	Keyboard *keyboard,
+	String *s_data
+) {
+	Assert(keyboard);
+	Assert(s_data);
+
+	String_Insert(s_data, keyboard->key_sym, s_data->length);
 }
