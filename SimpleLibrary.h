@@ -724,6 +724,17 @@ struct String {
 	char *value  = 0;
 };
 
+instant void
+String_Print(
+	String *s_data
+) {
+	Assert(s_data);
+
+	FOR(s_data->length, it) {
+		std::cout << s_data->value[it];
+	}
+}
+
 /// does NOT support UTF-8
 instant u64
 String_Length(
@@ -744,6 +755,8 @@ instant void
 String_Destroy(
 	String *s_data
 ) {
+	Assert(s_data);
+
 	Memory_Free(s_data->value);
 	*s_data = {};
 }
@@ -1478,9 +1491,8 @@ Array_Clear(
 
 template<typename T>
 instant void
-Array_Destroy(
-	Array<T> *array,
-	bool use_generic = false
+Array_DestroyContainer(
+	Array<T> *array
 ) {
 	Assert(array);
 
@@ -1555,7 +1567,6 @@ Array_Remove(
 	return result;
 }
 
-template<typename T>
 instant void
 Array_Destroy(
 	Array<String> *array
@@ -1566,15 +1577,24 @@ Array_Destroy(
 		String s_data_it = Array_Remove(array, 0);
 		String_Destroy(&s_data_it);
     }
-    Array_Destroy(array);
+    Array_DestroyContainer(array);
 }
+
+enum ARRAY_DELIMITER_TYPE {
+	ARRAY_DELIMITER_IGNORE,
+	/// Insert delimiter at the beginning of the next token
+	ARRAY_DELIMITER_FRONT,
+	/// Insert delimiter at the end if the current token
+	ARRAY_DELIMITER_BACK
+};
 
 /// Will copy string values, so array content has to be free'd
 instant Array<String>
 Array_Split(
 	String *s_data,
 	const char *delimiter,
-	bool exclude_delim = true
+	ARRAY_DELIMITER_TYPE type = ARRAY_DELIMITER_IGNORE
+
 ) {
 	Assert(s_data);
 
@@ -1585,15 +1605,42 @@ Array_Split(
 
 	s64 pos_found;
 	while(String_Find(&s_data_it, delimiter, &pos_found, 0, false)) {
-		String s_element;
-		String_Append(&s_element, s_data_it.value, pos_found);
-		Array_Add(&as_result, s_element);
-		s_data_it.value += pos_found + len_delim;
-		s_data_it.length   -= pos_found + len_delim;
+
+		if (pos_found) {
+			String s_element;
+
+			if (type == ARRAY_DELIMITER_FRONT AND as_result.count) {
+				String_Append(&s_element, delimiter, len_delim);
+			}
+
+			String_Append(&s_element, s_data_it.value, pos_found);
+
+			if (type == ARRAY_DELIMITER_BACK) {
+				String_Append(&s_element, delimiter, len_delim);
+			}
+
+			Array_Add(&as_result, s_element);
+		}
+		else {
+			/// in case of f.e: "\n\n\n" with "\n" as delimiter
+			String *s_element;
+			Array_AddEmpty(&as_result, &s_element);
+
+			if (type == ARRAY_DELIMITER_BACK) {
+				String_Append(s_element, delimiter, len_delim);
+			}
+		}
+
+		s_data_it.value  += pos_found + len_delim;
+		s_data_it.length -= pos_found + len_delim;
 	}
 
 	if (s_data_it.length > 0) {
 		String s_element;
+
+		if (type == ARRAY_DELIMITER_FRONT AND as_result.count)
+			String_Append(&s_element, delimiter, len_delim);
+
 		String_Append(&s_element, s_data_it.value, s_data_it.length);
 		Array_Add(&as_result, s_element);
 	}
@@ -3354,7 +3401,7 @@ Vertex_Destroy(
 		glDeleteBuffers(1, &vertex_buffer->id);
 	}
 
-	Array_Destroy(&vertex->a_attributes);
+	Array_DestroyContainer(&vertex->a_attributes);
 
 	glDeleteVertexArrays(1, &vertex->array_id);
 

@@ -213,7 +213,7 @@ Test_Arrays(
 			String_Destroy(&s_data_it);
 		}
 		AssertMessage(as_test.count == 0, "Array_Remove failed.");
-		Array_Destroy(&as_test, true);
+		Array_Destroy(&as_test);
 	}
 
 	{
@@ -221,7 +221,7 @@ Test_Arrays(
 		String_Append(&s_split, "aaa");
 
 		Array<String> as_split;
-		as_split = String_Split(&s_split, "\n", true);
+		as_split = String_Split(&s_split, "\n");
 
 		AssertMessage(as_split.count == 1, "Incorrect amount of items split from string (1).");
 		AssertMessage(String_IsEqual(&ARRAY_IT(as_split, 0), "aaa"), "First Array item does not match.");
@@ -238,7 +238,8 @@ Test_Arrays(
 		/// Will result in 1 (existing) + 3 (new empty) slots
 		Array_Reserve(&as_data, 3, true);
 		AssertMessage(as_data.limit == 32 AND as_data.count == 1, "Array reservation failed.");
-		String_Destroy(&s_data);
+
+		/// non-generic array_destroy will free the string
 		Array_Destroy(&as_data);
 	}
 
@@ -247,7 +248,7 @@ Test_Arrays(
 		String_Append(&s_split, "aaa\nbbb");
 
 		Array<String> as_split;
-		as_split = String_Split(&s_split, "\n", true);
+		as_split = String_Split(&s_split, "\n");
 
 		AssertMessage(as_split.count == 2, "Incorrect amount of items split from string (2).");
 		AssertMessage(String_IsEqual(&ARRAY_IT(as_split, 0), "aaa"), "First Array item does not match.");
@@ -337,6 +338,48 @@ Test_Arrays(
 						AND ARRAY_IT(a_sort, 9)  == 1
 						AND ARRAY_IT(a_sort, 10) == 1
 							, "Integer array sorting failed (descending).");
+	}
+
+	{
+		String s_data;
+		String_Append(&s_data, "Lorem ipsum dolor\r\n\r\nLorem ipsum dolor sit amet.");
+
+		///@Performance: text could be processed without having to split
+		///              data multiple times
+		Array<String> as_lines = Array_Split(&s_data, "\r\n", ARRAY_DELIMITER_BACK);
+		String_Destroy(&s_data);
+
+		Array<String> as_words;
+
+		FOR_ARRAY(as_lines, it_lines) {
+			Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ", ARRAY_DELIMITER_FRONT);
+
+			FOR_ARRAY(tas_words, it_words) {
+				Array_Add(&as_words, ARRAY_IT(tas_words, it_words));
+			}
+
+			/// keep string values in as_words valid
+			Array_DestroyContainer(&tas_words);
+		}
+
+///		"Lorem ipsum dolor\r\n",
+///		"\r\n",
+///		"Lorem ipsum dolor sit amet."
+		AssertMessage(as_lines.count == 3, "Splitting lines failed.");
+
+///		"Lorem",
+///		" ipsum",
+///		" dolor\r\n",
+///		"\r\n",
+///		"Lorem",
+///		" ipsum",
+///		" dolor",
+///		" sit",
+///		" amet."
+		AssertMessage(as_words.count == 9, "Splitting words failed.");
+
+		Array_Destroy(&as_lines);
+		Array_Destroy(&as_words);
 	}
 }
 
