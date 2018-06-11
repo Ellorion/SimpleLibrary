@@ -85,8 +85,7 @@
 //	ShaderSet shader_set;
 //	ShaderSet_Load(&shader_set, &shader_texture, window);
 //
-//	Vertex vertex;
-//	Vertex_Create(&shader_set, &vertex, &texture, {});
+//	Vertex vertex = Vertex_Create(&shader_set, &texture, {});
 //
 //	while(running) {
 //		msg = {};
@@ -291,7 +290,76 @@
 //	OpenGL_Destroy(&window);
 //	Window_Destroy(&window);
 //
-//    return 0;
+//	return 0;
+//}
+/// ===========================================================================
+
+/// Example: load truetype font and render two characters
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(
+//	Window *window
+//) {
+//	MSG msg;
+//	bool running = true;
+//	bool ui_zoom_enabled = true;
+//
+//	String s_font;
+//	String_Append(&s_font, "test/AutourOne-Regular.ttf");
+//
+//	Font font = Font_Load(&s_font, 60);
+//	/// Vertex_Destroy will free the texture, which will be created here
+//	Font_Codepoint font_codepoint_a = Font_GetCodepointData(&font, 'a');
+//	Font_Codepoint font_codepoint_b = Font_GetCodepointData(&font, 'b');
+//	Font_Destroy(&font);
+//
+//	ShaderSet shader_set;
+//	ShaderSet_Load(&shader_set, &shader_text, window);
+//
+//	Vertex vertex_a = Vertex_Create(&shader_set, &font_codepoint_a.texture, {});
+//	Vertex vertex_b = Vertex_Create(&shader_set, &font_codepoint_b.texture, {50, 50});
+//
+//	glEnable(GL_BLEND);
+//	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		Vertex_Render(&shader_set, &vertex_a);
+//		Vertex_Render(&shader_set, &vertex_b);
+//
+//		Window_Update(window);
+//	}
+//
+//	/// will destroy the linked texture
+//	Vertex_Destroy(&vertex_a);
+//	Vertex_Destroy(&vertex_b);
+//	ShaderSet_Destroy(&shader_set);
+//}
+//
+//int main() {
+//	Window window;
+//
+//	Window_Create(&window, "Hello, World!", 800, 480);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//	return 0;
 //}
 /// ===========================================================================
 
@@ -319,6 +387,9 @@ __inline__ static void debug_break(void)
 
 #define AND &&
 #define OR  ||
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
 
 #define instant static inline
 
@@ -398,10 +469,39 @@ struct RectF {
 	float h = 0.0f;
 };
 
+struct RectI {
+	s32 x;
+	s32 y;
+	s32 w;
+	s32 h;
+};
+
 struct Point {
 	float x = 0.0f;
 	float y = 0.0f;
 };
+
+template<typename K, typename L, typename V>
+struct Triple {
+	K first;
+	L second;
+	V third;
+};
+
+template<typename K, typename L, typename V>
+bool
+operator == (
+	Triple<K, L, V> &data1,
+	Triple<K, L, V> &data2
+) {
+	if (    data1.first  == data2.first
+		AND data1.second == data2.second)
+	{
+		return true;
+	}
+
+	return false;
+}
 
 template <typename T>
 instant void
@@ -2065,7 +2165,7 @@ File_Read(
 }
 
 instant String
-File_ReadFile(
+File_ReadAll(
 	String *s_filename,
 	bool as_binary = true
 ) {
@@ -2955,6 +3055,116 @@ struct Shader {
 	const char *code[3];
 };
 
+static const Shader shader_text = {
+R"(
+	#version 330 core
+
+	uniform vec4 viewport = vec4(0, 0, 800, 480);
+	in vec2 vertex_position;
+
+	float left   = 0.0f;
+	float right  = viewport.z;
+	float top    = 0.0f;
+	float bottom = viewport.w;
+
+    mat4 proj_matrix = mat4(
+		 2.0f / (right - left), 0                    ,  0,  0,
+		 0                    , 2.0f / (top - bottom),  0,  0,
+		 0                    , 0                    ,  1,  0,
+		-(right + left)   / (right - left),
+		-(top   + bottom) / (top   - bottom),
+		 0,
+		 1
+	);
+
+	out Vertex_Data {
+		mat4 proj_matrix;
+	} o_Vertex;
+
+	void main() {
+		gl_Position = vec4(vertex_position, 0, 1);
+		o_Vertex.proj_matrix = proj_matrix;
+	}
+)",
+
+R"(
+	#version 330 core
+
+	layout(points) in;
+	layout(triangle_strip, max_vertices = 4) out;
+
+	uniform sampler2D fragment_texture;
+	uniform float     scale_x       	= 1.0f;
+	uniform float     scale_y       	= 1.0f;
+
+	vec2 size = textureSize(fragment_texture, 0);
+
+	in Vertex_Data {
+		mat4 proj_matrix;
+	} i_Vertex[];
+
+	out vec2 tex_coords;
+
+	mat4 scale_matrix = mat4(
+		scale_x , 0      , 0, 0,
+		0       , scale_y, 0, 0,
+		0       , 0      , 1, 0,
+		0       , 0      , 0, 1
+	);
+
+	void main() {
+		vec4 point       = gl_in[0].gl_Position;
+		mat4 proj_matrix = i_Vertex[0].proj_matrix;
+
+		mat4 matrix_mod = proj_matrix;
+
+		vec4 v_pos_1 = matrix_mod * (point + vec4(0     , 0     , 0, 0) * scale_matrix);
+		vec4 v_pos_2 = matrix_mod * (point + vec4(size.x, 0     , 0, 0) * scale_matrix);
+		vec4 v_pos_3 = matrix_mod * (point + vec4(0     , size.y, 0, 0) * scale_matrix);
+		vec4 v_pos_4 = matrix_mod * (point + vec4(size.x, size.y, 0, 0) * scale_matrix);
+
+		/// v1
+		gl_Position = v_pos_1;
+		tex_coords = vec2(0, 0);
+		EmitVertex();
+
+		/// v3
+		gl_Position = v_pos_2;
+		tex_coords = vec2(1, 0);
+		EmitVertex();
+
+		/// v2
+		gl_Position = v_pos_3;
+		tex_coords = vec2(0, 1);
+		EmitVertex();
+
+		/// v4
+		gl_Position = v_pos_4;
+		tex_coords = vec2(1, 1);
+		EmitVertex();
+
+		EndPrimitive();
+	}
+)",
+
+R"(
+	#version 330 core
+
+	uniform vec4      viewport         = vec4(0, 0, 800, 480);
+	uniform float     scale_x          = 1.0f;
+	uniform float     scale_y          = 1.0f;
+	uniform sampler2D fragment_texture;
+
+	layout(origin_upper_left) in vec4 gl_FragCoord;
+
+	in vec2 tex_coords;
+
+	void main() {
+		vec4 color_greyscale = texture2D(fragment_texture, tex_coords);
+		gl_FragColor = vec4(1.0f, 1.0f, 1.0f, color_greyscale.a);
+	}
+)"};
+
 static const Shader shader_texture = {
 R"(
 	#version 330 core
@@ -3507,23 +3717,23 @@ Vertex_Render(
 	glDrawArrays(GL_POINTS, 0,  a_vertices.size / sizeof(GLfloat) / a_vertices.group_count);
 }
 
-instant bool
+instant Vertex
 Vertex_Create(
 	ShaderSet *shader_set,
-	Vertex *vertex,
 	Texture *texture,
 	Rect rect
 ) {
-	Assert(vertex);
 	Assert(texture);
 
+	Vertex vertex = {};
+
 	if (!texture->ID)
-		return false;
+		return vertex;
 
 	s32 width, height;
 
-	Vertex_SetTexture(shader_set, vertex, texture);
-	Vertex_GetTextureSize(vertex, &width, &height);
+	Vertex_SetTexture(shader_set, &vertex, texture);
+	Vertex_GetTextureSize(&vertex, &width, &height);
 
 	if (!rect.w)  rect.w = width;
 	if (!rect.h)  rect.h = height;
@@ -3531,9 +3741,9 @@ Vertex_Create(
 	float x_off = 0, y_off = 0, scale_x, scale_y;
 	Rect_GetAspect(width, height, &rect.w, &rect.h, &x_off, &y_off, &scale_x, &scale_y, true);
 
-	vertex->settings.flip = true;
-	vertex->settings.scale_x = scale_x;
-	vertex->settings.scale_y = scale_y;
+	vertex.settings.flip = true;
+	vertex.settings.scale_x = scale_x;
+	vertex.settings.scale_y = scale_y;
 
 	if (scale_y > scale_x)
 		rect.x += x_off;
@@ -3541,9 +3751,9 @@ Vertex_Create(
 		rect.y += y_off;
 
 	/// only use x, y -> will show full texture
-	Vertex_Create(vertex, 2, (float *)&rect, sizeof(float) * 2);
+	Vertex_Create(&vertex, 2, (float *)&rect, sizeof(float) * 2);
 
-	return true;
+	return vertex;
 }
 
 /// ::: Mouse
@@ -4058,4 +4268,119 @@ Joypad_GetSection(
 	}
 
 	return 0;
+}
+
+/// Font (TrueType)
+/// ===========================================================================
+struct Font {
+	stbtt_fontinfo info = {};
+	String s_data;
+	s32 size = 0;
+	bool filter_linear = false;
+	Array<Triple<s32, s32, Texture>> a_textures;
+};
+
+struct Font_Codepoint {
+	Font *font = 0;
+	Texture texture = {};
+};
+
+instant Font
+Font_Load(
+	String *s_file,
+	u32 size
+) {
+	Assert(s_file);
+
+    Font font;
+    font.s_data = File_ReadAll(s_file, true);
+    font.size = size;
+
+    if (!font.s_data.length) {
+		LOG_ERROR("Font does not exists.");
+    }
+
+    const u8 *c_data = (u8 *)font.s_data.value;
+    stbtt_InitFont(&font.info, c_data, stbtt_GetFontOffsetForIndex(c_data, 0));
+
+    return font;
+}
+
+instant void
+Font_Destroy(
+	Font *font
+) {
+	Assert(font);
+
+	String_Destroy(&font->s_data);
+
+	*font = {};
+}
+
+instant Texture
+Font_CodepointToTexture(
+	Font *font,
+	s32 codepoint
+) {
+	Assert(font);
+
+	Texture result = {};
+
+	s32 w, h, x_off, y_off;
+
+	float scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
+	unsigned char *bitmap = stbtt_GetCodepointBitmap(
+			&font->info,
+			0,
+			scale,
+			codepoint,
+			&w,
+			&h,
+			&x_off,
+			&y_off
+		);
+
+	if (bitmap) {
+		Texture_Load(&result, bitmap, w, h, true, font->filter_linear);
+		free(bitmap);
+	}
+
+	return result;
+}
+
+instant Font_Codepoint
+Font_GetCodepointData(
+	Font *font,
+	s32 codepoint
+) {
+	Assert(font);
+
+	Font_Codepoint codepoint_data = {};
+	Triple<s32, s32, Texture> t_entry;
+	u64 t_index;
+
+    codepoint_data.font = font;
+
+	t_entry.first  = codepoint;
+	t_entry.second = font->size;
+
+	if (!Array_Find(&font->a_textures, t_entry, &t_index)) {
+		codepoint_data.texture = Font_CodepointToTexture(font, codepoint);
+		t_entry.third = codepoint_data.texture;
+		Array_Add(&font->a_textures, t_entry);
+	}
+	else {
+		codepoint_data.texture = ARRAY_IT(font->a_textures, t_index).third;
+	}
+
+	return codepoint_data;
+}
+
+instant void
+Font_Destroy(
+	Font_Codepoint *codepoint
+) {
+	Assert(codepoint);
+
+    Texture_Destroy(&codepoint->texture);
 }
