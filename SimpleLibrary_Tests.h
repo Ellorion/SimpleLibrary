@@ -396,13 +396,11 @@ Test_Files(
     	String s_filename;
     	String_Append(&s_filename, __FILE__);
 
-		File file;
-		File_Open(&file, &s_filename, "r");
+		File file = File_Open(&s_filename, "r");
 		AssertMessage(file.fp          , "File could not be opened.");
 		AssertMessage(File_Size(&file) , "Could not read file size.");
 
-		String s_data;
-		File_Read(&s_data, &file);
+		String s_data = File_Read(&file);
 		AssertMessage(s_data.length    , "Could not read file content.");
 
 		String_Destroy(&s_data);

@@ -271,16 +271,14 @@
 //		/// ===================================================================
 //		OpenGL_ClearScreen();
 //
-//		LOG_DEBUG("X-Axis Section: " << Joypad_GetSection(joypad.state.thumb_left_x, 1500, 10));
-//		LOG_DEBUG("Y-Axis Section: " << Joypad_GetSection(joypad.state.thumb_left_y, 1500, 10));
+//		LOG_DEBUG("X-Axis Section: " << Joypad_GetSection(joypad.state.thumb_left_x, 3000, 10));
+//		LOG_DEBUG("Y-Axis Section: " << Joypad_GetSection(joypad.state.thumb_left_y, 3000, 10));
 //
 //		Window_Update(window);
 //	}
 //}
 //
 //int main() {
-//	Test_Windows();
-//
 //	Window window;
 //
 //	Window_Create(&window, "Hello, World!", 800, 480);
@@ -467,8 +465,13 @@ Rect_GetAspect(
 
 /// ::: Memory
 /// ===========================================================================
-#define Memory_Create(type, length) (type *)_Memory_Alloc_Empty(sizeof(type) * length)
-#define Memory_Resize(buffer, type, length) (buffer ? (type *) _Memory_Resize(buffer, sizeof(type) * length) : (type *) Memory_Create(type, length));
+#define Memory_Create(type, length) \
+		(type *)_Memory_Alloc_Empty(sizeof(type) * length)
+
+#define Memory_Resize(buffer, type, length) \
+		(buffer \
+			? (type *) _Memory_Resize(buffer, sizeof(type) * length) \
+			: (type *) Memory_Create(type, length));
 
 #define MEMORY_SIGNATURE 123456
 
@@ -1926,25 +1929,25 @@ File_CreateDirectory(
 	return success;
 }
 
-instant void
+instant File
 File_Open(
-	File *file,
 	String *s_filename,
 	const char *mode
 ) {
-	Assert(file);
 	Assert(s_filename);
 	Assert(mode);
 
-	*file = {};
+	File file;
 
 	if (s_filename->length) {
 		char *c_filename = String_CreateCBufferCopy(s_filename);
 
-		file->fp = fopen(c_filename, mode);
+		file.fp = fopen(c_filename, mode);
 
 		Memory_Free(c_filename);
 	}
+
+	return file;
 }
 
 instant bool
@@ -1997,23 +2000,45 @@ File_Write(
     fwrite(data, sizeof(char), sizeof(char) * length, file->fp);
 }
 
-instant void
+instant String
 File_Read(
-	String *s_data,
 	File *file
 ) {
-	Assert(s_data);
+	Assert(file);
 
 	u64 length = File_Size(file);
 
-	s_data->value  = Memory_Resize(s_data->value, char, length);
-	s_data->length = length;
-	fread(s_data->value, sizeof(char), sizeof(char) * length, file->fp);
+	String s_data;
+
+	s_data.value  = Memory_Resize(s_data.value, char, length);
+	s_data.length = length;
+	fread(s_data.value, sizeof(char), sizeof(char) * length, file->fp);
+
+	return s_data;
 }
 
+instant String
+File_ReadFile(
+	String *s_filename,
+	bool as_binary = true
+) {
+    Assert(s_filename);
+
+    File file;
+
+    if (as_binary)
+		file = File_Open(s_filename, "rb");
+	else
+		file = File_Open(s_filename, "r");
+
+	String s_data = File_Read(&file);
+
+	File_Close(&file);
+
+	return s_data;
+}
 
 struct File_Watcher {
-	String *s_filename = 0;
 	HANDLE file = 0;
 	bool exists = false;
 	FILETIME lastWriteTime = {};
@@ -2742,11 +2767,9 @@ Image_LoadBMP32(
 		return result;
 	}
 
-	File file;
-	File_Open(&file, s_filename, "rb");
+	File file = File_Open(s_filename, "rb");
 
-	String s_data;
-	File_Read(&s_data, &file);
+	String s_data = File_Read(&file);
 
 	File_Close(&file);
 
