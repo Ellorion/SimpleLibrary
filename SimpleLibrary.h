@@ -246,6 +246,57 @@
 //}
 /// ===========================================================================
 
+/// Example: read left thumb x/y from xbox 360 (xinput) joypad
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(Window *window) {
+//	MSG msg;
+//	bool running = true;
+//	bool ui_zoom_enabled = true;
+//
+//	Joypad joypad;
+//	Joypad_Init_XInput(&joypad);
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
+//
+//		Joypad_GetInput(&joypad, 0);
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		LOG_DEBUG("X-Axis Section: " << Joypad_GetSection(joypad.state.thumb_left_x, 1500, 10));
+//		LOG_DEBUG("Y-Axis Section: " << Joypad_GetSection(joypad.state.thumb_left_y, 1500, 10));
+//
+//		Window_Update(window);
+//	}
+//}
+//
+//int main() {
+//	Test_Windows();
+//
+//	Window window;
+//
+//	Window_Create(&window, "Hello, World!", 800, 480);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//    return 0;
+//}
+/// ===========================================================================
+
 #include <iostream>
 #include <math.h>
 #include <windows.h>
@@ -3775,4 +3826,166 @@ Keyboard_Insert(
 	Assert(s_data);
 
 	String_Insert(s_data, keyboard->key_sym, s_data->length);
+}
+
+/// ::: Joypad
+/// ===========================================================================
+#define XINPUT_GAMEPAD_DPAD_UP          0x0001
+#define XINPUT_GAMEPAD_DPAD_DOWN        0x0002
+#define XINPUT_GAMEPAD_DPAD_LEFT        0x0004
+#define XINPUT_GAMEPAD_DPAD_RIGHT       0x0008
+#define XINPUT_GAMEPAD_START            0x0010
+#define XINPUT_GAMEPAD_BACK             0x0020
+#define XINPUT_GAMEPAD_LEFT_THUMB       0x0040
+#define XINPUT_GAMEPAD_RIGHT_THUMB      0x0080
+#define XINPUT_GAMEPAD_LEFT_SHOULDER    0x0100
+#define XINPUT_GAMEPAD_RIGHT_SHOULDER   0x0200
+#define XINPUT_GAMEPAD_A                0x1000
+#define XINPUT_GAMEPAD_B                0x2000
+#define XINPUT_GAMEPAD_X                0x4000
+#define XINPUT_GAMEPAD_Y                0x8000
+
+#define XINPUT_ERROR_DEVICE_NOT_CONNECTED 0x048F
+
+struct Joypad_State {
+	u64     packet_number = 0;
+
+    u16		button = 0;
+    u8		trigger_left = 0;
+    u8		trigger_right = 0;
+    s16		thumb_left_x = 0;
+    s16		thumb_left_y = 0;
+    s16		thumb_right_x = 0;
+    s16		thumb_right_y = 0;
+};
+
+typedef DWORD(WINAPI* proc_XInputGetState)(u64 joy_index, Joypad_State *state);
+
+struct Joypad {
+	HINSTANCE dll = 0;
+	Joypad_State state = {};
+
+	proc_XInputGetState GetState = 0;
+};
+
+instant bool
+Joypad_Init_XInput(
+	Joypad *joypad
+) {
+	Assert(joypad);
+
+    char sys_dir[MAX_PATH];
+
+    u64 sys_dir_len = GetSystemDirectory(sys_dir, sizeof(sys_dir));
+    if (!sys_dir_len OR sys_dir_len > sizeof(sys_dir))  return false;
+
+    strcat(sys_dir, "\\xinput1_3.dll");
+
+    joypad->dll = LoadLibrary(sys_dir);
+    if (!joypad->dll)  return false;
+
+    joypad->GetState = (proc_XInputGetState)GetProcAddress(joypad->dll, "XInputGetState");
+
+	return true;
+}
+
+instant bool
+Joypad_GetInput(
+	Joypad *joypad,
+	u64 joy_index
+) {
+	Assert(joypad);
+
+	if (!joypad->dll)  return false;
+
+	u64 result = joypad->GetState(joy_index, &joypad->state);
+
+	return (result != XINPUT_ERROR_DEVICE_NOT_CONNECTED);
+}
+
+///@Hint: test for != 0
+
+/// DPad
+#define Joypad_IsPadUp(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_DPAD_UP)
+#define Joypad_IsPadDown(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_DPAD_DOWN)
+#define Joypad_IsPadLeft(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_DPAD_LEFT)
+#define Joypad_IsPadRight(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_DPAD_RIGHT)
+
+/// Center buttons
+#define Joypad_IsStart(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_START)
+#define Joypad_IsSelect(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_BACK)
+
+/// Thumb button
+#define Joypad_IsThumbLeft(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_LEFT_THUMB)
+#define Joypad_IsThumbRight(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_RIGHT_THUMB)
+
+/// Shoulder buttons
+#define Joypad_IsShoulderLeft(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_LEFT_SHOULDER)
+#define Joypad_IsShoulderRight(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_RIGHT_SHOULDER)
+
+/// Control buttons
+#define Joypad_IsA(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_A)
+#define Joypad_IsB(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_B)
+#define Joypad_IsX(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_X)
+#define Joypad_IsY(ptr_joypad) \
+	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_Y)
+
+/// for axis
+/// Returns: current section
+instant s32
+Joypad_GetSection(
+	s16 axis_value,
+	u16 deadzone,
+	u16 section_max
+) {
+	if (axis_value <= deadzone AND axis_value >= -deadzone)  return 0;
+
+	if (section_max > 0) {
+		constexpr s16 limit = 32767;
+
+		if (axis_value < 0) axis_value += deadzone;
+		else                axis_value -= deadzone;
+
+		float steps = (float)((limit - deadzone) / section_max);
+
+		return axis_value / steps;
+	}
+
+	return 0;
+}
+
+/// for triggers
+/// Returns: current section
+instant u8
+Joypad_GetSection(
+	u8  axis_value,
+	u16 deadzone,
+	u16 section_max
+) {
+	if (axis_value <= deadzone AND axis_value >= -deadzone)  return 0;
+
+	if (section_max > 0) {
+		constexpr s64 limit = 255;
+
+		if (axis_value < 0) axis_value += deadzone;
+		else                axis_value -= deadzone;
+
+		float steps = (float)((limit - deadzone) / section_max);
+		return axis_value / steps;
+	}
+
+	return 0;
 }
