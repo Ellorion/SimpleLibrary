@@ -309,15 +309,15 @@
 //
 //	Font font = Font_Load(&s_font, 60);
 //	/// Vertex_Destroy will free the texture, which will be created here
-//	Font_Codepoint font_codepoint_a = Font_GetCodepointData(&font, 'a');
-//	Font_Codepoint font_codepoint_b = Font_GetCodepointData(&font, 'b');
+//	Codepoint codepoint_a = Codepoint_GetData(&font, 'a');
+//	Codepoint codepoint_b = Codepoint_GetData(&font, 'b');
 //	Font_Destroy(&font);
 //
 //	ShaderSet shader_set;
 //	ShaderSet_Load(&shader_set, &shader_text, window);
 //
-//	Vertex vertex_a = Vertex_Create(&shader_set, &font_codepoint_a.texture, {});
-//	Vertex vertex_b = Vertex_Create(&shader_set, &font_codepoint_b.texture, {50, 50});
+//	Vertex vertex_a = Vertex_Create(&shader_set, &codepoint_a.texture, {});
+//	Vertex vertex_b = Vertex_Create(&shader_set, &codepoint_b.texture, {50, 50});
 //
 //	glEnable(GL_BLEND);
 //	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -350,6 +350,106 @@
 //	Window window;
 //
 //	Window_Create(&window, "Hello, World!", 800, 480);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//	return 0;
+//}
+/// ===========================================================================
+
+/// Example: draw string in opengl window
+///          (not good performance -> see hint)
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(
+//	Window *window
+//) {
+//	MSG msg;
+//	bool running = true;
+//	bool ui_zoom_enabled = true;
+//
+//	Timer timer_fps;
+//	Time_Reset(&timer_fps);
+//
+//	Timer timer_fps_log;
+//	Time_Reset(&timer_fps_log);
+//
+//	String s_font;
+//	String_Append(&s_font, "test/AutourOne-Regular.ttf");
+//
+//	Font font = Font_Load(&s_font, 20);
+//
+//	ShaderSet shader_set;
+//	ShaderSet_Load(&shader_set, &shader_text, window);
+//
+//	glEnable(GL_BLEND);
+//	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//
+//	Keyboard *keyboard = window->keyboard;
+//
+//	String s_text;
+//	String_Append(&s_text, "Hello, World!");
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
+//
+//		if (keyboard->up[VK_ESCAPE])
+//			running = false;
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		RectF rect_position = {};
+//
+//		///@Hint @Performance: because of creating / destroying everything
+//		///   all the time, performance will not be good
+//		FOR(s_text.length, it) {
+//			char ch = s_text.value[it];
+//
+//			Codepoint codepoint = Codepoint_GetData(&font, ch);
+//
+//			Codepoint_GetPosition(&codepoint, &rect_position);
+//
+//			///@Hint: ' ' does not have a texture
+//			if (!Texture_IsEmpty(&codepoint.texture)) {
+//				Vertex vertex = Vertex_Create(&shader_set, &codepoint.texture, {rect_position.x, rect_position.y});
+//				Vertex_Render(&shader_set, &vertex);
+//				Vertex_Destroy(&vertex);
+//			}
+//
+//			Font_Destroy(&codepoint);
+//		}
+//
+//		Window_Update(window);
+//
+//		u32 fps = Time_GetFPS(&timer_fps);
+//
+//		if (Time_HasElapsed(&timer_fps_log, 1000)) {
+//			LOG_DEBUG(fps << " fps");
+//		}
+//	}
+//
+//	Font_Destroy(&font);
+//	ShaderSet_Destroy(&shader_set);
+//}
+//
+//int main() {
+//	Window window;
+//
+//	Keyboard keyboard;
+//	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard);
 //	Window_Show(&window);
 //
 //	OpenGL_Init(&window);
@@ -2962,6 +3062,15 @@ struct Texture {
 	u32 ID = 0;
 };
 
+instant bool
+Texture_IsEmpty(
+	Texture *texture
+) {
+	Assert(texture);
+
+	return (texture->ID == 0);
+}
+
 instant void
 Texture_GetSizeAndBind(
 	Texture *texture,
@@ -3615,7 +3724,7 @@ Vertex_Destroy(
 
 	glDeleteVertexArrays(1, &vertex->array_id);
 
-	Texture_Destroy(vertex->texture);
+//	Texture_Destroy(vertex->texture);
 
 	*vertex = {};
 }
@@ -4280,8 +4389,14 @@ struct Font {
 	Array<Triple<s32, s32, Texture>> a_textures;
 };
 
-struct Font_Codepoint {
+struct Codepoint {
 	Font *font = 0;
+	s32 codepoint = 0;
+	s32 ascent = 0;
+	s32 descent = 0;
+	s32 advance = 0;
+	s32 left_side_bearing = 0;
+	RectI rect_subpixel = {};
 	Texture texture = {};
 };
 
@@ -4312,13 +4427,15 @@ Font_Destroy(
 ) {
 	Assert(font);
 
+	///@TODO: clear texture array and free texturess
+
 	String_Destroy(&font->s_data);
 
 	*font = {};
 }
 
 instant Texture
-Font_CodepointToTexture(
+Codepoint_ToTexture(
 	Font *font,
 	s32 codepoint
 ) {
@@ -4348,39 +4465,117 @@ Font_CodepointToTexture(
 	return result;
 }
 
-instant Font_Codepoint
-Font_GetCodepointData(
+instant Codepoint
+Codepoint_GetData(
 	Font *font,
 	s32 codepoint
 ) {
 	Assert(font);
 
-	Font_Codepoint codepoint_data = {};
-	Triple<s32, s32, Texture> t_entry;
-	u64 t_index;
-
+	Codepoint codepoint_data = {};
     codepoint_data.font = font;
+    codepoint_data.codepoint = codepoint;
 
-	t_entry.first  = codepoint;
-	t_entry.second = font->size;
+    float scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
 
-	if (!Array_Find(&font->a_textures, t_entry, &t_index)) {
-		codepoint_data.texture = Font_CodepointToTexture(font, codepoint);
-		t_entry.third = codepoint_data.texture;
-		Array_Add(&font->a_textures, t_entry);
+    /// get texture
+	{
+		Triple<s32, s32, Texture> t_entry;
+		u64 t_index;
+
+		t_entry.first  = codepoint;
+		t_entry.second = font->size;
+
+		if (!Array_Find(&font->a_textures, t_entry, &t_index)) {
+			codepoint_data.texture = Codepoint_ToTexture(font, codepoint);
+			t_entry.third = codepoint_data.texture;
+			Array_Add(&font->a_textures, t_entry);
+		}
+		else {
+			codepoint_data.texture = ARRAY_IT(font->a_textures, t_index).third;
+		}
 	}
-	else {
-		codepoint_data.texture = ARRAY_IT(font->a_textures, t_index).third;
+
+	/// get v-metrics
+	/// @Performance: if it's not codepoint dependent, refactor it
+	{
+		stbtt_GetFontVMetrics(&font->info, &codepoint_data.ascent, &codepoint_data.descent, 0);
+		codepoint_data.ascent  *= scale;
+		codepoint_data.descent *= scale;
+	}
+
+	/// get advance / left side bearing
+	{
+		stbtt_GetCodepointHMetrics(&font->info,
+									codepoint,
+									&codepoint_data.advance,
+									&codepoint_data.left_side_bearing);
+
+		codepoint_data.advance *= scale;
+		codepoint_data.left_side_bearing *= scale;
+	}
+
+	/// get subpixel
+	{
+		stbtt_GetCodepointBitmapBoxSubpixel(&font->info,
+											codepoint,
+											scale,
+											scale,
+											0,
+											0,
+											&codepoint_data.rect_subpixel.x,
+											&codepoint_data.rect_subpixel.y,
+											&codepoint_data.rect_subpixel.w,
+											&codepoint_data.rect_subpixel.h);
 	}
 
 	return codepoint_data;
 }
 
 instant void
-Font_Destroy(
-	Font_Codepoint *codepoint
+Codepoint_GetPosition(
+	Codepoint *codepoint,
+	RectF *rect
 ) {
 	Assert(codepoint);
+	Assert(codepoint->font);
+	Assert(rect);
+
+	/// rect_x: starting position for each line
+	///         to reset -> set 0 or x-offset
+	/// rect_h: lower end baseline for text drawing
+	///         increasing it will skip to the next line
+	/// rect_w: store advance of prev codepoint to
+	///         set the correct start position for the
+	///         next codepoint
+
+	*rect = {
+		rect->x + codepoint->left_side_bearing + rect->w,
+		rect->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->descent,
+		(float)codepoint->advance,
+		0
+	};
+}
+
+instant void
+Font_Destroy(
+	Codepoint *codepoint
+) {
+	Assert(codepoint);
+	Assert(codepoint->font);
+
+	Triple<s32, s32, Texture> t_entry;
+	u64 t_index;
+
+	t_entry.first  = codepoint->codepoint;
+	t_entry.second = codepoint->font->size;
+
+	auto *ta_textures = &codepoint->font->a_textures;
+
+	/// find -> remove
+	if (Array_Find(ta_textures, t_entry, &t_index)) {
+		Array_Remove(ta_textures, t_index);
+	}
 
     Texture_Destroy(&codepoint->texture);
 }
