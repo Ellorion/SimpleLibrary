@@ -179,7 +179,7 @@ Test_Arrays(
 			AssertMessage(String_IsEqual(&s_data_it, "test"), "Array_Add failed.");
 		}
 
-		Array_Clear(&as_test);
+		Array_ClearContainer(&as_test);
 		AssertMessage(		as_test.size  == 0
 						AND as_test.count == 0
 						AND as_test.limit == 8

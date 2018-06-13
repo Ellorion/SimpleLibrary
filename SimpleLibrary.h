@@ -429,7 +429,7 @@
 //				Vertex_Destroy(&vertex);
 //			}
 //
-//			Font_Destroy(&codepoint);
+//			Codepoint_Destroy(&codepoint);
 //		}
 //
 //		Window_Update(window);
@@ -443,6 +443,95 @@
 //
 //	Font_Destroy(&font);
 //	ShaderSet_Destroy(&shader_set);
+//}
+//
+//int main() {
+//	Window window;
+//
+//	Keyboard keyboard;
+//	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//	return 0;
+//}
+/// ===========================================================================
+
+/// Example: draw text from a file with ttf in opengl window + word wrap
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(
+//	Window *window
+//) {
+//	MSG msg;
+//	bool running = true;
+//
+//	Timer timer_fps;
+//	Time_Reset(&timer_fps);
+//
+//	Timer timer_fps_log;
+//	Time_Reset(&timer_fps_log);
+//
+//	String s_font;
+//	String_Append(&s_font, "test/AutourOne-Regular.ttf");
+//
+//	Font font = Font_Load(&s_font, 20);
+//
+//	ShaderSet shader_set;
+//	ShaderSet_Load(&shader_set, &shader_text, window);
+//
+//	glEnable(GL_BLEND);
+//	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//
+//	Keyboard *keyboard = window->keyboard;
+//
+//	String s_file;
+//	String_Append(&s_file, "test.txt");
+//
+//	String s_data = File_ReadAll(&s_file);
+//	String_Destroy(&s_file);
+//
+//	String_Replace(&s_data, "\r\n", "\n");
+//
+//	Text text = Text_Create(&shader_set, &font, &s_data, {10, 20, window->width - 10, 0});
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window);
+//
+//		if (keyboard->up[VK_ESCAPE])
+//			running = false;
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		Text_Render(&text);
+//
+//		Window_Update(window);
+//
+//		u32 fps = Time_GetFPS(&timer_fps);
+//
+//		if (Time_HasElapsed(&timer_fps_log, 1000)) {
+//			LOG_DEBUG(fps << " fps");
+//		}
+//	}
+//
+//	Text_Destroy(&text);
+//	Font_Destroy(&font);
+//	ShaderSet_Destroy(&shader_set);
+//
+//	String_Destroy(&s_data);
 //}
 //
 //int main() {
@@ -580,6 +669,25 @@ struct Point {
 	float x = 0.0f;
 	float y = 0.0f;
 };
+
+template<typename K, typename L>
+struct Tuple {
+	K first;
+	L second;
+};
+
+template<typename K, typename L>
+bool
+operator == (
+	Tuple<K, L> &data1,
+	Tuple<K, L> &data2
+) {
+	if (data1.first == data2.first){
+		return true;
+	}
+
+	return false;
+}
 
 template<typename K, typename L, typename V>
 struct Triple {
@@ -1604,7 +1712,7 @@ operator > (
 }
 
 
-/// :::Array
+/// ::: Array
 /// ===========================================================================
 #define ARRAY_IT(_array, _it) \
 	((_array).memory)[_it]
@@ -1679,9 +1787,8 @@ Array_AddEmpty(
 ///       do that
 template<typename T>
 instant void
-Array_Clear(
-	Array<T> *array,
-	bool use_generic = false
+Array_ClearContainer(
+	Array<T> *array
 ) {
 	Assert(array);
 
@@ -1804,8 +1911,7 @@ Array_Split(
 	u64 len_delim = String_Length(delimiter);
 
 	s64 pos_found;
-	while(String_Find(&s_data_it, delimiter, &pos_found, 0, false)) {
-
+	while(String_Find(&s_data_it, delimiter, &pos_found)) {
 		if (pos_found) {
 			String s_element;
 
@@ -1846,6 +1952,46 @@ Array_Split(
 	}
 
 	return as_result;
+}
+
+instant void
+_String_SplitWords(
+	String *s_data,
+	Array<String> *as_words
+) {
+	Assert(s_data);
+	Assert(as_words);
+	Assert(!as_words->count);
+
+	///@Performance: text could be processed without having to split
+	///              data multiple times
+	Array<String> as_lines = Array_Split(s_data, "\n", ARRAY_DELIMITER_BACK);
+
+	FOR_ARRAY(as_lines, it_lines) {
+		Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ", ARRAY_DELIMITER_FRONT);
+
+		FOR_ARRAY(tas_words, it_words) {
+			Array_Add(as_words, ARRAY_IT(tas_words, it_words));
+		}
+
+		Array_DestroyContainer(&tas_words);
+	}
+
+	Array_Destroy(&as_lines);
+}
+
+instant void
+Array_Clear(
+	Array<String> *array
+) {
+	Assert(array);
+
+    FOR_ARRAY(*array, it) {
+		String *ts_data = &ARRAY_IT(*array, it);
+		String_Destroy(ts_data);
+    }
+
+    Array_ClearContainer(array);
 }
 
 template <typename T>
@@ -2354,7 +2500,7 @@ File_ReadDirectory(
 ) {
 	Assert(as_files);
 
-	Array_Clear(as_files);
+	Array_ClearContainer(as_files);
 
 	if (!c_length)
 		c_length = String_Length(c_path);
@@ -3062,6 +3208,34 @@ struct Texture {
 	u32 ID = 0;
 };
 
+bool
+operator == (
+	Texture &texture_1,
+	Texture &texture_2
+) {
+	if (texture_1.ID == texture_2.ID){
+		return true;
+	}
+
+	return false;
+}
+
+instant void
+Array_Destroy(
+	Array<Tuple<Texture, Array<float>>> *array
+) {
+	Assert(array);
+
+	FOR_ARRAY(*array, it) {
+		Tuple<Texture, Array<float>> *t_tuple = &ARRAY_IT(*array, it);
+		Array<float> *a_second = &t_tuple->second;
+
+		Array_DestroyContainer(a_second);
+	}
+
+	Array_DestroyContainer(array);
+}
+
 instant bool
 Texture_IsEmpty(
 	Texture *texture
@@ -3155,6 +3329,36 @@ Texture_IsEqual(
 	Texture data2
 ) {
 	return (data1.ID == data2.ID);
+}
+
+instant void
+Texture_AddPosition(
+	Array<Tuple<Texture, Array<float>>> *a_texture_positions,
+	Texture *texture,
+	float x,
+	float y
+) {
+	Assert(a_texture_positions);
+	Assert(texture);
+
+	u64 t_index;
+
+	Tuple<Texture, Array<float>> t_find;
+	t_find.first = *texture;
+
+	Tuple<Texture, Array<float>> *t_element;
+
+	if (!Array_Find(a_texture_positions, t_find, &t_index)) {
+		Array_AddEmpty(a_texture_positions, &t_element);
+		t_element->first = *texture;
+	}
+	else {
+		t_element = &ARRAY_IT(*a_texture_positions, t_index);
+	}
+
+	Array<float> *a_positions = &t_element->second;
+	Array_Add(a_positions, x);
+	Array_Add(a_positions, y);
 }
 
 /// ::: GLSL
@@ -3830,37 +4034,23 @@ instant Vertex
 Vertex_Create(
 	ShaderSet *shader_set,
 	Texture *texture,
-	Rect rect
+	Array<float> *a_positions
 ) {
+	Assert(shader_set);
 	Assert(texture);
+	Assert(a_positions);
 
 	Vertex vertex = {};
 
 	if (!texture->ID)
 		return vertex;
 
-	s32 width, height;
-
 	Vertex_SetTexture(shader_set, &vertex, texture);
-	Vertex_GetTextureSize(&vertex, &width, &height);
-
-	if (!rect.w)  rect.w = width;
-	if (!rect.h)  rect.h = height;
-
-	float x_off = 0, y_off = 0, scale_x, scale_y;
-	Rect_GetAspect(width, height, &rect.w, &rect.h, &x_off, &y_off, &scale_x, &scale_y, true);
 
 	vertex.settings.flip = true;
-	vertex.settings.scale_x = scale_x;
-	vertex.settings.scale_y = scale_y;
-
-	if (scale_y > scale_x)
-		rect.x += x_off;
-	else
-		rect.y += y_off;
 
 	/// only use x, y -> will show full texture
-	Vertex_Create(&vertex, 2, (float *)&rect, sizeof(float) * 2);
+	Vertex_Create(&vertex, 2, (float *)a_positions->memory, sizeof(float) * a_positions->count);
 
 	return vertex;
 }
@@ -4379,7 +4569,7 @@ Joypad_GetSection(
 	return 0;
 }
 
-/// Font (TrueType)
+/// ::: Font (TrueType)
 /// ===========================================================================
 struct Font {
 	stbtt_fontinfo info = {};
@@ -4387,6 +4577,7 @@ struct Font {
 	s32 size = 0;
 	bool filter_linear = false;
 	Array<Triple<s32, s32, Texture>> a_textures;
+	Array<Tuple<Texture, Array<float>>> a_texture_positions;
 };
 
 struct Codepoint {
@@ -4427,13 +4618,22 @@ Font_Destroy(
 ) {
 	Assert(font);
 
-	///@TODO: clear texture array and free texturess
+	Array<Triple<s32, s32, Texture>> *ta_textures = &font->a_textures;
+
+	FOR_ARRAY(*ta_textures, it) {
+		Triple<s32, s32, Texture> *t_data = &ARRAY_IT(*ta_textures, it);
+		Texture_Destroy(&t_data->third);
+	}
 
 	String_Destroy(&font->s_data);
+	Array_Destroy(&font->a_texture_positions);
 
 	*font = {};
 }
 
+
+/// ::: Font (TrueType) ::: Codepoint
+/// ===========================================================================
 instant Texture
 Codepoint_ToTexture(
 	Font *font,
@@ -4545,6 +4745,8 @@ Codepoint_GetPosition(
 	///         to reset -> set 0 or x-offset
 	/// rect_h: lower end baseline for text drawing
 	///         increasing it will skip to the next line
+	///         has to get the value from itself, or it
+	///         will reset to 0
 	/// rect_w: store advance of prev codepoint to
 	///         set the correct start position for the
 	///         next codepoint
@@ -4553,12 +4755,61 @@ Codepoint_GetPosition(
 		rect->x + codepoint->left_side_bearing + rect->w,
 		rect->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->descent,
 		(float)codepoint->advance,
-		0
+		rect->h
 	};
 }
 
+instant s32
+Codepoint_GetAdvance(
+	Font *font,
+	s32 codepoint
+) {
+	Assert(font);
+
+	float scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
+
+	s32 advance;
+	stbtt_GetCodepointHMetrics(&font->info, codepoint, &advance, 0);
+	advance *= scale;
+
+	return advance;
+}
+
+
+instant u64
+Codepoint_GetStringAdvance(
+	Font *font,
+	String *s_data
+) {
+	Assert(font);
+	Assert(s_data);
+
+	u64 advance_word = 0;
+
+	FOR(s_data->length, it) {
+		char ch = s_data->value[it];
+		advance_word += Codepoint_GetAdvance(font, ch);
+	}
+
+	return advance_word;
+}
+
 instant void
-Font_Destroy(
+Codepoint_SetNewline(
+	Font *font,
+	RectF *rect_position,
+	float x_offset_start = 0
+) {
+	Assert(font);
+	Assert(rect_position);
+
+	rect_position->h += font->size;
+	rect_position->x = x_offset_start;
+	rect_position->w = 0;
+}
+
+instant void
+Codepoint_Destroy(
 	Codepoint *codepoint
 ) {
 	Assert(codepoint);
@@ -4578,4 +4829,132 @@ Font_Destroy(
 	}
 
     Texture_Destroy(&codepoint->texture);
+
+    ///@TODO: remove from positions array too
+}
+
+
+/// ::: Text (OpenGL rendering)
+/// ===========================================================================
+struct Text {
+	ShaderSet *shader_set = 0;
+	Font *font = 0;
+	String s_data = {};
+	Rect rect = {};
+};
+
+instant Text
+Text_Create(
+	ShaderSet *shader_set,
+	Font *font,
+	String *s_data,
+	Rect rect
+) {
+	Assert(shader_set);
+	Assert(font);
+
+	Text text;
+
+	text.shader_set = shader_set;
+	text.font = font;
+	text.rect = rect;
+
+	if (s_data)
+		String_Append(&text.s_data, s_data->value, s_data->length);
+
+	return text;
+}
+
+instant void
+Text_Destroy(
+	Text *text,
+	bool free_position_cache = false
+) {
+	Assert(text);
+
+	String_Destroy(&text->s_data);
+
+	if (free_position_cache)
+		Array_Destroy(&text->font->a_texture_positions);
+}
+
+///@Hint: will add out-of-bound textures to the rendering queue
+instant void
+Text_Render(
+	ShaderSet *shader_set,
+	Font *font,
+	String *s_data,
+	Rect rect,
+	Array<Tuple<Texture, Array<float>>> *a_texture_positions
+) {
+	Assert(shader_set);
+	Assert(font);
+	Assert(s_data);
+
+	RectF rect_position = { rect.x, 0, 0, rect.y };
+
+	/// reuse the same buffer for better performance
+	static Array<String> as_words;
+	_String_SplitWords(s_data, &as_words);
+
+	FOR_ARRAY(as_words, it_words) {
+		String *ts_word = &ARRAY_IT(as_words, it_words);
+
+		u64 advance_word = Codepoint_GetStringAdvance(font, ts_word);
+
+		u64 it_word_start = 0;
+
+		if (rect.w AND rect_position.x + advance_word >= rect.w - 10) {
+			Codepoint_SetNewline(font, &rect_position, rect.x);
+
+			if (it_words AND String_StartWith(ts_word, " ")) {
+				it_word_start = 1;
+			}
+		}
+
+		FOR_START(it_word_start, ts_word->length, it) {
+			char ch = ts_word->value[it];
+
+			Codepoint codepoint = Codepoint_GetData(font, ch);
+			Codepoint_GetPosition(&codepoint, &rect_position);
+
+			///@Hint: ' ' does not have a texture
+			if (!Texture_IsEmpty(&codepoint.texture)) {
+				Texture_AddPosition(
+					a_texture_positions,
+					&codepoint.texture,
+					rect_position.x,
+					rect_position.y
+				);
+			}
+		}
+
+		if (String_EndWith(ts_word, "\n")) {
+			rect_position.h += font->size;
+			rect_position.x = rect.x;
+		}
+	}
+
+	FOR_ARRAY(*a_texture_positions, it) {
+		Tuple<Texture, Array<float>> *t_data = &ARRAY_IT(*a_texture_positions, it);
+
+		Vertex vertex = Vertex_Create(shader_set, &t_data->first, &t_data->second);
+		Vertex_Render(shader_set, &vertex);
+		Vertex_Destroy(&vertex);
+
+		Array_DestroyContainer(&t_data->second);
+	}
+
+	Array_ClearContainer(a_texture_positions);
+
+	Array_Clear(&as_words);
+}
+
+instant void
+Text_Render(
+	Text *text
+) {
+	Assert(text);
+
+	Text_Render(text->shader_set, text->font, &text->s_data, text->rect, &text->font->a_texture_positions);
 }
