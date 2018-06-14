@@ -665,6 +665,13 @@ struct RectI {
 	s32 h;
 };
 
+struct Color {
+	float r = 1.0f;
+	float g = 1.0f;
+	float b = 1.0f;
+	float a = 1.0f;
+};
+
 struct Point {
 	float x = 0.0f;
 	float y = 0.0f;
@@ -4809,6 +4816,7 @@ struct Text {
 	Font *font = 0;
 	String s_data = {};
 	Rect rect = {};
+	Color color;
 };
 
 instant Text
@@ -4844,31 +4852,42 @@ Text_Destroy(
 }
 
 instant void
-Vertex_GetAttributeBuffer(
+Vertex_FindOrAdd(
 	Array<Vertex> *a_vertex,
 	Texture *texture_find,
-	u32 group_count,
-	const char *c_attribute_find,
-	Vertex_Buffer<float> **a_buffer
+	Vertex **entry
 ) {
 	Assert(a_vertex);
 	Assert(texture_find);
-	Assert(c_attribute_find);
-	Assert(a_buffer);
+	Assert(entry);
 
 	Vertex *t_vertex_entry;
 	Vertex t_vertex_find;
 	t_vertex_find.texture = *texture_find;
 
-	Vertex_Buffer<float> *t_attribute_entry;
-	Vertex_Buffer<float> t_attribute_find;
-	t_attribute_find.name = c_attribute_find;
-	t_attribute_find.group_count = group_count;
-
 	if (!Array_FindOrAddEmpty(a_vertex, t_vertex_find, &t_vertex_entry))
 		*t_vertex_entry = t_vertex_find;
 
-	if (!Array_FindOrAddEmpty(&t_vertex_entry->a_attributes, t_attribute_find, &t_attribute_entry))
+	*entry = t_vertex_entry;
+}
+
+instant void
+Vertex_FindOrAddAttribute(
+	Vertex *vertex,
+	u32 group_count,
+	const char *c_attribute_name,
+	Vertex_Buffer<float> **a_buffer
+) {
+	Assert(vertex);
+	Assert(c_attribute_name);
+	Assert(a_buffer);
+
+	Vertex_Buffer<float> *t_attribute_entry;
+	Vertex_Buffer<float> t_attribute_find;
+	t_attribute_find.name = c_attribute_name;
+	t_attribute_find.group_count = group_count;
+
+	if (!Array_FindOrAddEmpty(&vertex->a_attributes, t_attribute_find, &t_attribute_entry))
 		*t_attribute_entry = t_attribute_find;
 
 	*a_buffer = t_attribute_entry;
@@ -4880,7 +4899,8 @@ Text_Render(
 	ShaderSet *shader_set,
 	Font *font,
 	String *s_data,
-	Rect rect
+	Rect rect,
+	Color color
 ) {
 	Assert(shader_set);
 	Assert(font);
@@ -4888,10 +4908,11 @@ Text_Render(
 
 	RectF rect_position = { rect.x, 0, 0, rect.y };
 
-	Array<Vertex> a_vertex;
 
 	/// reuse the same buffer for better performance
+	static Array<Vertex> a_vertex;
 	static Array<String> as_words;
+
 	_String_SplitWords(s_data, &as_words);
 
 	FOR_ARRAY(as_words, it_words) {
@@ -4902,6 +4923,7 @@ Text_Render(
 		u64 it_word_start = 0;
 		u64 width_max = rect.w + rect.x;
 
+		/// word wrap
 		if (width_max AND rect_position.x + advance_word >= width_max) {
 			Codepoint_SetNewline(font, &rect_position, rect.x);
 
@@ -4919,14 +4941,18 @@ Text_Render(
 			///@Hint: ' ' does not have a texture
 			if (!Texture_IsEmpty(&codepoint.texture)) {
 				Vertex_Buffer<float> *t_attribute;
-				Vertex_GetAttributeBuffer(&a_vertex, &codepoint.texture, 2, "vertex_position", &t_attribute);
+
+				Vertex *t_vertex;
+				Vertex_FindOrAdd(&a_vertex, &codepoint.texture, &t_vertex);
+
+				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
 				Array_Add(&t_attribute->a_buffer, rect_position.x);
 				Array_Add(&t_attribute->a_buffer, rect_position.y);
 
-				Vertex_GetAttributeBuffer(&a_vertex, &codepoint.texture, 3, "text_color", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, 0.2f);
-				Array_Add(&t_attribute->a_buffer, 0.2f);
-				Array_Add(&t_attribute->a_buffer, 1.0f);
+				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
+				Array_Add(&t_attribute->a_buffer, color.r);
+				Array_Add(&t_attribute->a_buffer, color.g);
+				Array_Add(&t_attribute->a_buffer, color.b);
 			}
 		}
 
@@ -4940,10 +4966,12 @@ Text_Render(
 		Vertex_BindAttributes(shader_set, t_vertex);
 
 		Vertex_Render(shader_set, t_vertex);
-		Vertex_Destroy(t_vertex);
-	}
 
-	Array_DestroyContainer(&a_vertex);
+		FOR_ARRAY(t_vertex->a_attributes, it) {
+			Vertex_Buffer<float> *t_attribute = &ARRAY_IT(t_vertex->a_attributes, it);
+			Array_ClearContainer(&t_attribute->a_buffer);
+		}
+	}
 
 	Array_Clear(&as_words);
 }
@@ -4954,5 +4982,5 @@ Text_Render(
 ) {
 	Assert(text);
 
-	Text_Render(text->shader_set, text->font, &text->s_data, text->rect);
+	Text_Render(text->shader_set, text->font, &text->s_data, text->rect, text->color);
 }
