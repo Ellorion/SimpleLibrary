@@ -1849,6 +1849,29 @@ Array_Find(
 	return false;
 }
 
+template <typename T>
+instant bool
+Array_FindOrAddEmpty(
+	Array<T> *array,
+	T find,
+	T **entry
+) {
+	Assert(array);
+	Assert(entry);
+
+	u64 t_index_find;
+	bool found_element = Array_Find(array, find, &t_index_find);
+
+	if (!found_element) {
+        Array_AddEmpty(array, entry);
+	}
+	else {
+		*entry = &ARRAY_IT(*array, t_index_find);
+	}
+
+	return found_element;
+}
+
 /// Returns T, so dynamic memory can still be free'd
 template <typename T>
 instant T
@@ -2722,16 +2745,16 @@ Window_Create(
 	s32 x = 0;
 	s32 y = 0;
 
-	RECT windowRect = {};
-	GetClientRect(GetDesktopWindow(), &windowRect);
+	RECT rect_window = {};
+	GetClientRect(GetDesktopWindow(), &rect_window);
 
 	/// get desktop window center
 	/// -------------------------------------
-	x = (windowRect.right  - width)  >> 1;
-	y = (windowRect.bottom - height) >> 1;
+	x = (rect_window.right  - width)  >> 1;
+	y = (rect_window.bottom - height) >> 1;
 
-	windowRect.right  = width;
-	windowRect.bottom = height;
+	rect_window.right  = width;
+	rect_window.bottom = height;
 
 	u32 dwExStyle = WS_EX_APPWINDOW;
 	u32 dwStyle   = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
@@ -2744,7 +2767,7 @@ Window_Create(
 		dwStyle   |= WS_OVERLAPPEDWINDOW;
 	}
 
-	AdjustWindowRectEx(&windowRect, dwStyle, false, dwExStyle);
+	AdjustWindowRectEx(&rect_window, dwStyle, false, dwExStyle);
 
 	/// create window
 	/// -------------------------------------
@@ -2752,9 +2775,10 @@ Window_Create(
 								class_name, title,
 								dwStyle,
 								x, y,
-								windowRect.right - windowRect.left,
-								windowRect.bottom - windowRect.top,
+								rect_window.right - rect_window.left,
+								rect_window.bottom - rect_window.top,
 								0, 0, hInstance, 0);
+
 	if (!hWnd) {
 		LOG_ERROR("CreateWindow() failed: Cannot create a window.");
 		Window_Destroy(window);
@@ -2796,8 +2820,8 @@ Window_Create(
 
 	window->hDC = hDC;
 
-	window->title = title;
-	window->width = width;
+	window->title  = title;
+	window->width  = width;
 	window->height = height;
 
 	if (mouse)
@@ -3045,10 +3069,10 @@ OpenGL_AdjustScaleViewport(
 ) {
 	Assert(window);
 
-	RECT rctWindow;
-	GetClientRect(window->hWnd, &rctWindow);
-	s32 new_width  = rctWindow.right  - rctWindow.left;
-	s32 new_height = rctWindow.bottom - rctWindow.top;
+	RECT rect_window;
+	GetClientRect(window->hWnd, &rect_window);
+	s32 new_width  = rect_window.right  - rect_window.left;
+	s32 new_height = rect_window.bottom - rect_window.top;
 
 	float x = 0.f;
 	float y = 0.f;
@@ -3331,36 +3355,6 @@ Texture_IsEqual(
 	return (data1.ID == data2.ID);
 }
 
-instant void
-Texture_AddPosition(
-	Array<Tuple<Texture, Array<float>>> *a_texture_positions,
-	Texture *texture,
-	float x,
-	float y
-) {
-	Assert(a_texture_positions);
-	Assert(texture);
-
-	u64 t_index;
-
-	Tuple<Texture, Array<float>> t_find;
-	t_find.first = *texture;
-
-	Tuple<Texture, Array<float>> *t_element;
-
-	if (!Array_Find(a_texture_positions, t_find, &t_index)) {
-		Array_AddEmpty(a_texture_positions, &t_element);
-		t_element->first = *texture;
-	}
-	else {
-		t_element = &ARRAY_IT(*a_texture_positions, t_index);
-	}
-
-	Array<float> *a_positions = &t_element->second;
-	Array_Add(a_positions, x);
-	Array_Add(a_positions, y);
-}
-
 /// ::: GLSL
 /// ===========================================================================
 
@@ -3374,6 +3368,7 @@ R"(
 
 	uniform vec4 viewport = vec4(0, 0, 800, 480);
 	in vec2 vertex_position;
+	in vec3 text_color;
 
 	float left   = 0.0f;
 	float right  = viewport.z;
@@ -3392,11 +3387,13 @@ R"(
 
 	out Vertex_Data {
 		mat4 proj_matrix;
+		vec3 text_color;
 	} o_Vertex;
 
 	void main() {
 		gl_Position = vec4(vertex_position, 0, 1);
 		o_Vertex.proj_matrix = proj_matrix;
+		o_Vertex.text_color  = text_color;
 	}
 )",
 
@@ -3414,9 +3411,11 @@ R"(
 
 	in Vertex_Data {
 		mat4 proj_matrix;
+		vec3 text_color;
 	} i_Vertex[];
 
 	out vec2 tex_coords;
+	out vec3 text_color;
 
 	mat4 scale_matrix = mat4(
 		scale_x , 0      , 0, 0,
@@ -3439,21 +3438,25 @@ R"(
 		/// v1
 		gl_Position = v_pos_1;
 		tex_coords = vec2(0, 0);
+		text_color = i_Vertex[0].text_color;
 		EmitVertex();
 
 		/// v3
 		gl_Position = v_pos_2;
 		tex_coords = vec2(1, 0);
+		text_color = i_Vertex[0].text_color;
 		EmitVertex();
 
 		/// v2
 		gl_Position = v_pos_3;
 		tex_coords = vec2(0, 1);
+		text_color = i_Vertex[0].text_color;
 		EmitVertex();
 
 		/// v4
 		gl_Position = v_pos_4;
 		tex_coords = vec2(1, 1);
+		text_color = i_Vertex[0].text_color;
 		EmitVertex();
 
 		EndPrimitive();
@@ -3471,10 +3474,11 @@ R"(
 	layout(origin_upper_left) in vec4 gl_FragCoord;
 
 	in vec2 tex_coords;
+	in vec3 text_color;
 
 	void main() {
 		vec4 color_greyscale = texture2D(fragment_texture, tex_coords);
-		gl_FragColor = vec4(1.0f, 1.0f, 1.0f, color_greyscale.a);
+		gl_FragColor = vec4(text_color.xyz, color_greyscale.a);
 	}
 )"};
 
@@ -3827,11 +3831,10 @@ ShaderSet_Load(
 /// ===========================================================================
 template <typename T>
 struct Vertex_Buffer {
-	const char *name;
-	u32 id;
-	const T *data;
-	u32 size;
-	u32 group_count;
+	u32 id = 0;
+	const char *name = 0;
+	u32 group_count = 0;
+	Array<T> a_buffer;
 };
 
 struct Vertex_Settings {
@@ -3842,10 +3845,30 @@ struct Vertex_Settings {
 
 struct Vertex {
 	u32 array_id = 0;
+	Texture texture;
 	Array<Vertex_Buffer<float>> a_attributes;
-	Texture *texture = 0;
 	Vertex_Settings settings;
 };
+
+bool
+operator == (
+	Vertex &v1,
+	Vertex &v2
+) {
+	if (v1.texture.ID OR v2.texture.ID) {
+		if (v1.texture == v2.texture) {
+			return true;
+		}
+
+		return false;
+	}
+
+	if (v1.array_id == v2.array_id) {
+		return true;
+	}
+
+	return false;
+}
 
 template <typename T>
 bool
@@ -3863,52 +3886,9 @@ Vertex_GetTextureSize(
 	s32 *height
 ) {
 	Assert(vertex);
-    Assert(vertex->texture);
 
     if (width)  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH , width);
 	if (height) glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, height);
-}
-
-instant void
-Vertex_AddAttribute(
-	Vertex *vertex,
-	u32 group_count,
-	const char *name,
-	const float *data,
-	u32 size
-) {
-	Assert(vertex);
-	Assert(vertex->array_id > 0);
-
-	Vertex_Buffer<float> vertex_buffer;
-	glBindVertexArray(vertex->array_id);
-
-	vertex_buffer.name = name;
-	vertex_buffer.group_count = group_count;
-	vertex_buffer.data = data;
-	vertex_buffer.size = size;
-
-	u64 find_it;
-	bool found_entry = Array_Find(&vertex->a_attributes, vertex_buffer, &find_it);
-
-	if (!found_entry) {
-		/// new attribute
-		glGenBuffers(1, &vertex_buffer.id);
-		glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer.id);
-		glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW);
-
-		Array_Add(&vertex->a_attributes, vertex_buffer);
-	}
-	else {
-		/// update opengl attribute data
-		Vertex_Buffer<float> *t_buffer = &ARRAY_IT(vertex->a_attributes, find_it);
-		vertex_buffer.id = t_buffer->id;
-		glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer.id);
-		glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW);
-
-		/// update data in vertex->a_attribute
-		*t_buffer = vertex_buffer;
-	}
 }
 
 inline void
@@ -3917,50 +3897,17 @@ Vertex_Destroy(
 ) {
 	Assert(vertex);
 
-	if (!vertex->array_id)  return;
-
 	FOR_ARRAY(vertex->a_attributes, it) {
-		Vertex_Buffer<float> *vertex_buffer = &ARRAY_IT(vertex->a_attributes, it);
-		glDeleteBuffers(1, &vertex_buffer->id);
+		Vertex_Buffer<float> *t_attribute = &ARRAY_IT(vertex->a_attributes, it);
+		glDeleteBuffers(1, &t_attribute->id);
+		Array_DestroyContainer(&t_attribute->a_buffer);
+		int a = 1;
 	}
 
+	glDeleteVertexArrays(1, &vertex->array_id);
 	Array_DestroyContainer(&vertex->a_attributes);
 
-	glDeleteVertexArrays(1, &vertex->array_id);
-
-//	Texture_Destroy(vertex->texture);
-
 	*vertex = {};
-}
-
-inline void
-Vertex_Create(
-	Vertex *vertex,
-	u8 point_count,
-	const float *vertex_data,
-	u32 vertex_size
-) {
-	Assert(vertex);
-
-	if (!vertex->array_id)
-		glGenVertexArrays(1, &vertex->array_id);
-
-	///@Info: make sure this attribute exists in the shader
-	Vertex_AddAttribute(vertex, point_count, "vertex_position", vertex_data, vertex_size);
-}
-
-inline void
-Vertex_UseTextureIndex(
-	ShaderSet *shader_set,
-	Vertex *vertex,
-	Texture *texture
-) {
-	Assert(shader_set);
-	Assert(vertex);
-	Assert(texture);
-
-	/// use this uniform in a shader, if the texture index has to change
-	Shader_BindAndUseIndex0(shader_set, "fragment_texture", vertex->texture);
 }
 
 inline void
@@ -3973,9 +3920,33 @@ Vertex_SetTexture(
 	Assert(vertex);
 	Assert(texture);
 
-	vertex->texture = texture;
+	vertex->texture = *texture;
 
-	Vertex_UseTextureIndex(shader_set, vertex, texture);
+	/// use this uniform in a shader, if the texture index has to change
+	Shader_BindAndUseIndex0(shader_set, "fragment_texture", &vertex->texture);
+}
+
+instant Vertex
+Vertex_Create(
+	ShaderSet *shader_set,
+	Texture *texture
+) {
+	Assert(shader_set);
+	Assert(texture);
+
+	Vertex vertex = {};
+
+	if (!texture->ID)
+		return vertex;
+
+	Vertex_SetTexture(shader_set, &vertex, texture);
+
+	vertex.settings.flip = true;
+
+	if (!vertex.array_id)
+		glGenVertexArrays(1, &vertex.array_id);
+
+	return vertex;
 }
 
 instant void
@@ -4006,9 +3977,31 @@ Vertex_Load(
 		);
 	}
 
-	if (vertex->texture) {
-		Vertex_SetTexture(shader_set, vertex, vertex->texture);
+	if (vertex->texture.ID) {
+		Vertex_SetTexture(shader_set, vertex, &vertex->texture);
 	}
+}
+
+inline void
+Vertex_BindAttributes(
+	ShaderSet *shader_set,
+	Vertex *vertex
+) {
+	Assert(shader_set);
+	Assert(vertex);
+	Assert(vertex->a_attributes.count);
+
+	FOR_ARRAY(vertex->a_attributes, it_buffer) {
+		Vertex_Buffer<float> *t_buffer = &ARRAY_IT(vertex->a_attributes, it_buffer);
+
+		if (!t_buffer->id)
+			glGenBuffers(1, &t_buffer->id);
+
+		glBindBuffer(GL_ARRAY_BUFFER, t_buffer->id);
+		glBufferData(GL_ARRAY_BUFFER, t_buffer->a_buffer.size, t_buffer->a_buffer.memory, GL_DYNAMIC_DRAW);
+	}
+
+	Vertex_Load(shader_set, vertex);
 }
 
 inline void
@@ -4020,39 +4013,15 @@ Vertex_Render(
 	Assert(vertex);
 	Assert(vertex->a_attributes.count);
 
-	Vertex_Buffer<float> a_vertices = ARRAY_IT(vertex->a_attributes, 0);
+	///@Hint: vertex positions have to be the first entry in the array
+	Vertex_Buffer<float> *a_positions = &ARRAY_IT(vertex->a_attributes, 0);
+	Assert(a_positions->group_count);
 
 	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip);
 	Shader_SetValue(shader_set, "scale_x", vertex->settings.scale_x);
 	Shader_SetValue(shader_set, "scale_y", vertex->settings.scale_y);
 
-	Vertex_Load(shader_set, vertex);
-	glDrawArrays(GL_POINTS, 0,  a_vertices.size / sizeof(GLfloat) / a_vertices.group_count);
-}
-
-instant Vertex
-Vertex_Create(
-	ShaderSet *shader_set,
-	Texture *texture,
-	Array<float> *a_positions
-) {
-	Assert(shader_set);
-	Assert(texture);
-	Assert(a_positions);
-
-	Vertex vertex = {};
-
-	if (!texture->ID)
-		return vertex;
-
-	Vertex_SetTexture(shader_set, &vertex, texture);
-
-	vertex.settings.flip = true;
-
-	/// only use x, y -> will show full texture
-	Vertex_Create(&vertex, 2, (float *)a_positions->memory, sizeof(float) * a_positions->count);
-
-	return vertex;
+	glDrawArrays(GL_POINTS, 0, a_positions->a_buffer.size / sizeof(GLfloat) / a_positions->group_count);
 }
 
 /// ::: Mouse
@@ -4575,16 +4544,17 @@ struct Font {
 	stbtt_fontinfo info = {};
 	String s_data;
 	s32 size = 0;
+	s32 ascent = 0;
+	s32 descent = 0;
+	s32 linegap = 0;
 	bool filter_linear = false;
 	Array<Triple<s32, s32, Texture>> a_textures;
-	Array<Tuple<Texture, Array<float>>> a_texture_positions;
+//	Array<Tuple<Texture, Array<float>>> a_texture_positions;
 };
 
 struct Codepoint {
 	Font *font = 0;
 	s32 codepoint = 0;
-	s32 ascent = 0;
-	s32 descent = 0;
 	s32 advance = 0;
 	s32 left_side_bearing = 0;
 	RectI rect_subpixel = {};
@@ -4609,6 +4579,13 @@ Font_Load(
     const u8 *c_data = (u8 *)font.s_data.value;
     stbtt_InitFont(&font.info, c_data, stbtt_GetFontOffsetForIndex(c_data, 0));
 
+	float scale = stbtt_ScaleForPixelHeight(&font.info, font.size);
+
+	stbtt_GetFontVMetrics(&font.info, &font.ascent, &font.descent, &font.linegap);
+	font.ascent  *= scale;
+	font.descent *= scale;
+	font.linegap *= scale;
+
     return font;
 }
 
@@ -4626,7 +4603,6 @@ Font_Destroy(
 	}
 
 	String_Destroy(&font->s_data);
-	Array_Destroy(&font->a_texture_positions);
 
 	*font = {};
 }
@@ -4696,14 +4672,6 @@ Codepoint_GetData(
 		}
 	}
 
-	/// get v-metrics
-	/// @Performance: if it's not codepoint dependent, refactor it
-	{
-		stbtt_GetFontVMetrics(&font->info, &codepoint_data.ascent, &codepoint_data.descent, 0);
-		codepoint_data.ascent  *= scale;
-		codepoint_data.descent *= scale;
-	}
-
 	/// get advance / left side bearing
 	{
 		stbtt_GetCodepointHMetrics(&font->info,
@@ -4753,7 +4721,7 @@ Codepoint_GetPosition(
 
 	*rect = {
 		rect->x + codepoint->left_side_bearing + rect->w,
-		rect->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->descent,
+		rect->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->font->descent,
 		(float)codepoint->advance,
 		rect->h
 	};
@@ -4803,7 +4771,7 @@ Codepoint_SetNewline(
 	Assert(font);
 	Assert(rect_position);
 
-	rect_position->h += font->size;
+	rect_position->h += (font->ascent - font->descent + font->linegap + 1);
 	rect_position->x = x_offset_start;
 	rect_position->w = 0;
 }
@@ -4873,9 +4841,37 @@ Text_Destroy(
 	Assert(text);
 
 	String_Destroy(&text->s_data);
+}
 
-	if (free_position_cache)
-		Array_Destroy(&text->font->a_texture_positions);
+instant void
+Vertex_GetAttributeBuffer(
+	Array<Vertex> *a_vertex,
+	Texture *texture_find,
+	u32 group_count,
+	const char *c_attribute_find,
+	Vertex_Buffer<float> **a_buffer
+) {
+	Assert(a_vertex);
+	Assert(texture_find);
+	Assert(c_attribute_find);
+	Assert(a_buffer);
+
+	Vertex *t_vertex_entry;
+	Vertex t_vertex_find;
+	t_vertex_find.texture = *texture_find;
+
+	Vertex_Buffer<float> *t_attribute_entry;
+	Vertex_Buffer<float> t_attribute_find;
+	t_attribute_find.name = c_attribute_find;
+	t_attribute_find.group_count = group_count;
+
+	if (!Array_FindOrAddEmpty(a_vertex, t_vertex_find, &t_vertex_entry))
+		*t_vertex_entry = t_vertex_find;
+
+	if (!Array_FindOrAddEmpty(&t_vertex_entry->a_attributes, t_attribute_find, &t_attribute_entry))
+		*t_attribute_entry = t_attribute_find;
+
+	*a_buffer = t_attribute_entry;
 }
 
 ///@Hint: will add out-of-bound textures to the rendering queue
@@ -4884,14 +4880,15 @@ Text_Render(
 	ShaderSet *shader_set,
 	Font *font,
 	String *s_data,
-	Rect rect,
-	Array<Tuple<Texture, Array<float>>> *a_texture_positions
+	Rect rect
 ) {
 	Assert(shader_set);
 	Assert(font);
 	Assert(s_data);
 
 	RectF rect_position = { rect.x, 0, 0, rect.y };
+
+	Array<Vertex> a_vertex;
 
 	/// reuse the same buffer for better performance
 	static Array<String> as_words;
@@ -4903,8 +4900,9 @@ Text_Render(
 		u64 advance_word = Codepoint_GetStringAdvance(font, ts_word);
 
 		u64 it_word_start = 0;
+		u64 width_max = rect.w + rect.x;
 
-		if (rect.w AND rect_position.x + advance_word >= rect.w - 10) {
+		if (width_max AND rect_position.x + advance_word >= width_max) {
 			Codepoint_SetNewline(font, &rect_position, rect.x);
 
 			if (it_words AND String_StartWith(ts_word, " ")) {
@@ -4920,32 +4918,32 @@ Text_Render(
 
 			///@Hint: ' ' does not have a texture
 			if (!Texture_IsEmpty(&codepoint.texture)) {
-				Texture_AddPosition(
-					a_texture_positions,
-					&codepoint.texture,
-					rect_position.x,
-					rect_position.y
-				);
+				Vertex_Buffer<float> *t_attribute;
+				Vertex_GetAttributeBuffer(&a_vertex, &codepoint.texture, 2, "vertex_position", &t_attribute);
+				Array_Add(&t_attribute->a_buffer, rect_position.x);
+				Array_Add(&t_attribute->a_buffer, rect_position.y);
+
+				Vertex_GetAttributeBuffer(&a_vertex, &codepoint.texture, 3, "text_color", &t_attribute);
+				Array_Add(&t_attribute->a_buffer, 0.2f);
+				Array_Add(&t_attribute->a_buffer, 0.2f);
+				Array_Add(&t_attribute->a_buffer, 1.0f);
 			}
 		}
 
 		if (String_EndWith(ts_word, "\n")) {
-			rect_position.h += font->size;
-			rect_position.x = rect.x;
+			Codepoint_SetNewline(font, &rect_position, rect.x);
 		}
 	}
 
-	FOR_ARRAY(*a_texture_positions, it) {
-		Tuple<Texture, Array<float>> *t_data = &ARRAY_IT(*a_texture_positions, it);
+	FOR_ARRAY(a_vertex, it) {
+		Vertex *t_vertex = &ARRAY_IT(a_vertex, it);
+		Vertex_BindAttributes(shader_set, t_vertex);
 
-		Vertex vertex = Vertex_Create(shader_set, &t_data->first, &t_data->second);
-		Vertex_Render(shader_set, &vertex);
-		Vertex_Destroy(&vertex);
-
-		Array_DestroyContainer(&t_data->second);
+		Vertex_Render(shader_set, t_vertex);
+		Vertex_Destroy(t_vertex);
 	}
 
-	Array_ClearContainer(a_texture_positions);
+	Array_DestroyContainer(&a_vertex);
 
 	Array_Clear(&as_words);
 }
@@ -4956,5 +4954,5 @@ Text_Render(
 ) {
 	Assert(text);
 
-	Text_Render(text->shader_set, text->font, &text->s_data, text->rect, &text->font->a_texture_positions);
+	Text_Render(text->shader_set, text->font, &text->s_data, text->rect);
 }
