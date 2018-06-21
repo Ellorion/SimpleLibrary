@@ -1,6 +1,6 @@
 #pragma once
 
-/// Compiler: g++
+/// Compiler: g++ (6.3.0)
 ///
 /// Linker flags:
 ///		-lcomdlg32
@@ -644,6 +644,23 @@ _AssertMessage(
 #define GETBYTE(x, bit_start) LOBYTE((x) >> (bit_start))
 #define GETBIT(x, bit_start) (((x) >> (bit_start)) & 0x1)
 
+#define RECT_SET(_name, _x, _y, _w, _h) \
+	{ \
+		(_name).x = _x; \
+		(_name).y = _y; \
+		(_name).w = _w; \
+		(_name).h = _h; \
+	}
+
+#define RECT_MAKE(_type, _name, _x, _y, _w, _h) \
+	_type _name; \
+	{ \
+		(_name).x = _x; \
+		(_name).y = _y; \
+		(_name).w = _w; \
+		(_name).h = _h; \
+	}
+
 struct Rect {
 	float x = 0.0f;
 	float y = 0.0f;
@@ -659,10 +676,10 @@ struct RectF {
 };
 
 struct RectI {
-	s32 x;
-	s32 y;
-	s32 w;
-	s32 h;
+	s32 x = 0;
+	s32 y = 0;
+	s32 w = 0;
+	s32 h = 0;
 };
 
 struct Color {
@@ -776,6 +793,23 @@ Rect_GetAspect(
 		if (scale_x)  *scale_x = (float)*width_dst  / width_src;
 		if (scale_y)  *scale_y = (float)*height_dst / height_src;
     }
+}
+
+
+instant bool
+Rect_IsIntersecting(
+	Rect *rect_inner,
+	Rect *rect_outer
+) {
+	Assert(rect_inner);
+	Assert(rect_outer);
+
+	if (rect_inner->x + rect_inner->w < rect_outer->x)  return false;
+	if (rect_inner->x > rect_outer->x + rect_outer->w)  return false;
+
+	if (rect_inner->y + rect_inner->h < rect_outer->y)  return false;
+
+	return true;
 }
 
 /// ::: Memory
@@ -1616,12 +1650,12 @@ String_Replace(
 instant s64
 String_Insert(
 	String *s_data,
-	const char c_data,
-	u64 index_start
+	u64 index_start,
+	const char c_data
 ) {
 	Assert(s_data);
 
-	s32 length = 0;
+	s64 length = 0;
 
 	if (c_data == '\b') {
 		length = 0;
@@ -1630,6 +1664,10 @@ String_Insert(
 		if (!length) --length;
 
 		String_Remove(s_data, index_start + length, index_start);
+	}
+	else if (c_data == '\r' OR c_data == '\n') {
+		length = 1;
+		String_Insert(s_data, index_start, "\n", length);
 	}
 	else {
 		length = 1;
@@ -1740,6 +1778,7 @@ struct Array {
 	u64   size     = 0;
 	u64   limit    = 0; /// in bytes
 	u64   count    = 0;
+	bool  by_reference = false;
 };
 
 ///@Info: will copy the struct element pointers only
@@ -1869,11 +1908,11 @@ Array_FindOrAddEmpty(
 	u64 t_index_find;
 	bool found_element = Array_Find(array, find, &t_index_find);
 
-	if (!found_element) {
-        Array_AddEmpty(array, entry);
+	if (found_element) {
+		*entry = &ARRAY_IT(*array, t_index_find);
 	}
 	else {
-		*entry = &ARRAY_IT(*array, t_index_find);
+        Array_AddEmpty(array, entry);
 	}
 
 	return found_element;
@@ -1910,10 +1949,13 @@ Array_Destroy(
 ) {
 	Assert(array);
 
- 	while(array->count) {
-		String s_data_it = Array_Remove(array, 0);
-		String_Destroy(&s_data_it);
-    }
+	if (!array->by_reference) {
+		while(array->count) {
+			String s_data_it = Array_Remove(array, 0);
+			String_Destroy(&s_data_it);
+		}
+	}
+
     Array_DestroyContainer(array);
 }
 
@@ -1924,6 +1966,69 @@ enum ARRAY_DELIMITER_TYPE {
 	/// Insert delimiter at the end if the current token
 	ARRAY_DELIMITER_BACK
 };
+
+instant Array<String>
+Array_SplitRef(
+	String *s_data,
+	const char *delimiter,
+	ARRAY_DELIMITER_TYPE type = ARRAY_DELIMITER_IGNORE
+
+) {
+	Assert(s_data);
+
+	Array<String> as_result;
+	as_result.by_reference = true;
+
+	String s_data_it = *s_data;
+	u64 len_delim = String_Length(delimiter);
+
+	s64 pos_found;
+	while(String_Find(&s_data_it, delimiter, &pos_found)) {
+		if (pos_found) {
+			String *s_element;
+			Array_AddEmpty(&as_result, &s_element);
+
+			s_element->value  = s_data_it.value;
+			s_element->length = pos_found;
+
+			if (type == ARRAY_DELIMITER_FRONT AND as_result.count) {
+				s_element->value  -= len_delim;
+				s_element->length += len_delim;
+			}
+			else if (type == ARRAY_DELIMITER_BACK) {
+				s_element->length += len_delim;
+			}
+		}
+		else {
+			/// in case of f.e: "\n\n\n" with "\n" as delimiter
+			String *s_element;
+			Array_AddEmpty(&as_result, &s_element);
+
+			if (type == ARRAY_DELIMITER_BACK) {
+				s_element->value  = s_data_it.value;
+				s_element->length = len_delim;
+			}
+		}
+
+		s_data_it.value  += pos_found + len_delim;
+		s_data_it.length -= pos_found + len_delim;
+	}
+
+	if (s_data_it.length > 0) {
+		String *s_element;
+		Array_AddEmpty(&as_result, &s_element);
+
+		if (type == ARRAY_DELIMITER_FRONT AND as_result.count) {
+			s_element->value  -= len_delim;
+			s_element->length += len_delim;
+		}
+
+		s_element->value  = s_data_it.value;
+		s_element->length = s_data_it.length;
+	}
+
+	return as_result;
+}
 
 /// Will copy string values, so array content has to be free'd
 instant Array<String>
@@ -1985,7 +2090,7 @@ Array_Split(
 }
 
 instant void
-_String_SplitWords(
+_String_SplitWordsStatic(
 	String *s_data,
 	Array<String> *as_words
 ) {
@@ -1993,12 +2098,12 @@ _String_SplitWords(
 	Assert(as_words);
 	Assert(!as_words->count);
 
-	///@Performance: text could be processed without having to split
-	///              data multiple times
-	Array<String> as_lines = Array_Split(s_data, "\n", ARRAY_DELIMITER_BACK);
+	as_words->by_reference = true;
+
+	Array<String> as_lines = Array_SplitRef(s_data, "\n", ARRAY_DELIMITER_BACK);
 
 	FOR_ARRAY(as_lines, it_lines) {
-		Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ", ARRAY_DELIMITER_FRONT);
+		Array<String> tas_words = Array_SplitRef(&ARRAY_IT(as_lines, it_lines), " ", ARRAY_DELIMITER_FRONT);
 
 		FOR_ARRAY(tas_words, it_words) {
 			Array_Add(as_words, ARRAY_IT(tas_words, it_words));
@@ -2016,10 +2121,12 @@ Array_Clear(
 ) {
 	Assert(array);
 
-    FOR_ARRAY(*array, it) {
-		String *ts_data = &ARRAY_IT(*array, it);
-		String_Destroy(ts_data);
-    }
+	if (!array->by_reference) {
+		FOR_ARRAY(*array, it) {
+			String *ts_data = &ARRAY_IT(*array, it);
+			String_Destroy(ts_data);
+		}
+	}
 
     Array_ClearContainer(array);
 }
@@ -2102,8 +2209,6 @@ Array_Sort_Ascending(
 
 	Array_Sort_Quick_Ascending( &array->memory[0], &array->memory[array->count - 1]);
 }
-
-
 
 template <typename T>
 instant void
@@ -3374,6 +3479,9 @@ R"(
 	#version 330 core
 
 	uniform vec4 viewport = vec4(0, 0, 800, 480);
+	uniform float     scale_x       	= 1.0f;
+	uniform float     scale_y       	= 1.0f;
+
 	in vec2 vertex_position;
 	in vec3 text_color;
 
@@ -3392,14 +3500,23 @@ R"(
 		 1
 	);
 
+	mat4 scale_matrix = mat4(
+		scale_x , 0      , 0, 0,
+		0       , scale_y, 0, 0,
+		0       , 0      , 1, 0,
+		0       , 0      , 0, 1
+	);
+
 	out Vertex_Data {
 		mat4 proj_matrix;
+		mat4 scale_matrix;
 		vec3 text_color;
 	} o_Vertex;
 
 	void main() {
 		gl_Position = vec4(vertex_position, 0, 1);
 		o_Vertex.proj_matrix = proj_matrix;
+		o_Vertex.scale_matrix = scale_matrix;
 		o_Vertex.text_color  = text_color;
 	}
 )",
@@ -3411,29 +3528,21 @@ R"(
 	layout(triangle_strip, max_vertices = 4) out;
 
 	uniform sampler2D fragment_texture;
-	uniform float     scale_x       	= 1.0f;
-	uniform float     scale_y       	= 1.0f;
-
 	vec2 size = textureSize(fragment_texture, 0);
 
 	in Vertex_Data {
 		mat4 proj_matrix;
+		mat4 scale_matrix;
 		vec3 text_color;
 	} i_Vertex[];
 
 	out vec2 tex_coords;
 	out vec3 text_color;
 
-	mat4 scale_matrix = mat4(
-		scale_x , 0      , 0, 0,
-		0       , scale_y, 0, 0,
-		0       , 0      , 1, 0,
-		0       , 0      , 0, 1
-	);
-
 	void main() {
-		vec4 point       = gl_in[0].gl_Position;
-		mat4 proj_matrix = i_Vertex[0].proj_matrix;
+		vec4 point        = gl_in[0].gl_Position;
+		mat4 proj_matrix  = i_Vertex[0].proj_matrix;
+		mat4 scale_matrix = i_Vertex[0].scale_matrix;
 
 		mat4 matrix_mod = proj_matrix;
 
@@ -3473,9 +3582,6 @@ R"(
 R"(
 	#version 330 core
 
-	uniform vec4      viewport         = vec4(0, 0, 800, 480);
-	uniform float     scale_x          = 1.0f;
-	uniform float     scale_y          = 1.0f;
 	uniform sampler2D fragment_texture;
 
 	layout(origin_upper_left) in vec4 gl_FragCoord;
@@ -3828,7 +3934,14 @@ ShaderSet_Load(
 	glUseProgram(shader_set->program_id);
 
 	if (shader_set->window) {
-		RectF viewport = {shader_set->window->x_viewport, shader_set->window->y_viewport, (float)shader_set->window->width, (float)shader_set->window->height};
+		RectF viewport;
+		Window *t_window = shader_set->window;
+
+		viewport.x = t_window->x_viewport;
+		viewport.y = t_window->y_viewport;
+		viewport.w = (float)t_window->width;
+		viewport.h = (float)t_window->height;
+
 		Shader_SetValue(shader_set, "viewport", (float *)&viewport, 4);
 		glDisable(GL_BLEND);
 	}
@@ -4029,6 +4142,48 @@ Vertex_Render(
 	Shader_SetValue(shader_set, "scale_y", vertex->settings.scale_y);
 
 	glDrawArrays(GL_POINTS, 0, a_positions->a_buffer.size / sizeof(GLfloat) / a_positions->group_count);
+}
+
+instant void
+Vertex_FindOrAdd(
+	Array<Vertex> *a_vertex,
+	Texture *texture_find,
+	Vertex **entry
+) {
+	Assert(a_vertex);
+	Assert(texture_find);
+	Assert(entry);
+
+	Vertex *t_vertex_entry;
+	Vertex t_vertex_find;
+	t_vertex_find.texture = *texture_find;
+
+	if (!Array_FindOrAddEmpty(a_vertex, t_vertex_find, &t_vertex_entry))
+		*t_vertex_entry = t_vertex_find;
+
+	*entry = t_vertex_entry;
+}
+
+instant void
+Vertex_FindOrAddAttribute(
+	Vertex *vertex,
+	u32 group_count,
+	const char *c_attribute_name,
+	Vertex_Buffer<float> **a_buffer
+) {
+	Assert(vertex);
+	Assert(c_attribute_name);
+	Assert(a_buffer);
+
+	Vertex_Buffer<float> *t_attribute_entry;
+	Vertex_Buffer<float> t_attribute_find;
+	t_attribute_find.name = c_attribute_name;
+	t_attribute_find.group_count = group_count;
+
+	if (!Array_FindOrAddEmpty(&vertex->a_attributes, t_attribute_find, &t_attribute_entry))
+		*t_attribute_entry = t_attribute_find;
+
+	*a_buffer = t_attribute_entry;
 }
 
 /// ::: Mouse
@@ -4380,7 +4535,7 @@ Keyboard_Insert(
 	Assert(keyboard);
 	Assert(s_data);
 
-	String_Insert(s_data, keyboard->key_sym, s_data->length);
+	String_Insert(s_data, s_data->length, keyboard->key_sym);
 }
 
 /// ::: Joypad
@@ -4726,12 +4881,9 @@ Codepoint_GetPosition(
 	///         set the correct start position for the
 	///         next codepoint
 
-	*rect = {
-		rect->x + codepoint->left_side_bearing + rect->w,
-		rect->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->font->descent,
-		(float)codepoint->advance,
-		rect->h
-	};
+	rect->x = rect->x + codepoint->left_side_bearing + rect->w;
+	rect->y = rect->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->font->descent;
+	rect->w = (float)codepoint->advance;
 }
 
 instant s32
@@ -4851,48 +5003,6 @@ Text_Destroy(
 	String_Destroy(&text->s_data);
 }
 
-instant void
-Vertex_FindOrAdd(
-	Array<Vertex> *a_vertex,
-	Texture *texture_find,
-	Vertex **entry
-) {
-	Assert(a_vertex);
-	Assert(texture_find);
-	Assert(entry);
-
-	Vertex *t_vertex_entry;
-	Vertex t_vertex_find;
-	t_vertex_find.texture = *texture_find;
-
-	if (!Array_FindOrAddEmpty(a_vertex, t_vertex_find, &t_vertex_entry))
-		*t_vertex_entry = t_vertex_find;
-
-	*entry = t_vertex_entry;
-}
-
-instant void
-Vertex_FindOrAddAttribute(
-	Vertex *vertex,
-	u32 group_count,
-	const char *c_attribute_name,
-	Vertex_Buffer<float> **a_buffer
-) {
-	Assert(vertex);
-	Assert(c_attribute_name);
-	Assert(a_buffer);
-
-	Vertex_Buffer<float> *t_attribute_entry;
-	Vertex_Buffer<float> t_attribute_find;
-	t_attribute_find.name = c_attribute_name;
-	t_attribute_find.group_count = group_count;
-
-	if (!Array_FindOrAddEmpty(&vertex->a_attributes, t_attribute_find, &t_attribute_entry))
-		*t_attribute_entry = t_attribute_find;
-
-	*a_buffer = t_attribute_entry;
-}
-
 ///@Hint: will add out-of-bound textures to the rendering queue
 instant void
 Text_Render(
@@ -4906,14 +5016,13 @@ Text_Render(
 	Assert(font);
 	Assert(s_data);
 
-	RectF rect_position = { rect.x, 0, 0, rect.y };
-
+	RECT_MAKE(RectF, rect_position, rect.x, 0, 0, rect.y);
 
 	/// reuse the same buffer for better performance
 	static Array<Vertex> a_vertex;
 	static Array<String> as_words;
 
-	_String_SplitWords(s_data, &as_words);
+	_String_SplitWordsStatic(s_data, &as_words);
 
 	FOR_ARRAY(as_words, it_words) {
 		String *ts_word = &ARRAY_IT(as_words, it_words);
@@ -4921,16 +5030,18 @@ Text_Render(
 		u64 advance_word = Codepoint_GetStringAdvance(font, ts_word);
 
 		u64 it_word_start = 0;
-		u64 width_max = rect.w + rect.x;
+		u64 width_max = rect.x + rect.w;
 
 		/// word wrap
-		if (width_max AND rect_position.x + advance_word >= width_max) {
+		if (rect.w AND rect_position.x + advance_word >= width_max) {
 			Codepoint_SetNewline(font, &rect_position, rect.x);
 
 			if (it_words AND String_StartWith(ts_word, " ")) {
 				it_word_start = 1;
 			}
 		}
+
+		RECT_MAKE(Rect, rect_window, 0, 0, shader_set->window->width, shader_set->window->height);
 
 		FOR_START(it_word_start, ts_word->length, it) {
 			char ch = ts_word->value[it];
@@ -4940,10 +5051,15 @@ Text_Render(
 
 			///@Hint: ' ' does not have a texture
 			if (!Texture_IsEmpty(&codepoint.texture)) {
-				Vertex_Buffer<float> *t_attribute;
+				RECT_MAKE(Rect, rect_texture, rect_position.x, rect_position.y, 10, 10);
+
+				if (!Rect_IsIntersecting(&rect_texture, &rect_window))
+					continue;
 
 				Vertex *t_vertex;
 				Vertex_FindOrAdd(&a_vertex, &codepoint.texture, &t_vertex);
+
+				Vertex_Buffer<float> *t_attribute;
 
 				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
 				Array_Add(&t_attribute->a_buffer, rect_position.x);
