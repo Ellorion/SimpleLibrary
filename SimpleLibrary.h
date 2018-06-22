@@ -552,6 +552,83 @@
 //}
 /// ===========================================================================
 
+/// Example: render a colored rectangle
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(
+//	Window *window
+//) {
+//	MSG msg;
+//	bool running = true;
+//
+//	ShaderSet shader_set;
+//	ShaderSet_Load(&shader_set, &shader_rect, window);
+//
+//	OpenGL_UseBlending(true);
+//
+//	Keyboard *keyboard = window->keyboard;
+//
+//	Vertex vertex_rect = Vertex_Create(&shader_set, 0);
+//
+//	Vertex_Buffer<float> *t_attribute;
+//
+//	Vertex_FindOrAddAttribute(&vertex_rect, 4, "vertex_position", &t_attribute);
+//	Array_Add(&t_attribute->a_buffer, 10.0f);
+//	Array_Add(&t_attribute->a_buffer, 10.0f);
+//	Array_Add(&t_attribute->a_buffer, 300.0f);
+//	Array_Add(&t_attribute->a_buffer, 200.0f);
+//
+//	Vertex_FindOrAddAttribute(&vertex_rect, 4, "rect_color", &t_attribute);
+//	Array_Add(&t_attribute->a_buffer, 1.0f);
+//	Array_Add(&t_attribute->a_buffer, 1.0f);
+//	Array_Add(&t_attribute->a_buffer, 1.0f);
+//	Array_Add(&t_attribute->a_buffer, 0.5f);
+//
+//	Vertex_BindAttributes(&shader_set, &vertex_rect);
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window);
+//
+//		if (keyboard->up[VK_ESCAPE])
+//			running = false;
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		Vertex_Render(&shader_set, &vertex_rect);
+//
+//		Window_Update(window);
+//	}
+//
+//	Vertex_Destroy(&vertex_rect);
+//
+//	ShaderSet_Destroy(&shader_set);
+//}
+//
+//
+//int main() {
+//	Window window;
+//
+//	Keyboard keyboard;
+//	Window_Create(&window, "Hello, World!", 1600, 900, 32, &keyboard);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//	return 0;
+//}
+/// ===========================================================================
+
 #include <iostream>
 #include <math.h>
 #include <windows.h>
@@ -3250,6 +3327,18 @@ OpenGL_Scissor_Disable() {
 	glDisable(GL_SCISSOR_TEST);
 }
 
+instant void
+OpenGL_UseBlending(
+	bool enabled
+) {
+	if (enabled) {
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	}
+	else {
+		glDisable(GL_BLEND);
+	}
+}
 
 /// ::: Image
 /// ===========================================================================
@@ -3456,13 +3545,122 @@ struct Shader {
 	const char *code[3];
 };
 
-static const Shader shader_text = {
+static const Shader shader_rect = {
 R"(
 	#version 330 core
 
 	uniform vec4 viewport = vec4(0, 0, 800, 480);
-	uniform float     scale_x       	= 1.0f;
-	uniform float     scale_y       	= 1.0f;
+	uniform float scale_x = 1.0f;
+	uniform float scale_y = 1.0f;
+
+	in vec4 vertex_position;
+	in vec4 rect_color;
+
+	float left   = 0.0f;
+	float right  = viewport.z;
+	float top    = 0.0f;
+	float bottom = viewport.w;
+
+    mat4 proj_matrix = mat4(
+		 2.0f / (right - left), 0                    ,  0,  0,
+		 0                    , 2.0f / (top - bottom),  0,  0,
+		 0                    , 0                    ,  1,  0,
+		-(right + left)   / (right - left),
+		-(top   + bottom) / (top   - bottom),
+		 0,
+		 1
+	);
+
+	mat4 scale_matrix = mat4(
+		scale_x , 0      , 0, 0,
+		0       , scale_y, 0, 0,
+		0       , 0      , 1, 0,
+		0       , 0      , 0, 1
+	);
+
+	out Vertex_Data {
+		mat4 proj_matrix;
+		mat4 scale_matrix;
+		vec4 rect_color;
+	} o_Vertex;
+
+	void main() {
+		gl_Position           = vertex_position;
+		o_Vertex.proj_matrix  = proj_matrix;
+		o_Vertex.scale_matrix = scale_matrix;
+		o_Vertex.rect_color   = rect_color;
+	}
+)",
+
+R"(
+	#version 330 core
+
+	layout(points) in;
+	layout(triangle_strip, max_vertices = 4) out;
+
+	in Vertex_Data {
+		mat4 proj_matrix;
+		mat4 scale_matrix;
+		vec4 rect_color;
+	} i_Vertex[];
+
+	out vec4 rect_color;
+
+	void main() {
+		vec4 pt           = gl_in[0].gl_Position;
+		mat4 proj_matrix  = i_Vertex[0].proj_matrix;
+		mat4 scale_matrix = i_Vertex[0].scale_matrix;
+
+		mat4 matrix_mod = proj_matrix;
+
+		vec4 v_pos_1 = matrix_mod * vec4(pt.x       , pt.y       , 0, 1) * scale_matrix;
+		vec4 v_pos_2 = matrix_mod * vec4(pt.x       , pt.y + pt.w, 0, 1) * scale_matrix;
+		vec4 v_pos_3 = matrix_mod * vec4(pt.x + pt.z, pt.y       , 0, 1) * scale_matrix;
+		vec4 v_pos_4 = matrix_mod * vec4(pt.x + pt.z, pt.y + pt.w, 0, 1) * scale_matrix;
+
+		/// v1
+		gl_Position = v_pos_1;
+		rect_color = i_Vertex[0].rect_color;
+		EmitVertex();
+
+		/// v3
+		gl_Position = v_pos_2;
+		rect_color = i_Vertex[0].rect_color;
+		EmitVertex();
+
+		/// v2
+		gl_Position = v_pos_3;
+		rect_color = i_Vertex[0].rect_color;
+		EmitVertex();
+
+		/// v4
+		gl_Position = v_pos_4;
+		rect_color = i_Vertex[0].rect_color;
+		EmitVertex();
+
+		EndPrimitive();
+	}
+)",
+
+R"(
+	#version 330 core
+
+	layout(origin_upper_left) in vec4 gl_FragCoord;
+
+	in vec4 rect_color;
+
+	void main() {
+		gl_FragColor = rect_color;
+	}
+)"};
+
+static const Shader shader_text = {
+R"(
+	#version 330 core
+
+	uniform vec4  viewport = vec4(0, 0, 800, 480);
+	uniform float scale_x  = 1.0f;
+	uniform float scale_y  = 1.0f;
 
 	in vec2 vertex_position;
 	in vec3 text_color;
@@ -4034,22 +4232,42 @@ Vertex_Create(
 	Texture *texture
 ) {
 	Assert(shader_set);
-	Assert(texture);
 
 	Vertex vertex = {};
 
-	if (!texture->ID)
-		return vertex;
-
-	Vertex_SetTexture(shader_set, &vertex, texture);
-
-	vertex.settings.flip = true;
+	if (texture AND texture->ID) {
+		Vertex_SetTexture(shader_set, &vertex, texture);
+		vertex.settings.flip = true;
+	}
 
 	if (!vertex.array_id)
 		glGenVertexArrays(1, &vertex.array_id);
 
 	return vertex;
 }
+
+//instant Vertex
+//Vertex_Create(
+//	ShaderSet *shader_set,
+//	Texture *texture
+//) {
+//	Assert(shader_set);
+//	Assert(texture);
+//
+//	Vertex vertex = {};
+//
+//	if (!texture->ID)
+//		return vertex;
+//
+//	Vertex_SetTexture(shader_set, &vertex, texture);
+//
+//	vertex.settings.flip = true;
+//
+//	if (!vertex.array_id)
+//		glGenVertexArrays(1, &vertex.array_id);
+//
+//	return vertex;
+//}
 
 instant void
 Vertex_Load(
