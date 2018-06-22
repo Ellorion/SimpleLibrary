@@ -713,28 +713,6 @@ operator == (
 	return false;
 }
 
-template<typename K, typename L, typename V>
-struct Triple {
-	K first;
-	L second;
-	V third;
-};
-
-template<typename K, typename L, typename V>
-bool
-operator == (
-	Triple<K, L, V> &data1,
-	Triple<K, L, V> &data2
-) {
-	if (    data1.first  == data2.first
-		AND data1.second == data2.second)
-	{
-		return true;
-	}
-
-	return false;
-}
-
 template <typename T>
 instant void
 Swap(
@@ -1913,6 +1891,10 @@ Array_FindOrAddEmpty(
 	}
 	else {
         Array_AddEmpty(array, entry);
+
+        /// store what you want to find, if it does not exists,
+        /// so it does not have to be assigned manually all the time
+        **entry = find;
 	}
 
 	return found_element;
@@ -2098,12 +2080,12 @@ _String_SplitWordsStatic(
 	Assert(as_words);
 	Assert(!as_words->count);
 
-	as_words->by_reference = true;
+//	as_words->by_reference = true;
 
-	Array<String> as_lines = Array_SplitRef(s_data, "\n", ARRAY_DELIMITER_BACK);
+	Array<String> as_lines = Array_Split(s_data, "\n", ARRAY_DELIMITER_BACK);
 
 	FOR_ARRAY(as_lines, it_lines) {
-		Array<String> tas_words = Array_SplitRef(&ARRAY_IT(as_lines, it_lines), " ", ARRAY_DELIMITER_FRONT);
+		Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ", ARRAY_DELIMITER_FRONT);
 
 		FOR_ARRAY(tas_words, it_words) {
 			Array_Add(as_words, ARRAY_IT(tas_words, it_words));
@@ -4702,17 +4684,7 @@ Joypad_GetSection(
 
 /// ::: Font (TrueType)
 /// ===========================================================================
-struct Font {
-	stbtt_fontinfo info = {};
-	String s_data;
-	s32 size = 0;
-	s32 ascent = 0;
-	s32 descent = 0;
-	s32 linegap = 0;
-	bool filter_linear = false;
-	Array<Triple<s32, s32, Texture>> a_textures;
-//	Array<Tuple<Texture, Array<float>>> a_texture_positions;
-};
+struct Font;
 
 struct Codepoint {
 	Font *font = 0;
@@ -4722,6 +4694,29 @@ struct Codepoint {
 	RectI rect_subpixel = {};
 	Texture texture = {};
 };
+
+struct Font {
+	stbtt_fontinfo info = {};
+	String s_data;
+	s32 size = 0;
+	s32 ascent = 0;
+	s32 descent = 0;
+	s32 linegap = 0;
+	bool filter_linear = false;
+	Array<Codepoint> a_codepoint;
+};
+
+bool
+operator == (
+	Codepoint &cp_1,
+	Codepoint &cp_2
+) {
+	if (cp_1.codepoint == cp_2.codepoint){
+		return true;
+	}
+
+	return false;
+}
 
 instant Font
 Font_Load(
@@ -4751,17 +4746,17 @@ Font_Load(
     return font;
 }
 
+instant void Codepoint_Destroy(Codepoint *);
+
 instant void
 Font_Destroy(
 	Font *font
 ) {
 	Assert(font);
 
-	Array<Triple<s32, s32, Texture>> *ta_textures = &font->a_textures;
-
-	FOR_ARRAY(*ta_textures, it) {
-		Triple<s32, s32, Texture> *t_data = &ARRAY_IT(*ta_textures, it);
-		Texture_Destroy(&t_data->third);
+	FOR_ARRAY(font->a_codepoint, it) {
+		Codepoint *t_codepoint = &ARRAY_IT(font->a_codepoint, it);
+        Codepoint_Destroy(t_codepoint);
 	}
 
 	String_Destroy(&font->s_data);
@@ -4803,63 +4798,52 @@ Codepoint_ToTexture(
 	return result;
 }
 
-instant Codepoint
+instant void
 Codepoint_GetData(
 	Font *font,
-	s32 codepoint
+	s32 codepoint,
+	Codepoint *entry
 ) {
 	Assert(font);
-
-	Codepoint codepoint_data = {};
-    codepoint_data.font = font;
-    codepoint_data.codepoint = codepoint;
+	Assert(entry);
 
     float scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
 
-    /// get texture
-	{
-		Triple<s32, s32, Texture> t_entry;
-		u64 t_index;
+    u64 t_index_find;
 
-		t_entry.first  = codepoint;
-		t_entry.second = font->size;
+    Codepoint t_codepoint_find;
+    t_codepoint_find.font      = font;
+    t_codepoint_find.codepoint = codepoint;
 
-		if (!Array_Find(&font->a_textures, t_entry, &t_index)) {
-			codepoint_data.texture = Codepoint_ToTexture(font, codepoint);
-			t_entry.third = codepoint_data.texture;
-			Array_Add(&font->a_textures, t_entry);
-		}
-		else {
-			codepoint_data.texture = ARRAY_IT(font->a_textures, t_index).third;
-		}
-	}
+    Codepoint *t_entry;
 
-	/// get advance / left side bearing
-	{
+    if (!Array_FindOrAddEmpty(&font->a_codepoint, t_codepoint_find, &t_entry)) {
+		/// get texture
+		t_entry->texture = Codepoint_ToTexture(font, codepoint);
+
+		/// get advance / left side bearing
 		stbtt_GetCodepointHMetrics(&font->info,
 									codepoint,
-									&codepoint_data.advance,
-									&codepoint_data.left_side_bearing);
+									&t_entry->advance,
+									&t_entry->left_side_bearing);
 
-		codepoint_data.advance *= scale;
-		codepoint_data.left_side_bearing *= scale;
-	}
+		t_entry->advance *= scale;
+		t_entry->left_side_bearing *= scale;
 
-	/// get subpixel
-	{
+		/// get subpixel
 		stbtt_GetCodepointBitmapBoxSubpixel(&font->info,
 											codepoint,
 											scale,
 											scale,
 											0,
 											0,
-											&codepoint_data.rect_subpixel.x,
-											&codepoint_data.rect_subpixel.y,
-											&codepoint_data.rect_subpixel.w,
-											&codepoint_data.rect_subpixel.h);
-	}
+											&t_entry->rect_subpixel.x,
+											&t_entry->rect_subpixel.y,
+											&t_entry->rect_subpixel.w,
+											&t_entry->rect_subpixel.h);
+    }
 
-	return codepoint_data;
+	*entry = *t_entry;
 }
 
 instant void
@@ -4942,22 +4926,7 @@ Codepoint_Destroy(
 	Assert(codepoint);
 	Assert(codepoint->font);
 
-	Triple<s32, s32, Texture> t_entry;
-	u64 t_index;
-
-	t_entry.first  = codepoint->codepoint;
-	t_entry.second = codepoint->font->size;
-
-	auto *ta_textures = &codepoint->font->a_textures;
-
-	/// find -> remove
-	if (Array_Find(ta_textures, t_entry, &t_index)) {
-		Array_Remove(ta_textures, t_index);
-	}
-
-    Texture_Destroy(&codepoint->texture);
-
-    ///@TODO: remove from positions array too
+	Texture_Destroy(&codepoint->texture);
 }
 
 
@@ -5046,7 +5015,9 @@ Text_Render(
 		FOR_START(it_word_start, ts_word->length, it) {
 			char ch = ts_word->value[it];
 
-			Codepoint codepoint = Codepoint_GetData(font, ch);
+			Codepoint codepoint;
+
+			Codepoint_GetData(font, ch, &codepoint);
 			Codepoint_GetPosition(&codepoint, &rect_position);
 
 			///@Hint: ' ' does not have a texture
