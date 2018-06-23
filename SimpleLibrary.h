@@ -21,7 +21,7 @@
 ///     c_ -> C-String (when String with the same name might also be used)
 ///    as_ -> Array<String> ...
 ///     t_ -> temporary local variable (which might overlap in name with
-///           a parameter) and will not be used as return value
+///           a parameter)
 ///
 /// Return types: if a function returns a struct, it's memory needs to
 ///               be free'd to prevent memory leaks
@@ -69,7 +69,7 @@
 //	Time_Reset(&timer_fps_log);
 //
 //	String s_file_image;
-//	String_Append(&s_file_image, "32_bit_(rgba)_bitmap.bmp");
+//	String_Append(&s_file_image, "test/32_bit_(rgba)_bitmap.bmp");
 //
 //	Image image;
 //	if (!Image_LoadBMP32(&image, &s_file_image)) {
@@ -85,7 +85,11 @@
 //	ShaderSet shader_set;
 //	ShaderSet_Load(&shader_set, &shader_texture, window);
 //
-//	Vertex vertex = Vertex_Create(&shader_set, &texture, {});
+//	Vertex vertex = Vertex_Create(&shader_set, &texture);
+//	Vertex_AddTexturePosition(&vertex,   0,   0);
+//	Vertex_AddTexturePosition(&vertex, 150, 150);
+//
+//	Vertex_BindAttributes(&shader_set, &vertex);
 //
 //	while(running) {
 //		msg = {};
@@ -110,7 +114,7 @@
 //		Window_Update(window);
 //	}
 //
-//	/// will destroy the linked texture
+//	Texture_Destroy(&texture);
 //	Vertex_Destroy(&vertex);
 //	ShaderSet_Destroy(&shader_set);
 //}
@@ -172,7 +176,7 @@
 //	Mouse mouse;
 //	Window window;
 //
-//	Window_Create(&window, "Hello, World!", 800, 480, 32, &mouse);
+//	Window_Create(&window, "Hello, World!", 800, 480, 32, 0, &mouse);
 //	Window_Show(&window);
 //
 //	OpenGL_Init(&window);
@@ -294,175 +298,6 @@
 //}
 /// ===========================================================================
 
-/// Example: load truetype font and render two characters
-/// ===========================================================================
-//instant void
-//Window_HandleEvents(
-//	Window *window
-//) {
-//	MSG msg;
-//	bool running = true;
-//	bool ui_zoom_enabled = true;
-//
-//	String s_font;
-//	String_Append(&s_font, "test/AutourOne-Regular.ttf");
-//
-//	Font font = Font_Load(&s_font, 60);
-//	/// Vertex_Destroy will free the texture, which will be created here
-//	Codepoint codepoint_a = Codepoint_GetData(&font, 'a');
-//	Codepoint codepoint_b = Codepoint_GetData(&font, 'b');
-//	Font_Destroy(&font);
-//
-//	ShaderSet shader_set;
-//	ShaderSet_Load(&shader_set, &shader_text, window);
-//
-//	Vertex vertex_a = Vertex_Create(&shader_set, &codepoint_a.texture, {});
-//	Vertex vertex_b = Vertex_Create(&shader_set, &codepoint_b.texture, {50, 50});
-//
-//	glEnable(GL_BLEND);
-//	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//
-//	while(running) {
-//		msg = {};
-//
-//		/// Events
-//		/// ===================================================================
-//		Window_ReadMessage(msg, running, window);
-//		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
-//
-//		/// Render
-//		/// ===================================================================
-//		OpenGL_ClearScreen();
-//
-//		Vertex_Render(&shader_set, &vertex_a);
-//		Vertex_Render(&shader_set, &vertex_b);
-//
-//		Window_Update(window);
-//	}
-//
-//	/// will destroy the linked texture
-//	Vertex_Destroy(&vertex_a);
-//	Vertex_Destroy(&vertex_b);
-//	ShaderSet_Destroy(&shader_set);
-//}
-//
-//int main() {
-//	Window window;
-//
-//	Window_Create(&window, "Hello, World!", 800, 480);
-//	Window_Show(&window);
-//
-//	OpenGL_Init(&window);
-//
-//	Window_HandleEvents(&window);
-//
-//	OpenGL_Destroy(&window);
-//	Window_Destroy(&window);
-//
-//	return 0;
-//}
-/// ===========================================================================
-
-/// Example: draw string in opengl window
-///          (not good performance -> see hint)
-/// ===========================================================================
-//instant void
-//Window_HandleEvents(
-//	Window *window
-//) {
-//	MSG msg;
-//	bool running = true;
-//	bool ui_zoom_enabled = true;
-//
-//	Timer timer_fps;
-//	Time_Reset(&timer_fps);
-//
-//	Timer timer_fps_log;
-//	Time_Reset(&timer_fps_log);
-//
-//	String s_font;
-//	String_Append(&s_font, "test/AutourOne-Regular.ttf");
-//
-//	Font font = Font_Load(&s_font, 20);
-//
-//	ShaderSet shader_set;
-//	ShaderSet_Load(&shader_set, &shader_text, window);
-//
-//	glEnable(GL_BLEND);
-//	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//
-//	Keyboard *keyboard = window->keyboard;
-//
-//	String s_text;
-//	String_Append(&s_text, "Hello, World!");
-//
-//	while(running) {
-//		msg = {};
-//
-//		/// Events
-//		/// ===================================================================
-//		Window_ReadMessage(msg, running, window);
-//		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
-//
-//		if (keyboard->up[VK_ESCAPE])
-//			running = false;
-//
-//		/// Render
-//		/// ===================================================================
-//		OpenGL_ClearScreen();
-//
-//		RectF rect_position = {};
-//
-//		///@Hint @Performance: because of creating / destroying everything
-//		///   all the time, performance will not be good
-//		FOR(s_text.length, it) {
-//			char ch = s_text.value[it];
-//
-//			Codepoint codepoint = Codepoint_GetData(&font, ch);
-//
-//			Codepoint_GetPosition(&codepoint, &rect_position);
-//
-//			///@Hint: ' ' does not have a texture
-//			if (!Texture_IsEmpty(&codepoint.texture)) {
-//				Vertex vertex = Vertex_Create(&shader_set, &codepoint.texture, {rect_position.x, rect_position.y});
-//				Vertex_Render(&shader_set, &vertex);
-//				Vertex_Destroy(&vertex);
-//			}
-//
-//			Codepoint_Destroy(&codepoint);
-//		}
-//
-//		Window_Update(window);
-//
-//		u32 fps = Time_GetFPS(&timer_fps);
-//
-//		if (Time_HasElapsed(&timer_fps_log, 1000)) {
-//			LOG_DEBUG(fps << " fps");
-//		}
-//	}
-//
-//	Font_Destroy(&font);
-//	ShaderSet_Destroy(&shader_set);
-//}
-//
-//int main() {
-//	Window window;
-//
-//	Keyboard keyboard;
-//	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard);
-//	Window_Show(&window);
-//
-//	OpenGL_Init(&window);
-//
-//	Window_HandleEvents(&window);
-//
-//	OpenGL_Destroy(&window);
-//	Window_Destroy(&window);
-//
-//	return 0;
-//}
-/// ===========================================================================
-
 /// Example: draw text from a file with ttf in opengl window + word wrap
 /// ===========================================================================
 //instant void
@@ -484,10 +319,7 @@
 //	Font font = Font_Load(&s_font, 20);
 //
 //	ShaderSet shader_set;
-//	ShaderSet_Load(&shader_set, &shader_text, window);
-//
-//	glEnable(GL_BLEND);
-//	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//	shader_set.window = window;
 //
 //	Keyboard *keyboard = window->keyboard;
 //
@@ -499,7 +331,7 @@
 //
 //	String_Replace(&s_data, "\r\n", "\n");
 //
-//	Text text = Text_Create(&shader_set, &font, &s_data, {10, 20, window->width - 10, 0});
+//	Text text = Text_Create(&shader_set, &font, &s_data, {10, 10, window->width - 20, 0});
 //
 //	while(running) {
 //		msg = {};
@@ -552,7 +384,7 @@
 //}
 /// ===========================================================================
 
-/// Example: render a colored rectangle
+/// Example: draw text in multiple rectangles
 /// ===========================================================================
 //instant void
 //Window_HandleEvents(
@@ -562,29 +394,41 @@
 //	bool running = true;
 //
 //	ShaderSet shader_set;
-//	ShaderSet_Load(&shader_set, &shader_rect, window);
+//	shader_set.window = window;
 //
 //	OpenGL_UseBlending(true);
 //
 //	Keyboard *keyboard = window->keyboard;
 //
-//	Vertex vertex_rect = Vertex_Create(&shader_set, 0);
+//	String s_font;
+//	String_Append(&s_font, "test/AutourOne-Regular.ttf");
+//	Font font = Font_Load(&s_font, 20);
 //
-//	Vertex_Buffer<float> *t_attribute;
+//	Rect rect_box = {10, 20, 300, 200};
 //
-//	Vertex_FindOrAddAttribute(&vertex_rect, 4, "vertex_position", &t_attribute);
-//	Array_Add(&t_attribute->a_buffer, 10.0f);
-//	Array_Add(&t_attribute->a_buffer, 10.0f);
-//	Array_Add(&t_attribute->a_buffer, 300.0f);
-//	Array_Add(&t_attribute->a_buffer, 200.0f);
+//	Vertex vertex_rect = Vertex_Create();
+//	Vertex_AddRect32(&vertex_rect, rect_box, Color_MakeGrey(1.0f));
 //
-//	Vertex_FindOrAddAttribute(&vertex_rect, 4, "rect_color", &t_attribute);
-//	Array_Add(&t_attribute->a_buffer, 1.0f);
-//	Array_Add(&t_attribute->a_buffer, 1.0f);
-//	Array_Add(&t_attribute->a_buffer, 1.0f);
-//	Array_Add(&t_attribute->a_buffer, 0.5f);
+//	Rect_Resize(&rect_box, -1);
+//	Vertex_AddRect32(&vertex_rect, rect_box, Color_MakeGrey(0.0f));
 //
-//	Vertex_BindAttributes(&shader_set, &vertex_rect);
+//	Rect_Resize(&rect_box, -2);
+//	Vertex_AddRect32(&vertex_rect, rect_box, Color_MakeGrey(1.0f));
+//
+//	Text text_box;
+//	{
+//		String s_box_data;
+//		String_Append(&s_box_data, "Hello");
+//
+//		text_box.shader_set = &shader_set;
+//		text_box.rect       = rect_box;
+//		text_box.font       = &font;
+//		text_box.color      = Color_MakeGrey(0.0f);
+//
+//		String_Append(&text_box.s_data, s_box_data.value, s_box_data.length);
+//
+//		String_Destroy(&s_box_data);
+//	}
 //
 //	while(running) {
 //		msg = {};
@@ -601,22 +445,28 @@
 //		/// ===================================================================
 //		OpenGL_ClearScreen();
 //
-//		Vertex_Render(&shader_set, &vertex_rect);
+//		///@Performance: should be used once at the beginning, when rendering
+//		///              is done in batches, or constant recompiling
+//		///              the same shader will reduce the performance loss
+//		ShaderSet_Load(&shader_set, &shader_rect, shader_set.window);
+//		Rect_Render(&shader_set, &vertex_rect);
+//
+//		ShaderSet_Load(&shader_set, &shader_text, shader_set.window);
+//		Text_Render(&text_box);
 //
 //		Window_Update(window);
 //	}
 //
+//	Text_Destroy(&text_box);
 //	Vertex_Destroy(&vertex_rect);
-//
 //	ShaderSet_Destroy(&shader_set);
 //}
-//
 //
 //int main() {
 //	Window window;
 //
 //	Keyboard keyboard;
-//	Window_Create(&window, "Hello, World!", 1600, 900, 32, &keyboard);
+//	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard);
 //	Window_Show(&window);
 //
 //	OpenGL_Init(&window);
@@ -721,22 +571,22 @@ _AssertMessage(
 #define GETBYTE(x, bit_start) LOBYTE((x) >> (bit_start))
 #define GETBIT(x, bit_start) (((x) >> (bit_start)) & 0x1)
 
-#define RECT_SET(_name, _x, _y, _w, _h) \
-	{ \
-		(_name).x = _x; \
-		(_name).y = _y; \
-		(_name).w = _w; \
-		(_name).h = _h; \
-	}
-
-#define RECT_MAKE(_type, _name, _x, _y, _w, _h) \
-	_type _name; \
-	{ \
-		(_name).x = _x; \
-		(_name).y = _y; \
-		(_name).w = _w; \
-		(_name).h = _h; \
-	}
+//#define RECT_SET(_name, _x, _y, _w, _h) \
+//	{ \
+//		(_name).x = _x; \
+//		(_name).y = _y; \
+//		(_name).w = _w; \
+//		(_name).h = _h; \
+//	}
+//
+//#define RECT_MAKE(_type, _name, _x, _y, _w, _h) \
+//	_type _name; \
+//	{ \
+//		(_name).x = _x; \
+//		(_name).y = _y; \
+//		(_name).w = _w; \
+//		(_name).h = _h; \
+//	}
 
 struct Rect {
 	float x = 0.0f;
@@ -759,7 +609,7 @@ struct RectI {
 	s32 h = 0;
 };
 
-struct Color {
+struct Color32 {
 	float r = 1.0f;
 	float g = 1.0f;
 	float b = 1.0f;
@@ -865,6 +715,27 @@ Rect_IsIntersecting(
 	if (rect_inner->y + rect_inner->h < rect_outer->y)  return false;
 
 	return true;
+}
+
+instant void
+Rect_Resize(
+	Rect *rect,
+	s32 pixel_offset
+) {
+	Assert(rect);
+
+	rect->x -= pixel_offset;
+	rect->y -= pixel_offset;
+	rect->w += (pixel_offset << 1);
+	rect->h += (pixel_offset << 1);
+}
+
+instant Color32
+Color_MakeGrey(
+	float value,
+	float alpha = 1.0f
+) {
+	return {value, value, value, alpha};
 }
 
 /// ::: Memory
@@ -3780,7 +3651,8 @@ R"(
 	#version 330 core
 
 	uniform vec4 viewport = vec4(0, 0, 800, 480);
-	in vec4 vertex_position;
+
+	in vec2 vertex_position;
 
 	float left   = 0.0f;
 	float right  = viewport.z;
@@ -3802,7 +3674,7 @@ R"(
 	} o_Vertex;
 
 	void main() {
-		gl_Position = vertex_position;
+		gl_Position = vec4(vertex_position, 0, 1);
 		o_Vertex.proj_matrix = proj_matrix;
 	}
 )",
@@ -3816,9 +3688,9 @@ R"(
 	uniform sampler2D fragment_texture;
 	vec2 size = textureSize(fragment_texture, 0);
 
+	uniform bool  flip_h  = false;
 	uniform float scale_x = 1.0f;
 	uniform float scale_y = 1.0f;
-	uniform bool  flip_h = false;
 
 	in Vertex_Data {
 		mat4 proj_matrix;
@@ -3826,7 +3698,6 @@ R"(
 
 	out Vertex_Data {
 		vec2 tex_coords;
-		vec4 position;
 	} o_Vertex;
 
 	mat4 scale_matrix = mat4(
@@ -4123,11 +3994,11 @@ ShaderSet_Load(
 		viewport.h = (float)t_window->height;
 
 		Shader_SetValue(shader_set, "viewport", (float *)&viewport, 4);
-		glDisable(GL_BLEND);
+		OpenGL_UseBlending(true);
 	}
 }
 
-/// ::: Vertex
+/// ::: Vertex / Rendering
 /// ===========================================================================
 template <typename T>
 struct Vertex_Buffer {
@@ -4143,6 +4014,9 @@ struct Vertex_Settings {
 	float scale_y = 1.0f;
 };
 
+///@Hint: does not take texture ownership
+///       so it will not be free'd when
+///       destroyed
 struct Vertex {
 	u32 array_id = 0;
 	Texture texture;
@@ -4179,6 +4053,7 @@ operator == (
 	return String_IsEqual(b1.name, b2.name);
 }
 
+///@Hint: texture has to be bound first
 instant void
 Vertex_GetTextureSize(
 	Vertex *vertex,
@@ -4201,7 +4076,6 @@ Vertex_Destroy(
 		Vertex_Buffer<float> *t_attribute = &ARRAY_IT(vertex->a_attributes, it);
 		glDeleteBuffers(1, &t_attribute->id);
 		Array_DestroyContainer(&t_attribute->a_buffer);
-		int a = 1;
 	}
 
 	glDeleteVertexArrays(1, &vertex->array_id);
@@ -4228,46 +4102,33 @@ Vertex_SetTexture(
 
 instant Vertex
 Vertex_Create(
-	ShaderSet *shader_set,
-	Texture *texture
 ) {
-	Assert(shader_set);
-
 	Vertex vertex = {};
 
-	if (texture AND texture->ID) {
-		Vertex_SetTexture(shader_set, &vertex, texture);
-		vertex.settings.flip = true;
-	}
-
-	if (!vertex.array_id)
-		glGenVertexArrays(1, &vertex.array_id);
+	glGenVertexArrays(1, &vertex.array_id);
 
 	return vertex;
 }
 
-//instant Vertex
-//Vertex_Create(
-//	ShaderSet *shader_set,
-//	Texture *texture
-//) {
-//	Assert(shader_set);
-//	Assert(texture);
-//
-//	Vertex vertex = {};
-//
-//	if (!texture->ID)
-//		return vertex;
-//
-//	Vertex_SetTexture(shader_set, &vertex, texture);
-//
-//	vertex.settings.flip = true;
-//
-//	if (!vertex.array_id)
-//		glGenVertexArrays(1, &vertex.array_id);
-//
-//	return vertex;
-//}
+instant Vertex
+Vertex_Create(
+	ShaderSet *shader_set,
+	Texture *texture
+) {
+	Assert(shader_set);
+	Assert(texture);
+
+	Vertex vertex = {};
+
+	if (texture->ID) {
+		Vertex_SetTexture(shader_set, &vertex, texture);
+		vertex.settings.flip = true;
+	}
+
+	glGenVertexArrays(1, &vertex.array_id);
+
+	return vertex;
+}
 
 instant void
 Vertex_Load(
@@ -4282,8 +4143,19 @@ Vertex_Load(
 		Vertex_Buffer<float> *entry = &ARRAY_IT(vertex->a_attributes, it);
 		s32 attrib_position = glGetAttribLocation(shader_set->program_id, entry->name);
 
-		if (attrib_position < 0)
+		if (attrib_position < 0) {
+			String s_error;
+			String_Append(&s_error, "Shader and attributes mismatch.\n    Missing: ");
+			String_Append(&s_error, entry->name);
+
+			char *c_error_msg = String_CreateCBufferCopy(&s_error);
+
+			AssertMessage(false, c_error_msg);
+
+			Memory_Free(c_error_msg);
+
 			continue;
+		}
 
 		glEnableVertexAttribArray(attrib_position);
 		glBindBuffer(GL_ARRAY_BUFFER, entry->id);
@@ -4335,6 +4207,7 @@ Vertex_Render(
 
 	///@Hint: vertex positions have to be the first entry in the array
 	Vertex_Buffer<float> *a_positions = &ARRAY_IT(vertex->a_attributes, 0);
+	AssertMessage(a_positions->id, "No Attributes found.\n    Forgot to bind the attributes?");
 	Assert(a_positions->group_count);
 
 	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip);
@@ -4384,6 +4257,58 @@ Vertex_FindOrAddAttribute(
 		*t_attribute_entry = t_attribute_find;
 
 	*a_buffer = t_attribute_entry;
+}
+
+instant void
+Vertex_AddTexturePosition(
+	Vertex *vertex,
+	float x,
+	float y
+) {
+	Assert(vertex);
+
+	Vertex_Buffer<float> *t_attribute;
+
+	Vertex_FindOrAddAttribute(vertex, 2, "vertex_position", &t_attribute);
+	Array_Add(&t_attribute->a_buffer, x);
+	Array_Add(&t_attribute->a_buffer, y);
+}
+
+instant void
+Vertex_AddRect32(
+	Vertex *vertex,
+	Rect rect,
+	Color32 color
+) {
+	Assert(vertex);
+
+	Vertex_Buffer<float> *t_attribute;
+
+	Vertex_FindOrAddAttribute(vertex, 4, "vertex_position", &t_attribute);
+	Array_Add(&t_attribute->a_buffer, (float)rect.x);
+	Array_Add(&t_attribute->a_buffer, (float)rect.y);
+	Array_Add(&t_attribute->a_buffer, (float)rect.w);
+	Array_Add(&t_attribute->a_buffer, (float)rect.h);
+
+	Vertex_FindOrAddAttribute(vertex, 4, "rect_color", &t_attribute);
+	Array_Add(&t_attribute->a_buffer, (float)color.r);
+	Array_Add(&t_attribute->a_buffer, (float)color.g);
+	Array_Add(&t_attribute->a_buffer, (float)color.b);
+	Array_Add(&t_attribute->a_buffer, (float)color.a);
+}
+
+instant void
+Rect_Render(
+	ShaderSet *shader_set,
+	Vertex *vertex
+) {
+	Assert(shader_set);
+	Assert(shader_set->window);
+	Assert(vertex);
+
+	Vertex_BindAttributes(shader_set, vertex);
+
+	Vertex_Render(shader_set, vertex);
 }
 
 /// ::: Mouse
@@ -5155,7 +5080,7 @@ struct Text {
 	Font *font = 0;
 	String s_data = {};
 	Rect rect = {};
-	Color color;
+	Color32 color;
 };
 
 instant Text
@@ -5182,12 +5107,23 @@ Text_Create(
 
 instant void
 Text_Destroy(
-	Text *text,
-	bool free_position_cache = false
+	Text *text
 ) {
 	Assert(text);
 
 	String_Destroy(&text->s_data);
+}
+
+instant void
+Vertex_ClearAttribute(
+	Vertex *vertex
+) {
+	Assert(vertex);
+
+	FOR_ARRAY(vertex->a_attributes, it) {
+		auto *t_attribute = &ARRAY_IT(vertex->a_attributes, it);
+		Array_ClearContainer(&t_attribute->a_buffer);
+	}
 }
 
 ///@Hint: will add out-of-bound textures to the rendering queue
@@ -5197,13 +5133,14 @@ Text_Render(
 	Font *font,
 	String *s_data,
 	Rect rect,
-	Color color
+	Color32 color
 ) {
 	Assert(shader_set);
+	Assert(shader_set->window);
 	Assert(font);
 	Assert(s_data);
 
-	RECT_MAKE(RectF, rect_position, rect.x, 0, 0, rect.y);
+	RectF rect_position = {rect.x, 0, 0, rect.y};
 
 	/// reuse the same buffer for better performance
 	static Array<Vertex> a_vertex;
@@ -5228,7 +5165,7 @@ Text_Render(
 			}
 		}
 
-		RECT_MAKE(Rect, rect_window, 0, 0, shader_set->window->width, shader_set->window->height);
+		Rect rect_window = {0, 0, shader_set->window->width, shader_set->window->height};
 
 		FOR_START(it_word_start, ts_word->length, it) {
 			char ch = ts_word->value[it];
@@ -5240,7 +5177,7 @@ Text_Render(
 
 			///@Hint: ' ' does not have a texture
 			if (!Texture_IsEmpty(&codepoint.texture)) {
-				RECT_MAKE(Rect, rect_texture, rect_position.x, rect_position.y, 10, 10);
+				Rect rect_texture = {rect_position.x, rect_position.y, 10, 10};
 
 				if (!Rect_IsIntersecting(&rect_texture, &rect_window))
 					continue;
@@ -5272,10 +5209,7 @@ Text_Render(
 
 		Vertex_Render(shader_set, t_vertex);
 
-		FOR_ARRAY(t_vertex->a_attributes, it) {
-			Vertex_Buffer<float> *t_attribute = &ARRAY_IT(t_vertex->a_attributes, it);
-			Array_ClearContainer(&t_attribute->a_buffer);
-		}
+		Vertex_ClearAttribute(t_vertex);
 	}
 
 	Array_Clear(&as_words);
