@@ -479,6 +479,86 @@
 //}
 /// ===========================================================================
 
+/// Example: show basic click-able / tab-able widgets
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(
+//	Window *window
+//) {
+//	MSG msg;
+//	bool running = true;
+//
+//	ShaderSet shader_set;
+//	shader_set.window = window;
+//
+//	OpenGL_UseBlending(true);
+//
+//	Keyboard *keyboard = window->keyboard;
+//
+//	String s_font;
+//	String_Append(&s_font, "test/AutourOne-Regular.ttf");
+//	Font font_20 = Font_Load(&s_font, 20);
+//
+//	Widget widget_label    = Widget_CreateLabel( window, &font_20, {  10,  20, 300, 200}, "Label");
+//	Widget widget_click_me = Widget_CreateButton(window, &font_20, { 320,  20, 100,  30}, "click me");
+//	Widget widget_exit     = Widget_CreateButton(window, &font_20, { 320,  50, 100,  30}, "Exit");
+//
+//	Array<Widget *> ap_widgets;
+//	Array_Add(&ap_widgets, &widget_label);
+//	Array_Add(&ap_widgets, &widget_click_me);
+//	Array_Add(&ap_widgets, &widget_exit);
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window);
+//
+//		/// hold shift-key to get reverse order
+//		Widget_UpdateFocus(&ap_widgets, keyboard->pressing[VK_SHIFT], 0);
+//
+//		if (keyboard->up[VK_ESCAPE] OR Widget_OnClick(&widget_exit))
+//			running = false;
+//
+//		if (Widget_OnClick(&widget_click_me)) {
+//			std::cout << "clicked" << std::endl;
+//		}
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		Widget_Render(&shader_set, &ap_widgets);
+//
+//		Window_Update(window);
+//	}
+//
+//	Widget_Destroy(&ap_widgets);
+//
+//	ShaderSet_Destroy(&shader_set);
+//}
+//
+//int main() {
+//	Window window;
+//
+//	Keyboard keyboard;
+//	Mouse    mouse;
+//
+//	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard, &mouse);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//	return 0;
+//}
+/// ===========================================================================
+
 #include <iostream>
 #include <math.h>
 #include <windows.h>
@@ -571,22 +651,8 @@ _AssertMessage(
 #define GETBYTE(x, bit_start) LOBYTE((x) >> (bit_start))
 #define GETBIT(x, bit_start) (((x) >> (bit_start)) & 0x1)
 
-//#define RECT_SET(_name, _x, _y, _w, _h) \
-//	{ \
-//		(_name).x = _x; \
-//		(_name).y = _y; \
-//		(_name).w = _w; \
-//		(_name).h = _h; \
-//	}
-//
-//#define RECT_MAKE(_type, _name, _x, _y, _w, _h) \
-//	_type _name; \
-//	{ \
-//		(_name).x = _x; \
-//		(_name).y = _y; \
-//		(_name).w = _w; \
-//		(_name).h = _h; \
-//	}
+#define IF_USE(pointer) \
+	(pointer) AND (*pointer)
 
 struct Rect {
 	float x = 0.0f;
@@ -717,6 +783,23 @@ Rect_IsIntersecting(
 	return true;
 }
 
+instant bool
+Rect_IsIntersecting(
+	Point *point,
+	Rect  *rect
+) {
+	Assert(point);
+	Assert(rect);
+
+	if (point->x < rect->x)  return false;
+	if (point->y < rect->y)  return false;
+
+	if (point->x > rect->x + rect->w)  return false;
+	if (point->y > rect->y + rect->h)  return false;
+
+	return true;
+}
+
 instant void
 Rect_Resize(
 	Rect *rect,
@@ -775,6 +858,35 @@ _Memory_Alloc_Empty(
 
 	void *mem = calloc(1, size + sizeof(Memory_Header));
 	((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
+	mem = (char *)mem + sizeof(Memory_Header);
+
+	return mem;
+}
+
+template <typename T>
+struct Array;
+
+template <typename T>
+instant void *
+_Memory_Resize(
+	void *mem,
+	u64 size
+) {
+	if (!mem)  return _Memory_Alloc_Empty(size);
+
+	Memory_Header mem_header;
+	Memory_GetHeader(&mem_header, mem);
+
+	if (mem_header.sig != MEMORY_SIGNATURE) {
+		return _Memory_Alloc_Empty(size);
+	}
+
+	mem = (char *)mem - sizeof(Memory_Header);
+
+	///@Info: will NOT keep the same (virtual) memory address!!!
+	mem = realloc(mem, size + sizeof(Memory_Header));
+	((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
+
 	mem = (char *)mem + sizeof(Memory_Header);
 
 	return mem;
@@ -1046,20 +1158,23 @@ String_Resize(
 	s_data->value = Memory_Resize(s_data->value, char, s_data->length + length_delta);
 }
 
-instant void
+instant bool
 String_Append(
 	String *s_data,
 	const char *c_data,
 	u64 length_append = 0
 ) {
-    Assert(s_data);
+    if (!s_data)
+		return false;
 
     if (length_append == 0)  length_append = String_Length(c_data);
-    if (length_append == 0)  return;
+    if (length_append == 0)  return false;
 
 	String_Resize(s_data, length_append);
 	Memory_Copy(s_data->value + s_data->length, (char *)c_data, length_append);
 	s_data->length += length_append;
+
+	return true;
 }
 
 instant u64
@@ -1690,13 +1805,18 @@ operator > (
 
 #define FOR_ARRAY(_array, _it) 		\
 	for(u64 _it = 0;        		\
-	_it < (_array).count;       	\
-	++_it)
+		_it < (_array).count;       	\
+		++_it)
+
+#define FOR_ARRAY_REV(_array, _it)	\
+	for(s64 _it = (_array).count - 1;	\
+		_it >= 0;						\
+		--_it)
 
 #define FOR_ARRAY_START(_array, _start, _it) 	\
 	for(u64 _it = (_start);   					\
-	_it < (_array).count;       				\
-	++_it)
+		_it < (_array).count;       				\
+		++_it)
 
 template <typename T>
 struct Array {
@@ -2020,15 +2140,30 @@ Array_Split(
 }
 
 instant void
+Array_Clear(
+	Array<String> *array
+) {
+	Assert(array);
+
+	if (!array->by_reference) {
+		FOR_ARRAY(*array, it) {
+			String *ts_data = &ARRAY_IT(*array, it);
+			String_Destroy(ts_data);
+		}
+	}
+
+    Array_ClearContainer(array);
+}
+
+instant void
 _String_SplitWordsStatic(
 	String *s_data,
 	Array<String> *as_words
 ) {
 	Assert(s_data);
 	Assert(as_words);
-	Assert(!as_words->count);
 
-//	as_words->by_reference = true;
+	Array_Clear(as_words);
 
 	Array<String> as_lines = Array_Split(s_data, "\n", ARRAY_DELIMITER_BACK);
 
@@ -2043,22 +2178,6 @@ _String_SplitWordsStatic(
 	}
 
 	Array_Destroy(&as_lines);
-}
-
-instant void
-Array_Clear(
-	Array<String> *array
-) {
-	Assert(array);
-
-	if (!array->by_reference) {
-		FOR_ARRAY(*array, it) {
-			String *ts_data = &ARRAY_IT(*array, it);
-			String_Destroy(ts_data);
-		}
-	}
-
-    Array_ClearContainer(array);
 }
 
 template <typename T>
@@ -4382,11 +4501,28 @@ Mouse_Reset(
 instant void
 Mouse_GetPosition(
 	float *x,
-	float *y
+	float *y,
+	Window *window
 ) {
 	POINT point;
-
 	GetCursorPos(&point);
+
+	RECT rect_active;
+
+	if (window) {
+		GetWindowRect(window->hWnd, &rect_active);
+		Window_UnAdjustRect(window->hWnd, &rect_active);
+
+		RectF rect_viewport;
+		glGetFloatv(GL_VIEWPORT, (GLfloat *)&rect_viewport);
+
+		float scale_x = window->width  / rect_viewport.w;
+		float scale_y = window->height / rect_viewport.h;
+
+		point.x = (point.x - (rect_active.left + rect_viewport.x)) * scale_x;
+		point.y = (point.y - (rect_active.top  + rect_viewport.y)) * scale_y;
+	}
+
 
 	if (x) *x = point.x;
 	if (y) *y = point.y;
@@ -4406,7 +4542,7 @@ Mouse_GetPosition(
 
 	Mouse t_mouse = *mouse;
 
-	Mouse_GetPosition(&mouse->point.x, &mouse->point.y);
+	Mouse_GetPosition(&mouse->point.x, &mouse->point.y, 0);
 
 	RectF rect_viewport;
 
@@ -5075,12 +5211,19 @@ Codepoint_Destroy(
 
 /// ::: Text (OpenGL rendering)
 /// ===========================================================================
+enum TEXT_ALIGN_X_TYPE {
+	TEXT_ALIGN_X_LEFT,
+	TEXT_ALIGN_X_MIDDLE
+//	TEXT_ALIGN_X_RIGHT
+};
+
 struct Text {
 	ShaderSet *shader_set = 0;
 	Font *font = 0;
 	String s_data = {};
 	Rect rect = {};
 	Color32 color;
+	TEXT_ALIGN_X_TYPE align_x = TEXT_ALIGN_X_LEFT;
 };
 
 instant Text
@@ -5088,7 +5231,8 @@ Text_Create(
 	ShaderSet *shader_set,
 	Font *font,
 	String *s_data,
-	Rect rect
+	Rect rect,
+	TEXT_ALIGN_X_TYPE align_x
 ) {
 	Assert(shader_set);
 	Assert(font);
@@ -5096,8 +5240,9 @@ Text_Create(
 	Text text;
 
 	text.shader_set = shader_set;
-	text.font = font;
-	text.rect = rect;
+	text.font       = font;
+	text.rect       = rect;
+	text.align_x    = align_x;
 
 	if (s_data)
 		String_Append(&text.s_data, s_data->value, s_data->length);
@@ -5115,7 +5260,7 @@ Text_Destroy(
 }
 
 instant void
-Vertex_ClearAttribute(
+Vertex_ClearAttributes(
 	Vertex *vertex
 ) {
 	Assert(vertex);
@@ -5126,6 +5271,77 @@ Vertex_ClearAttribute(
 	}
 }
 
+instant void
+_Text_CalcLinesWidthStatic(
+	Font *font,
+	Array<String> *as_words,
+	Rect rect,
+	Array<u64> *a_lines_width
+) {
+	Assert(font);
+	Assert(as_words);
+	Assert(a_lines_width);
+
+	Array_ClearContainer(a_lines_width);
+
+
+	RectF rect_line_search = {rect.x, 0, 0, rect.y};
+
+	FOR_ARRAY(*as_words, it_words) {
+		String *ts_word = &ARRAY_IT(*as_words, it_words);
+
+		u64 advance_word = Codepoint_GetStringAdvance(font, ts_word);
+
+		u64 it_word_start = 0;
+		u64 width_max = rect.x + rect.w;
+
+		/// word wrap
+		if (rect.w AND rect_line_search.x + advance_word >= width_max) {
+			Array_Add(a_lines_width, (u64)rect_line_search.x);
+
+			Codepoint_SetNewline(font, &rect_line_search, rect.x);
+
+			if (it_words AND String_StartWith(ts_word, " ")) {
+				it_word_start = 1;
+			}
+		}
+
+		/// multiple ' '
+		if (!ts_word->length) {
+			Codepoint codepoint;
+
+			Codepoint_GetData(font, ' ', &codepoint);
+			Codepoint_GetPosition(&codepoint, &rect_line_search);
+		}
+
+		FOR_START(it_word_start, ts_word->length, it) {
+			char ch = ts_word->value[it];
+
+			Codepoint codepoint;
+
+			Codepoint_GetData(font, ch, &codepoint);
+			Codepoint_GetPosition(&codepoint, &rect_line_search);
+		}
+
+		if (String_EndWith(ts_word, "\n")) {
+			Array_Add(a_lines_width, (u64)rect_line_search.x);
+
+			Codepoint_SetNewline(font, &rect_line_search, rect.x);
+		}
+	}
+
+	/// advance the last character at the last line with an
+	/// invisible character to calc. the correct line width
+	if (rect_line_search.x > rect.x) {
+		Codepoint codepoint;
+
+		Codepoint_GetData(font, '\n', &codepoint);
+		Codepoint_GetPosition(&codepoint, &rect_line_search);
+
+		Array_Add(a_lines_width, (u64)rect_line_search.x);
+	}
+}
+
 ///@Hint: will add out-of-bound textures to the rendering queue
 instant void
 Text_Render(
@@ -5133,7 +5349,8 @@ Text_Render(
 	Font *font,
 	String *s_data,
 	Rect rect,
-	Color32 color
+	Color32 color,
+	TEXT_ALIGN_X_TYPE align_x
 ) {
 	Assert(shader_set);
 	Assert(shader_set->window);
@@ -5145,8 +5362,20 @@ Text_Render(
 	/// reuse the same buffer for better performance
 	static Array<Vertex> a_vertex;
 	static Array<String> as_words;
+	static Array<u64>    a_lines_width;
 
 	_String_SplitWordsStatic(s_data, &as_words);
+
+	if (align_x == TEXT_ALIGN_X_MIDDLE) {
+		_Text_CalcLinesWidthStatic(font, &as_words, rect, &a_lines_width);
+	}
+
+	u64 line_width_index = 0;
+	u64 line_width = 0;
+
+	if (align_x == TEXT_ALIGN_X_MIDDLE) {
+		line_width = ARRAY_IT(a_lines_width, line_width_index);
+	}
 
 	FOR_ARRAY(as_words, it_words) {
 		String *ts_word = &ARRAY_IT(as_words, it_words);
@@ -5158,6 +5387,10 @@ Text_Render(
 
 		/// word wrap
 		if (rect.w AND rect_position.x + advance_word >= width_max) {
+			if (align_x == TEXT_ALIGN_X_MIDDLE) {
+				line_width = ARRAY_IT(a_lines_width, ++line_width_index);
+			}
+
 			Codepoint_SetNewline(font, &rect_position, rect.x);
 
 			if (it_words AND String_StartWith(ts_word, " ")) {
@@ -5166,6 +5399,14 @@ Text_Render(
 		}
 
 		Rect rect_window = {0, 0, shader_set->window->width, shader_set->window->height};
+
+		/// multiple ' '
+		if (!ts_word->length) {
+			Codepoint codepoint;
+
+			Codepoint_GetData(font, ' ', &codepoint);
+			Codepoint_GetPosition(&codepoint, &rect_position);
+		}
 
 		FOR_START(it_word_start, ts_word->length, it) {
 			char ch = ts_word->value[it];
@@ -5187,8 +5428,14 @@ Text_Render(
 
 				Vertex_Buffer<float> *t_attribute;
 
+				u64 x_offset = 0;
+
+				if (align_x == TEXT_ALIGN_X_MIDDLE) {
+					x_offset = (width_max - line_width) >> 1;
+				}
+
 				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, rect_position.x);
+				Array_Add(&t_attribute->a_buffer, x_offset + rect_position.x);
 				Array_Add(&t_attribute->a_buffer, rect_position.y);
 
 				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
@@ -5199,6 +5446,10 @@ Text_Render(
 		}
 
 		if (String_EndWith(ts_word, "\n")) {
+			if (align_x == TEXT_ALIGN_X_MIDDLE) {
+				line_width = ARRAY_IT(a_lines_width, ++line_width_index);
+			}
+
 			Codepoint_SetNewline(font, &rect_position, rect.x);
 		}
 	}
@@ -5209,10 +5460,8 @@ Text_Render(
 
 		Vertex_Render(shader_set, t_vertex);
 
-		Vertex_ClearAttribute(t_vertex);
+		Vertex_ClearAttributes(t_vertex);
 	}
-
-	Array_Clear(&as_words);
 }
 
 instant void
@@ -5221,5 +5470,432 @@ Text_Render(
 ) {
 	Assert(text);
 
-	Text_Render(text->shader_set, text->font, &text->s_data, text->rect, text->color);
+	Text_Render(text->shader_set, text->font, &text->s_data, text->rect, text->color, text->align_x);
+}
+
+
+/// ::: Widget
+/// ===========================================================================
+struct Widget_Settings {
+	Color32 color_background    = Color_MakeGrey(0.9f);
+	Color32 color_outline       = {0, 0, 0, 1};
+	Color32 color_outline_focus = {0, 0, 1, 1};
+	Color32 color_font          = {0, 0, 0, 1};
+	Color32 color_progress      = {0.2, 0.2, 0.6, 1};
+
+	u32  border_size         = 0;
+	bool is_focusable        = true;
+};
+
+enum WIDGET_TYPE {
+	WIDGET_LABEL,
+	WIDGET_BUTTON
+};
+
+struct Widget {
+	WIDGET_TYPE type;
+	Rect rect_box;
+	Text text;
+	Vertex vertex_rect;
+	Window *window;
+
+	bool has_focus;
+
+	Widget_Settings setting;
+};
+
+instant bool
+Mouse_IsHovering(
+	Widget *widget
+) {
+	Assert(widget);
+
+	Point t_point;
+	Mouse_GetPosition(&t_point.x, &t_point.y, widget->window);
+
+    return Rect_IsIntersecting(&t_point, &widget->rect_box);
+}
+
+instant void
+Widget_Resize(
+	Widget *widget
+) {
+	Assert(widget);
+
+	switch (widget->type) {
+		case WIDGET_LABEL: {
+			Vertex *t_vertex = &widget->vertex_rect;
+			Rect    rect_box =  widget->rect_box;
+
+			if (!t_vertex->array_id)
+				*t_vertex = Vertex_Create();
+			else
+				Vertex_ClearAttributes(t_vertex);
+
+			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
+
+			widget->text.rect = rect_box;
+		} break;
+
+		case WIDGET_BUTTON: {
+			Vertex *t_vertex = &widget->vertex_rect;
+			Rect    rect_box =  widget->rect_box;
+
+			if (!t_vertex->array_id)
+				*t_vertex = Vertex_Create();
+			else
+				Vertex_ClearAttributes(t_vertex);
+
+			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
+
+			if (widget->setting.border_size) {
+				Rect_Resize(&rect_box, -1);
+				Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_outline);
+
+				Rect_Resize(&rect_box, -widget->setting.border_size);
+				Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
+			}
+
+			widget->text.rect = rect_box;
+		} break;
+
+		default:
+			AssertMessage(false, "Unhandled widget background drawing.");
+	}
+}
+
+instant Widget
+Widget_CreateLabel(
+	Window *window,
+	Font *font,
+	Rect rect_box,
+	const char *c_data = 0,
+	TEXT_ALIGN_X_TYPE text_align_x = TEXT_ALIGN_X_LEFT,
+	u64 c_length = 0
+) {
+	Assert(window);
+	Assert(font);
+
+	Widget t_widget = {};
+
+	t_widget.type     = WIDGET_LABEL;
+	t_widget.rect_box = rect_box;
+	t_widget.window   = window;
+
+	t_widget.setting.is_focusable = false;
+
+	t_widget.text.align_x    = text_align_x;
+	t_widget.text.rect       = t_widget.rect_box;
+	t_widget.text.font       = font;
+	t_widget.text.color      = t_widget.setting.color_font;
+
+	String_Append(&t_widget.text.s_data, c_data, c_length);
+
+	Widget_Resize(&t_widget);
+
+	return t_widget;
+}
+
+instant Widget
+Widget_CreateButton(
+	Window *window,
+	Font *font,
+	Rect rect_box,
+	const char *c_data = 0,
+	TEXT_ALIGN_X_TYPE text_align_x = TEXT_ALIGN_X_MIDDLE,
+	u64 c_length = 0
+) {
+	Assert(window);
+	Assert(font);
+
+	Widget t_widget = {};
+
+	t_widget.setting.border_size = 2;
+	t_widget.setting.color_outline = {0.2f, 0.2f, 1.0f};
+
+	t_widget.type     = WIDGET_BUTTON;
+	t_widget.rect_box = rect_box;
+	t_widget.window   = window;
+
+	t_widget.text.align_x    = text_align_x;
+	t_widget.text.rect       = t_widget.rect_box;
+	t_widget.text.font       = font;
+	t_widget.text.color      = t_widget.setting.color_font;
+
+	String_Append(&t_widget.text.s_data, c_data, c_length);
+
+	Widget_Resize(&t_widget);
+
+	return t_widget;
+}
+
+instant void
+Widget_Render(
+	ShaderSet *shader_set,
+	Widget *widget
+) {
+	Assert(shader_set);
+	Assert(widget);
+
+	widget->text.shader_set = shader_set;
+
+	ShaderSet_Load(shader_set, &shader_rect, widget->window);
+	Rect_Render(shader_set, &widget->vertex_rect);
+
+	ShaderSet_Load(shader_set, &shader_text, widget->window);
+	Text_Render(&widget->text);
+}
+
+instant void
+Widget_Render(
+	ShaderSet *shader_set,
+	Array<Widget *> *ap_widgets
+) {
+	Assert(ap_widgets);
+
+    FOR_ARRAY(*ap_widgets, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+
+		Widget_Render(shader_set, t_widget);
+    }
+}
+
+instant void
+Widget_Destroy(
+	Widget *widget
+) {
+	Assert(widget);
+
+	Text_Destroy(&widget->text);
+	Vertex_Destroy(&widget->vertex_rect);
+}
+
+instant void
+Widget_Destroy(
+	Array<Widget *> *ap_widgets
+) {
+	Assert(ap_widgets);
+
+    FOR_ARRAY(*ap_widgets, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+
+		Text_Destroy(&t_widget->text);
+		Vertex_Destroy(&t_widget->vertex_rect);
+    }
+}
+
+/// mouse_button
+///   0: left
+///   1: middle
+///   2: right
+instant bool
+Widget_OnClick(
+	Widget *widget,
+	u16 mouse_button = 0
+) {
+	Assert(widget);
+	Assert(widget->window);
+
+	bool result = false;
+
+	Keyboard *keyboard = widget->window->keyboard;
+	Mouse    *mouse    = widget->window->mouse;
+
+	if ((IF_USE(keyboard).up[VK_RETURN]) OR
+		(IF_USE(keyboard).up[VK_SPACE]))
+	{
+		if (widget->has_focus)
+			result = true;
+	}
+	else {
+		///@Performance: IsHovering does not have to retrieve
+		///              the mouse position again, when the
+		///              updated mouse information is already
+		///              stored in the window structure
+		///	             (in case the data was retrieved in
+		///              the message loop)
+		///
+		if (IF_USE(mouse).up[mouse_button]) {
+			if (Mouse_IsHovering(widget)) {
+				result = true;
+			}
+		}
+	}
+
+	return result;
+}
+
+instant void
+_Widget_UpdateFocusForward(
+	Array<Widget *> *ap_widgets,
+	Widget **widget_focus
+) {
+	Assert(ap_widgets);
+
+	bool result = false;
+	bool focus_set_next = false;
+
+	Widget *t_widget_focus_check = 0;
+
+	if (!ap_widgets->count)
+		return;
+
+	FOR_ARRAY(*ap_widgets, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+
+		if (!t_widget->setting.is_focusable)
+			continue;
+
+		result = false;
+
+		Keyboard *keyboard = t_widget->window->keyboard;
+		Mouse    *mouse    = t_widget->window->mouse;
+
+		if (focus_set_next) {
+			t_widget->has_focus = true;
+			focus_set_next = false;
+		}
+		else {
+			if (IF_USE(keyboard).up[VK_TAB]) {
+				if (t_widget->has_focus) {
+					t_widget->has_focus = false;
+					focus_set_next = true;
+				}
+			}
+
+			///@Performance: IsHovering does not have to retrieve
+			///              the mouse position again, when the
+			///              updated mouse information is already
+			///              stored in the window structure
+			///	             (in case the data was retrieved in
+			///              the message loop)
+			///
+			if (IF_USE(mouse).up[0]) {
+				if (Mouse_IsHovering(t_widget)) {
+					result = true;
+				}
+
+				t_widget->has_focus = result;
+			}
+		}
+
+		if (t_widget->has_focus) {
+			t_widget_focus_check = t_widget;
+
+			if (widget_focus)
+				*widget_focus = t_widget;
+
+			///@Hint: comment this out, in case the top-most widget
+			///       is needed, otherwise the first bottom widget
+			///       will be retrieved
+			break;
+		}
+	}
+
+	if (focus_set_next OR !t_widget_focus_check) {
+		FOR_ARRAY(*ap_widgets, it_widget) {
+			Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+
+			if (t_widget->setting.is_focusable) {
+				t_widget->has_focus = true;
+
+				if (widget_focus)
+					*widget_focus = t_widget;
+
+				break;
+			}
+		}
+	}
+}
+
+instant void
+_Widget_UpdateFocusBackward(
+	Array<Widget *> *ap_widgets,
+	Widget **widget_focus
+) {
+	Assert(ap_widgets);
+
+	bool result = false;
+	bool focus_set_prev = false;
+
+	Widget *t_widget_focus_check = 0;
+
+	if (!ap_widgets->count)
+		return;
+
+	FOR_ARRAY_REV(*ap_widgets, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+
+		if (!t_widget->setting.is_focusable)
+			continue;
+
+		result = false;
+
+		Keyboard *keyboard = t_widget->window->keyboard;
+		Mouse    *mouse    = t_widget->window->mouse;
+
+		if (focus_set_prev) {
+			t_widget->has_focus = true;
+			focus_set_prev = false;
+		}
+		else {
+			if (IF_USE(keyboard).up[VK_TAB]) {
+				if (t_widget->has_focus) {
+					t_widget->has_focus = false;
+					focus_set_prev = true;
+				}
+			}
+
+			///@Performance: IsHovering does not have to retrieve
+			///              the mouse position again, when the
+			///              updated mouse information is already
+			///              stored in the window structure
+			///	             (in case the data was retrieved in
+			///              the message loop)
+			///
+			if (IF_USE(mouse).up[0]) {
+				if (Mouse_IsHovering(t_widget)) {
+					result = true;
+				}
+
+				t_widget->has_focus = result;
+			}
+		}
+
+		if (t_widget->has_focus) {
+			t_widget_focus_check = t_widget;
+
+			if (widget_focus)
+				*widget_focus = t_widget;
+
+			break;
+		}
+	}
+
+	if (focus_set_prev OR !t_widget_focus_check) {
+		FOR_ARRAY_REV(*ap_widgets, it_widget) {
+			Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+
+			if (t_widget->setting.is_focusable) {
+				t_widget->has_focus = true;
+
+				if (widget_focus)
+					*widget_focus = t_widget;
+
+				break;
+			}
+		}
+	}
+}
+
+instant void
+Widget_UpdateFocus(
+	Array<Widget *> *ap_widgets,
+	bool reverse,
+	Widget **widget_focus
+) {
+	if (!reverse)
+		_Widget_UpdateFocusForward(ap_widgets, widget_focus);
+	else
+		_Widget_UpdateFocusBackward(ap_widgets, widget_focus);
 }
