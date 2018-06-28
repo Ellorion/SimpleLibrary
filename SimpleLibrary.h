@@ -5517,7 +5517,7 @@ Mouse_IsHovering(
 }
 
 instant void
-Widget_Resize(
+Widget_Redraw(
 	Widget *widget
 ) {
 	Assert(widget);
@@ -5550,7 +5550,11 @@ Widget_Resize(
 
 			if (widget->setting.border_size) {
 				Rect_Resize(&rect_box, -1);
-				Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_outline);
+
+				if (widget->has_focus)
+					Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_outline_focus);
+				else
+					Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_outline);
 
 				Rect_Resize(&rect_box, -widget->setting.border_size);
 				Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
@@ -5591,7 +5595,7 @@ Widget_CreateLabel(
 
 	String_Append(&t_widget.text.s_data, c_data, c_length);
 
-	Widget_Resize(&t_widget);
+	Widget_Redraw(&t_widget);
 
 	return t_widget;
 }
@@ -5612,6 +5616,7 @@ Widget_CreateButton(
 
 	t_widget.setting.border_size = 2;
 	t_widget.setting.color_outline = {0.2f, 0.2f, 1.0f};
+	t_widget.setting.color_outline_focus = {0.5f, 0.5f, 0.0f};
 
 	t_widget.type     = WIDGET_BUTTON;
 	t_widget.rect_box = rect_box;
@@ -5624,7 +5629,7 @@ Widget_CreateButton(
 
 	String_Append(&t_widget.text.s_data, c_data, c_length);
 
-	Widget_Resize(&t_widget);
+	Widget_Redraw(&t_widget);
 
 	return t_widget;
 }
@@ -5754,12 +5759,16 @@ _Widget_UpdateFocusForward(
 		if (focus_set_next) {
 			t_widget->has_focus = true;
 			focus_set_next = false;
+
+			Widget_Redraw(t_widget);
 		}
 		else {
 			if (IF_USE(keyboard).up[VK_TAB]) {
 				if (t_widget->has_focus) {
 					t_widget->has_focus = false;
 					focus_set_next = true;
+
+					Widget_Redraw(t_widget);
 				}
 			}
 
@@ -5775,10 +5784,14 @@ _Widget_UpdateFocusForward(
 					result = true;
 				}
 
-				t_widget->has_focus = result;
+				if (t_widget->has_focus != result) {
+					t_widget->has_focus = result;
+					Widget_Redraw(t_widget);
+				}
 			}
 		}
 
+		/// find who has focus without changing focus
 		if (t_widget->has_focus) {
 			t_widget_focus_check = t_widget;
 
@@ -5792,12 +5805,17 @@ _Widget_UpdateFocusForward(
 		}
 	}
 
+	/// search for next focus from the beginning,
+	/// if there was no focusable left past the last focused
+	/// widget
 	if (focus_set_next OR !t_widget_focus_check) {
 		FOR_ARRAY(*ap_widgets, it_widget) {
 			Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
 
 			if (t_widget->setting.is_focusable) {
 				t_widget->has_focus = true;
+
+				Widget_Redraw(t_widget);
 
 				if (widget_focus)
 					*widget_focus = t_widget;
@@ -5808,6 +5826,7 @@ _Widget_UpdateFocusForward(
 	}
 }
 
+///@Hint: reversed loop copy of forward function
 instant void
 _Widget_UpdateFocusBackward(
 	Array<Widget *> *ap_widgets,
@@ -5837,28 +5856,28 @@ _Widget_UpdateFocusBackward(
 		if (focus_set_prev) {
 			t_widget->has_focus = true;
 			focus_set_prev = false;
+
+			Widget_Redraw(t_widget);
 		}
 		else {
 			if (IF_USE(keyboard).up[VK_TAB]) {
 				if (t_widget->has_focus) {
 					t_widget->has_focus = false;
 					focus_set_prev = true;
+
+					Widget_Redraw(t_widget);
 				}
 			}
 
-			///@Performance: IsHovering does not have to retrieve
-			///              the mouse position again, when the
-			///              updated mouse information is already
-			///              stored in the window structure
-			///	             (in case the data was retrieved in
-			///              the message loop)
-			///
 			if (IF_USE(mouse).up[0]) {
 				if (Mouse_IsHovering(t_widget)) {
 					result = true;
 				}
 
-				t_widget->has_focus = result;
+				if (t_widget->has_focus != result) {
+					t_widget->has_focus = result;
+					Widget_Redraw(t_widget);
+				}
 			}
 		}
 
@@ -5878,6 +5897,8 @@ _Widget_UpdateFocusBackward(
 
 			if (t_widget->setting.is_focusable) {
 				t_widget->has_focus = true;
+
+				Widget_Redraw(t_widget);
 
 				if (widget_focus)
 					*widget_focus = t_widget;
