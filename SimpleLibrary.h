@@ -5797,11 +5797,6 @@ _Widget_UpdateFocusForward(
 
 			if (widget_focus)
 				*widget_focus = t_widget;
-
-			///@Hint: comment this out, in case the top-most widget
-			///       is needed, otherwise the first bottom widget
-			///       will be retrieved
-			break;
 		}
 	}
 
