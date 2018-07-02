@@ -5771,6 +5771,17 @@ Text_GetSize(
 
 /// ::: Widget
 /// ===========================================================================
+enum WIDGET_TYPE {
+	WIDGET_LABEL,
+	WIDGET_BUTTON,
+	WIDGET_LISTBOX
+};
+
+enum WIDGET_SCROLL_TYPE {
+	WIDGET_SCROLL_ITEM,
+	WIDGET_SCROLL_BLOCK
+};
+
 struct Widget_Settings {
 	Color32 color_background       = Color_MakeGrey(0.9f);
 	Color32 color_outline          = {0   , 0   , 0   , 1};
@@ -5783,12 +5794,8 @@ struct Widget_Settings {
 	u32  spacing       = 1;
 	bool is_focusable  = true;
 	bool is_scrollable = false;
-};
 
-enum WIDGET_TYPE {
-	WIDGET_LABEL,
-	WIDGET_BUTTON,
-	WIDGET_LISTBOX
+	WIDGET_SCROLL_TYPE scroll_type = WIDGET_SCROLL_ITEM;
 };
 
 struct Widget {
@@ -6485,9 +6492,34 @@ Widget_UpdateInput(
 		Rect rect_active_row;
         Widget_GetActiveRowRect(widget, &rect_active_row);
 
-        if (!Rect_IsVisibleFully(&rect_active_row, &widget->rect_box)) {
-			widget->text.y_offset -= (rect_active_row.y - widget->rect_box.y);
-        }
+		if (!Rect_IsVisibleFully(&rect_active_row, &widget->rect_box)) {
+			if (widget->setting.scroll_type == WIDGET_SCROLL_ITEM) {
+				if (widget->active_row_id < prev_active_row) {
+					widget->text.y_offset -= (rect_active_row.y - widget->rect_box.y);
+				}
+				else {
+					widget->text.y_offset -= (rect_active_row.y - widget->rect_box.y);
+					widget->text.y_offset += (widget->rect_box.h - rect_active_row.h);
+				}
+			}
+			else if (widget->setting.scroll_type == WIDGET_SCROLL_BLOCK) {
+				if (!Rect_IsVisibleFully(&rect_active_row, &widget->rect_box)) {
+					if (widget->active_row_id < prev_active_row) {
+						widget->text.y_offset -= (rect_active_row.y - widget->rect_box.y);
+						widget->text.y_offset += (widget->rect_box.h - rect_active_row.h);
+					}
+					else {
+						widget->text.y_offset -= (rect_active_row.y - widget->rect_box.y);
+					}
+				}
+			}
+			else {
+				AssertMessage(	false,
+								"Unhandled widget scroll type.");
+			}
+		}
+
+        Widget_ClampTextOffset(widget);
     }
 
 	if (widget->has_focus != got_focus) {
