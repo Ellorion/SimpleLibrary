@@ -23,6 +23,9 @@
 ///     t_ -> temporary local variable (which might overlap in name with
 ///           a parameter)
 ///
+///     Function names that ends with "Static" have a byRef return parameter
+///     which needs manual freeing, in case it is not a static object / variable
+///
 /// Return types: if a function returns a struct, it's memory needs to
 ///               be free'd to prevent memory leaks
 
@@ -559,6 +562,121 @@
 //}
 /// ===========================================================================
 
+/// Example: create render and input data to a listbox widget
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(
+//	Window *window
+//) {
+//	MSG msg;
+//	bool running = true;
+//
+//	Timer timer_fps;
+//	Time_Reset(&timer_fps);
+//
+//	Timer timer_fps_log;
+//	Time_Reset(&timer_fps_log);
+//
+//	ShaderSet shader_set = ShaderSet_Create(window);
+//
+//	OpenGL_UseBlending(true);
+//
+//	Keyboard *keyboard = window->keyboard;
+//
+//	String s_font;
+//	String_Append(&s_font, "test/AutourOne-Regular.ttf");
+//	Font font_20 = Font_Load(&s_font, 20);
+//
+//	Widget widget_listbox  = Widget_CreateListbox(window, &font_20, { 10,  20, 300, 200});
+//	Widget widget_click_me = Widget_CreateButton( window, &font_20, {320,  20, 100,  30}, "click me");
+//	Widget widget_exit     = Widget_CreateButton( window, &font_20, {320,  50, 100,  30}, "Exit");
+//
+//	Array<Widget *> ap_widgets;
+//	Array_Add(&ap_widgets, &widget_listbox);
+//	Array_Add(&ap_widgets, &widget_click_me);
+//	Array_Add(&ap_widgets, &widget_exit);
+//
+//	Widget_AddRow(&widget_listbox, "1");
+//	Widget_AddRow(&widget_listbox, "2");
+//	Widget_AddRow(&widget_listbox, "3");
+//	Widget_AddRow(&widget_listbox, "4");
+//	Widget_AddRow(&widget_listbox, "5");
+//	Widget_AddRow(&widget_listbox, "6");
+//	Widget_AddRow(&widget_listbox, "7");
+//	Widget_AddRow(&widget_listbox, "8");
+//	Widget_AddRow(&widget_listbox, "9");
+//	Widget_AddRow(&widget_listbox, "10");
+//	Widget_AddRow(&widget_listbox, "11");
+//	Widget_AddRow(&widget_listbox, "12");
+//	Widget_AddRow(&widget_listbox, "13");
+//	Widget_AddRow(&widget_listbox, "14");
+//	Widget_AddRow(&widget_listbox, "15");
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window);
+//
+//		/// hold shift-key to get reverse tab order
+//		Widget_UpdateInput(&ap_widgets);
+//		Widget_UpdateFocus(&ap_widgets, keyboard->pressing[VK_SHIFT]);
+//
+//		if (keyboard->up[VK_ESCAPE] OR Widget_OnClick(&widget_exit))
+//			running = false;
+//
+//		if (Widget_OnClick(&widget_click_me)) {
+//			std::cout << "clicked" << std::endl;
+//		}
+//
+//		if (Widget_OnClick(&widget_listbox)) {
+//			String s_row_data;
+//			Widget_GetSelectedRow(&widget_listbox, &s_row_data);
+//
+//			LOG_DEBUG(s_row_data.value);
+//		}
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		Widget_Render(&shader_set, &ap_widgets);
+//
+//		Window_Update(window);
+//
+//		u32 fps = Time_GetFPS(&timer_fps);
+//
+//		if (Time_HasElapsed(&timer_fps_log, 1000)) {
+//			LOG_DEBUG(fps << " fps");
+//		}
+//	}
+//
+//	Widget_Destroy(&ap_widgets);
+//
+//	ShaderSet_Destroy(&shader_set);
+//}
+//
+//int main() {
+//	Window window;
+//
+//	Keyboard keyboard;
+//	Mouse    mouse;
+//
+//	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard, &mouse);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//	return 0;
+//}
+/// ===========================================================================
+
 #include <iostream>
 #include <math.h>
 #include <windows.h>
@@ -653,6 +771,9 @@ _AssertMessage(
 
 #define IF_USE(pointer) \
 	(pointer) AND (*pointer)
+
+#define IF_SET(pointer) \
+	if (pointer) (*pointer)
 
 struct Rect {
 	float x = 0.0f;
@@ -766,6 +887,23 @@ Rect_GetAspect(
     }
 }
 
+instant bool
+Rect_IsIntersecting(
+	Rect *rect_inner,
+	Rect *rect_outer,
+	Point pt_inner_offset
+) {
+	Assert(rect_inner);
+	Assert(rect_outer);
+
+	if (rect_inner->x + pt_inner_offset.x + rect_inner->w < rect_outer->x)  return false;
+	if (rect_inner->x + pt_inner_offset.x > rect_outer->x + rect_outer->w)  return false;
+
+	if (rect_inner->y + pt_inner_offset.y + rect_inner->h < rect_outer->y)  return false;
+	if (rect_inner->y + pt_inner_offset.y > rect_outer->y + rect_outer->h)  return false;
+
+	return true;
+}
 
 instant bool
 Rect_IsIntersecting(
@@ -775,12 +913,7 @@ Rect_IsIntersecting(
 	Assert(rect_inner);
 	Assert(rect_outer);
 
-	if (rect_inner->x + rect_inner->w < rect_outer->x)  return false;
-	if (rect_inner->x > rect_outer->x + rect_outer->w)  return false;
-
-	if (rect_inner->y + rect_inner->h < rect_outer->y)  return false;
-
-	return true;
+	return Rect_IsIntersecting(rect_inner, rect_outer, {0, 0});
 }
 
 instant bool
@@ -796,6 +929,24 @@ Rect_IsIntersecting(
 
 	if (point->x > rect->x + rect->w)  return false;
 	if (point->y > rect->y + rect->h)  return false;
+
+	return true;
+}
+
+instant bool
+Rect_IsVisibleFully(
+	Rect *rect_inner,
+	Rect *rect_outer
+) {
+	Assert(rect_inner);
+	Assert(rect_outer);
+
+
+	if (rect_inner->x < rect_outer->x)  return false;
+	if (rect_inner->y < rect_outer->y)  return false;
+
+	if (rect_inner->x + rect_inner->w > rect_outer->x + rect_outer->w)  return false;
+	if (rect_inner->y + rect_inner->h > rect_outer->y + rect_outer->h)  return false;
 
 	return true;
 }
@@ -1857,7 +2008,7 @@ Array_Add(
 }
 
 template <typename T>
-instant void
+instant u64
 Array_AddEmpty(
 	Array<T> *array,
 	T **element_empty
@@ -1868,6 +2019,8 @@ Array_AddEmpty(
 	T t_element_empty = {};
 	Array_Add(array, t_element_empty);
 	*element_empty = &ARRAY_IT(*array, array->count - 1);
+
+	return array->count - 1;
 }
 
 ///@Info: does NOT have ownership and clears/destroys
@@ -2009,19 +2162,19 @@ Array_Destroy(
     Array_DestroyContainer(array);
 }
 
-enum ARRAY_DELIMITER_TYPE {
-	ARRAY_DELIMITER_IGNORE,
+enum DELIMITER_TYPE {
+	DELIMITER_IGNORE,
 	/// Insert delimiter at the beginning of the next token
-	ARRAY_DELIMITER_FRONT,
+	DELIMITER_ADD_FRONT,
 	/// Insert delimiter at the end if the current token
-	ARRAY_DELIMITER_BACK
+	DELIMITER_ADD_BACK
 };
 
 instant Array<String>
 Array_SplitRef(
 	String *s_data,
 	const char *delimiter,
-	ARRAY_DELIMITER_TYPE type = ARRAY_DELIMITER_IGNORE
+	DELIMITER_TYPE type = DELIMITER_IGNORE
 
 ) {
 	Assert(s_data);
@@ -2041,11 +2194,11 @@ Array_SplitRef(
 			s_element->value  = s_data_it.value;
 			s_element->length = pos_found;
 
-			if (type == ARRAY_DELIMITER_FRONT AND as_result.count) {
+			if (type == DELIMITER_ADD_FRONT AND as_result.count) {
 				s_element->value  -= len_delim;
 				s_element->length += len_delim;
 			}
-			else if (type == ARRAY_DELIMITER_BACK) {
+			else if (type == DELIMITER_ADD_BACK) {
 				s_element->length += len_delim;
 			}
 		}
@@ -2054,7 +2207,7 @@ Array_SplitRef(
 			String *s_element;
 			Array_AddEmpty(&as_result, &s_element);
 
-			if (type == ARRAY_DELIMITER_BACK) {
+			if (type == DELIMITER_ADD_BACK) {
 				s_element->value  = s_data_it.value;
 				s_element->length = len_delim;
 			}
@@ -2068,7 +2221,7 @@ Array_SplitRef(
 		String *s_element;
 		Array_AddEmpty(&as_result, &s_element);
 
-		if (type == ARRAY_DELIMITER_FRONT AND as_result.count) {
+		if (type == DELIMITER_ADD_FRONT AND as_result.count) {
 			s_element->value  -= len_delim;
 			s_element->length += len_delim;
 		}
@@ -2085,7 +2238,7 @@ instant Array<String>
 Array_Split(
 	String *s_data,
 	const char *delimiter,
-	ARRAY_DELIMITER_TYPE type = ARRAY_DELIMITER_IGNORE
+	DELIMITER_TYPE type = DELIMITER_IGNORE
 
 ) {
 	Assert(s_data);
@@ -2100,13 +2253,13 @@ Array_Split(
 		if (pos_found) {
 			String s_element;
 
-			if (type == ARRAY_DELIMITER_FRONT AND as_result.count) {
+			if (type == DELIMITER_ADD_FRONT AND as_result.count) {
 				String_Append(&s_element, delimiter, len_delim);
 			}
 
 			String_Append(&s_element, s_data_it.value, pos_found);
 
-			if (type == ARRAY_DELIMITER_BACK) {
+			if (type == DELIMITER_ADD_BACK) {
 				String_Append(&s_element, delimiter, len_delim);
 			}
 
@@ -2117,7 +2270,7 @@ Array_Split(
 			String *s_element;
 			Array_AddEmpty(&as_result, &s_element);
 
-			if (type == ARRAY_DELIMITER_BACK) {
+			if (type == DELIMITER_ADD_BACK) {
 				String_Append(s_element, delimiter, len_delim);
 			}
 		}
@@ -2129,7 +2282,7 @@ Array_Split(
 	if (s_data_it.length > 0) {
 		String s_element;
 
-		if (type == ARRAY_DELIMITER_FRONT AND as_result.count)
+		if (type == DELIMITER_ADD_FRONT AND as_result.count)
 			String_Append(&s_element, delimiter, len_delim);
 
 		String_Append(&s_element, s_data_it.value, s_data_it.length);
@@ -2156,7 +2309,7 @@ Array_Clear(
 }
 
 instant void
-_String_SplitWordsStatic(
+String_SplitWordsStatic(
 	String *s_data,
 	Array<String> *as_words
 ) {
@@ -2165,10 +2318,10 @@ _String_SplitWordsStatic(
 
 	Array_Clear(as_words);
 
-	Array<String> as_lines = Array_Split(s_data, "\n", ARRAY_DELIMITER_BACK);
+	Array<String> as_lines = Array_Split(s_data, "\n", DELIMITER_ADD_BACK);
 
 	FOR_ARRAY(as_lines, it_lines) {
-		Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ", ARRAY_DELIMITER_FRONT);
+		Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ");
 
 		FOR_ARRAY(tas_words, it_words) {
 			Array_Add(as_words, ARRAY_IT(tas_words, it_words));
@@ -2514,7 +2667,7 @@ File_Open(
 	Assert(s_filename);
 	Assert(mode);
 
-	File file;
+	File file = {};
 
 	if (s_filename->length) {
 		char *c_filename = String_CreateCBufferCopy(s_filename);
@@ -3313,6 +3466,28 @@ OpenGL_Scissor(
 }
 
 instant void
+OpenGL_Scissor(
+	Window *window,
+	Rect rect
+) {
+	Assert(window);
+
+	float x = rect.x;
+	float y = rect.y;
+	s32   w = rect.w;
+	s32   h = rect.h;
+
+	/// convert to right-hand coordinate system
+	float t_x = x / window->scale_x + window->x_viewport;
+	float t_y = (window->height - y - h) / window->scale_y + window->y_viewport;
+	s32   t_w = w / window->scale_x;
+	s32   t_h = h / window->scale_y;
+
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(t_x, t_y, t_w, t_h);
+}
+
+instant void
 OpenGL_Scissor_Disable() {
 	glDisable(GL_SCISSOR_TEST);
 }
@@ -3530,12 +3705,20 @@ Texture_IsEqual(
 
 /// ::: GLSL
 /// ===========================================================================
+enum SHADER_PROG_TYPE {
+	SHADER_PROG_RECT = 0,
+	SHADER_PROG_TEXT,
+	SHADER_PROG_TEXTURE,
+	SHADER_PROG_COUNT
+};
 
 struct Shader {
+	SHADER_PROG_TYPE type;
 	const char *code[3];
 };
 
 static const Shader shader_rect = {
+	SHADER_PROG_RECT,
 R"(
 	#version 330 core
 
@@ -3645,6 +3828,7 @@ R"(
 )"};
 
 static const Shader shader_text = {
+	SHADER_PROG_TEXT,
 R"(
 	#version 330 core
 
@@ -3766,6 +3950,7 @@ R"(
 )"};
 
 static const Shader shader_texture = {
+	SHADER_PROG_TEXTURE,
 R"(
 	#version 330 core
 
@@ -3896,21 +4081,26 @@ R"(
 
 /// ::: Shader
 /// ===========================================================================
+struct ShaderProgram {
+	u32 id = 0;
+	u32 vertex_id   = 0;
+	u32 geometry_id = 0;
+	u32 fragment_id = 0;
+};
+
 struct ShaderSet {
-	u32 program_id    = 0;
-	u32 vertex_id     = 0;
-	u32 geometry_id   = 0;
-	u32 fragment_id   = 0;
+	Array<ShaderProgram> a_shaders;
+	u64 active_id = 0;
 	Window *window = 0;
 };
 
 instant void
-ShaderSet_Add(
-	ShaderSet *shader_set,
+ShaderProgram_Add(
+	ShaderProgram *shader_prog,
 	u32 type,
 	const char *code
 ) {
-	Assert(shader_set);
+	Assert(shader_prog);
 
     u32 id_shader = glCreateShader(type);
 
@@ -3932,64 +4122,101 @@ ShaderSet_Add(
 	}
 
 	switch (type) {
-		case GL_VERTEX_SHADER:   { shader_set->vertex_id   = id_shader; } break;
-		case GL_GEOMETRY_SHADER: { shader_set->geometry_id = id_shader; } break;
-		case GL_FRAGMENT_SHADER: { shader_set->fragment_id = id_shader; } break;
+		case GL_VERTEX_SHADER:   { shader_prog->vertex_id   = id_shader; } break;
+		case GL_GEOMETRY_SHADER: { shader_prog->geometry_id = id_shader; } break;
+		case GL_FRAGMENT_SHADER: { shader_prog->fragment_id = id_shader; } break;
 		default: {
 			LOG_DEBUG("Unimplemented shader type");
 		}
 	}
 }
 
-inline void
-ShaderSet_Use(
+/// returns shader array index
+instant u32
+ShaderSet_Add(
 	ShaderSet *shader_set,
 	const Shader *shader
 ) {
 	Assert(shader_set);
-	Assert(shader);
+    Assert(shader);
 
-	if (shader->code[0])  ShaderSet_Add(shader_set, GL_VERTEX_SHADER  , shader->code[0]);
-	if (shader->code[1])  ShaderSet_Add(shader_set, GL_GEOMETRY_SHADER, shader->code[1]);
-	if (shader->code[2])  ShaderSet_Add(shader_set, GL_FRAGMENT_SHADER, shader->code[2]);
+	ShaderProgram *shader_prog;
+	u64 array_id = Array_AddEmpty(&shader_set->a_shaders, &shader_prog);
 
-	if (shader_set->program_id)
-		glDeleteProgram(shader_set->program_id);
+	AssertMessage(	array_id == shader->type,
+					"Shader added out of SHADER_PROG_TYPE order.");
 
-	shader_set->program_id = glCreateProgram();
+	if (shader->code[0])  ShaderProgram_Add(shader_prog, GL_VERTEX_SHADER  , shader->code[0]);
+	if (shader->code[1])  ShaderProgram_Add(shader_prog, GL_GEOMETRY_SHADER, shader->code[1]);
+	if (shader->code[2])  ShaderProgram_Add(shader_prog, GL_FRAGMENT_SHADER, shader->code[2]);
 
-	if (shader->code[0])  glAttachShader(shader_set->program_id, shader_set->vertex_id);
-	if (shader->code[1])  glAttachShader(shader_set->program_id, shader_set->geometry_id);
-	if (shader->code[2])  glAttachShader(shader_set->program_id, shader_set->fragment_id);
-	glLinkProgram(shader_set->program_id);
+	shader_prog->id = glCreateProgram();
+
+	if (shader->code[0])  glAttachShader(shader_prog->id, shader_prog->vertex_id);
+	if (shader->code[1])  glAttachShader(shader_prog->id, shader_prog->geometry_id);
+	if (shader->code[2])  glAttachShader(shader_prog->id, shader_prog->fragment_id);
+	glLinkProgram(shader_prog->id);
 
 	GLint result = GL_FALSE;
 	s32 length_info_log;
-	glGetProgramiv(shader_set->program_id, GL_LINK_STATUS, &result);
-	glGetProgramiv(shader_set->program_id, GL_INFO_LOG_LENGTH, &length_info_log);
+	glGetProgramiv(shader_prog->id, GL_LINK_STATUS, &result);
+	glGetProgramiv(shader_prog->id, GL_INFO_LOG_LENGTH, &length_info_log);
 
 	if (length_info_log) {
 		/// make space for '\0'
 		char *c_error_msg = Memory_Create(char, length_info_log + 1);
-		glGetProgramInfoLog(shader_set->program_id, length_info_log, 0, c_error_msg);
+		glGetProgramInfoLog(shader_prog->id, length_info_log, 0, c_error_msg);
 		LOG_DEBUG(c_error_msg);
 		Memory_Free(c_error_msg);
 	}
 
-	glDeleteShader(shader_set->vertex_id);
-	glDeleteShader(shader_set->geometry_id);
-	glDeleteShader(shader_set->fragment_id);
+	return array_id;
+}
+
+instant ShaderSet
+ShaderSet_Create(
+	Window *window
+) {
+	Assert(window);
+
+	ShaderSet t_shader_set;
+	t_shader_set.window = window;
+
+	ShaderSet_Add(&t_shader_set, &shader_rect);
+	ShaderSet_Add(&t_shader_set, &shader_text);
+	ShaderSet_Add(&t_shader_set, &shader_texture);
+
+	AssertMessage(	t_shader_set.a_shaders.count == SHADER_PROG_COUNT,
+					"Shader missing compared to SHADER_PROG_TYPE count.");
+
+	return t_shader_set;
+}
+
+inline void
+ShaderProgram_Destroy(
+	ShaderProgram *shader_prog
+) {
+	Assert(shader_prog);
+
+    if (shader_prog->id) {
+		glDeleteProgram(shader_prog->id);
+		glDeleteShader(shader_prog->vertex_id);
+		glDeleteShader(shader_prog->geometry_id);
+		glDeleteShader(shader_prog->fragment_id);
+
+		*shader_prog = {};
+    }
 }
 
 inline void
 ShaderSet_Destroy(
 	ShaderSet *shader_set
 ) {
-	Assert(shader_set);
+    Assert(shader_set);
 
-    if (shader_set->program_id) {
-		glDeleteProgram(shader_set->program_id);
-		shader_set->program_id = 0;
+    FOR_ARRAY(shader_set->a_shaders, it) {
+		ShaderProgram *t_shader_prog = &ARRAY_IT(shader_set->a_shaders, it);
+		ShaderProgram_Destroy(t_shader_prog);
     }
 }
 
@@ -3999,10 +4226,13 @@ Shader_SetValue(
 	const char *name,
 	const float buffer
 ) {
-	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
+
+	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
 
 	if (loc_id >= 0)
-		glProgramUniform1f(shader_set->program_id, loc_id, buffer);
+		glProgramUniform1f(shader_prog->id, loc_id, buffer);
 }
 
 inline void
@@ -4012,16 +4242,19 @@ Shader_SetValue(
 	const float *buffer,
 	u32 count
 ) {
-	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
+
+	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
 
 	if (loc_id >= 0) {
 		switch (count) {
 			case 3: {
-				glProgramUniform3fv(shader_set->program_id, loc_id, 1, buffer);
+				glProgramUniform3fv(shader_prog->id, loc_id, 1, buffer);
 			} break;
 
 			case 4: {
-				glProgramUniform4fv(shader_set->program_id, loc_id, 1, buffer);
+				glProgramUniform4fv(shader_prog->id, loc_id, 1, buffer);
 			} break;
 
 			default: {
@@ -4037,10 +4270,13 @@ Shader_SetValue(
 	const char *name,
 	int value
 ) {
-	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
+
+	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
 
 	if (loc_id >= 0)
-		glProgramUniform1i(shader_set->program_id, loc_id, value);
+		glProgramUniform1i(shader_prog->id, loc_id, value);
 }
 
 inline void
@@ -4050,10 +4286,13 @@ Shader_SetValue(
 	int value_a,
 	int value_b
 ) {
-	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
+
+	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
 
 	if (loc_id >= 0) {
-		glProgramUniform2i(shader_set->program_id, loc_id, value_a, value_b);
+		glProgramUniform2i(shader_prog->id, loc_id, value_a, value_b);
 	}
 }
 
@@ -4064,10 +4303,13 @@ Shader_SetValue(
 	float value_a,
 	float value_b
 ) {
-	s32 loc_id = glGetUniformLocation(shader_set->program_id, name);
+	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
+
+	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
 
 	if (loc_id >= 0) {
-		glProgramUniform2f(shader_set->program_id, loc_id, value_a, value_b);
+		glProgramUniform2f(shader_prog->id, loc_id, value_a, value_b);
 	}
 }
 
@@ -4086,22 +4328,35 @@ Shader_BindAndUseIndex0(
 }
 
 inline void
-ShaderSet_Load(
+ShaderSet_Use(
 	ShaderSet *shader_set,
-	const Shader *shader,
-	Window *window = 0
+	SHADER_PROG_TYPE type
 ) {
 	Assert(shader_set);
-
-	if (window)  shader_set->window = window;
-
 	Assert(shader_set->window);
 
-	if (shader_set->program_id)
-		ShaderSet_Destroy(shader_set);
+	u64 prev_active_id = shader_set->active_id;
 
-	ShaderSet_Use(shader_set, shader);
-	glUseProgram(shader_set->program_id);
+	switch (type) {
+		case SHADER_PROG_RECT:
+		case SHADER_PROG_TEXTURE:
+		case SHADER_PROG_TEXT: {
+			shader_set->active_id = type;
+		} break;
+
+		default: {
+			AssertMessage(	false,
+							"Unhandled Shader-Program type.");
+		} break;
+	}
+
+	if (prev_active_id == shader_set->active_id)
+		return;
+
+	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
+
+	glUseProgram(shader_prog->id);
 
 	if (shader_set->window) {
 		RectF viewport;
@@ -4256,11 +4511,13 @@ Vertex_Load(
 ) {
 	Assert(shader_set);
 	Assert(vertex);
-	Assert(shader_set->program_id);
+
+	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
 
 	FOR_ARRAY(vertex->a_attributes, it) {
 		Vertex_Buffer<float> *entry = &ARRAY_IT(vertex->a_attributes, it);
-		s32 attrib_position = glGetAttribLocation(shader_set->program_id, entry->name);
+		s32 attrib_position = glGetAttribLocation(shader_prog->id, entry->name);
 
 		if (attrib_position < 0) {
 			String s_error;
@@ -4315,6 +4572,18 @@ Vertex_BindAttributes(
 	Vertex_Load(shader_set, vertex);
 }
 
+instant void
+Vertex_ClearAttributes(
+	Vertex *vertex
+) {
+	Assert(vertex);
+
+	FOR_ARRAY(vertex->a_attributes, it) {
+		auto *t_attribute = &ARRAY_IT(vertex->a_attributes, it);
+		Array_ClearContainer(&t_attribute->a_buffer);
+	}
+}
+
 inline void
 Vertex_Render(
 	ShaderSet *shader_set,
@@ -4326,7 +4595,10 @@ Vertex_Render(
 
 	///@Hint: vertex positions have to be the first entry in the array
 	Vertex_Buffer<float> *a_positions = &ARRAY_IT(vertex->a_attributes, 0);
-	AssertMessage(a_positions->id, "No Attributes found.\n    Forgot to bind the attributes?");
+
+	AssertMessage(	a_positions->id,
+					"No Attributes found.\n    Forgot to bind the attributes?");
+
 	Assert(a_positions->group_count);
 
 	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip);
@@ -4334,6 +4606,24 @@ Vertex_Render(
 	Shader_SetValue(shader_set, "scale_y", vertex->settings.scale_y);
 
 	glDrawArrays(GL_POINTS, 0, a_positions->a_buffer.size / sizeof(GLfloat) / a_positions->group_count);
+}
+
+instant void
+Vertex_Render(
+	ShaderSet *shader_set,
+	Array<Vertex> *a_vertex
+) {
+	Assert(shader_set);
+	Assert(a_vertex);
+
+	FOR_ARRAY(*a_vertex, it) {
+		Vertex *t_vertex = &ARRAY_IT(*a_vertex, it);
+		Vertex_BindAttributes(shader_set, t_vertex);
+
+		Vertex_Render(shader_set, t_vertex);
+
+		Vertex_ClearAttributes(t_vertex);
+	}
 }
 
 instant void
@@ -5213,8 +5503,8 @@ Codepoint_Destroy(
 /// ===========================================================================
 enum TEXT_ALIGN_X_TYPE {
 	TEXT_ALIGN_X_LEFT,
-	TEXT_ALIGN_X_MIDDLE
-//	TEXT_ALIGN_X_RIGHT
+	TEXT_ALIGN_X_MIDDLE,
+	TEXT_ALIGN_X_RIGHT
 };
 
 struct Text {
@@ -5224,6 +5514,8 @@ struct Text {
 	Rect rect = {};
 	Color32 color;
 	TEXT_ALIGN_X_TYPE align_x = TEXT_ALIGN_X_LEFT;
+	float x_offset = 0;
+	float y_offset = 0;
 };
 
 instant Text
@@ -5259,209 +5551,185 @@ Text_Destroy(
 	String_Destroy(&text->s_data);
 }
 
-instant void
-Vertex_ClearAttributes(
-	Vertex *vertex
-) {
-	Assert(vertex);
+struct Text_Line {
+	u64 width_pixel;
+	String s_data;
+};
 
-	FOR_ARRAY(vertex->a_attributes, it) {
-		auto *t_attribute = &ARRAY_IT(vertex->a_attributes, it);
-		Array_ClearContainer(&t_attribute->a_buffer);
-	}
-}
-
-instant void
-_Text_CalcLinesWidthStatic(
+instant s32
+Text_BuildLinesStatic(
 	Font *font,
-	Array<String> *as_words,
 	Rect rect,
-	Array<u64> *a_lines_width
+	Array<String> *as_words,
+	Array<Text_Line> *a_text_line
 ) {
 	Assert(font);
 	Assert(as_words);
-	Assert(a_lines_width);
+	Assert(a_text_line);
 
-	Array_ClearContainer(a_lines_width);
+	FOR_ARRAY(*a_text_line, it_line) {
+		Text_Line *t_text_line = &ARRAY_IT(*a_text_line, it_line);
+		String_Destroy(&t_text_line->s_data);
+		t_text_line->width_pixel = 0;
+	}
+	Array_ClearContainer(a_text_line);
 
+	Assert(a_text_line->count == 0);
 
-	RectF rect_line_search = {rect.x, 0, 0, rect.y};
+	s32 height_max  = 0;
+	s32 height_line = font->size + font->linegap;
+	u64 width_max   = rect.x + rect.w;
+	bool line_start = true;
 
-	FOR_ARRAY(*as_words, it_words) {
+	u64 advance_space = Codepoint_GetAdvance(font, ' ');
+
+	if (as_words->count)
+		height_max += height_line;
+
+	Rect rect_line_current = {rect.x, rect.y, 0, height_line};
+
+	Text_Line *t_text_line;
+	Array_AddEmpty(a_text_line, &t_text_line);
+
+    FOR_ARRAY(*as_words, it_words) {
 		String *ts_word = &ARRAY_IT(*as_words, it_words);
 
 		u64 advance_word = Codepoint_GetStringAdvance(font, ts_word);
 
-		u64 it_word_start = 0;
-		u64 width_max = rect.x + rect.w;
+		if (!line_start) {
+			rect_line_current.x      += advance_space;
+			t_text_line->width_pixel += advance_space;
+			String_Append(&t_text_line->s_data, " ", 1);
+		}
 
 		/// word wrap
-		if (rect.w AND rect_line_search.x + advance_word >= width_max) {
-			Array_Add(a_lines_width, (u64)rect_line_search.x);
+		if (rect.w AND rect_line_current.x + advance_word >= width_max) {
+			Array_AddEmpty(a_text_line, &t_text_line);
+			line_start = true;
 
-			Codepoint_SetNewline(font, &rect_line_search, rect.x);
+			rect_line_current.x  = rect.x;
+			rect_line_current.y += rect_line_current.h;
 
-			if (it_words AND String_StartWith(ts_word, " ")) {
-				it_word_start = 1;
-			}
-		}
-
-		/// multiple ' '
-		if (!ts_word->length) {
-			Codepoint codepoint;
-
-			Codepoint_GetData(font, ' ', &codepoint);
-			Codepoint_GetPosition(&codepoint, &rect_line_search);
-		}
-
-		FOR_START(it_word_start, ts_word->length, it) {
-			char ch = ts_word->value[it];
-
-			Codepoint codepoint;
-
-			Codepoint_GetData(font, ch, &codepoint);
-			Codepoint_GetPosition(&codepoint, &rect_line_search);
+			height_max += height_line;
 		}
 
 		if (String_EndWith(ts_word, "\n")) {
-			Array_Add(a_lines_width, (u64)rect_line_search.x);
+			t_text_line->width_pixel += advance_word;
+			String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
 
-			Codepoint_SetNewline(font, &rect_line_search, rect.x);
+			Array_AddEmpty(a_text_line, &t_text_line);
+			line_start = true;
+
+			rect_line_current.x  = rect.x;
+			rect_line_current.y += rect_line_current.h;
+
+			height_max += height_line;
+
+			continue;
 		}
-	}
 
-	/// advance the last character at the last line with an
-	/// invisible character to calc. the correct line width
-	if (rect_line_search.x > rect.x) {
-		Codepoint codepoint;
+		rect_line_current.x      += advance_word;
+		t_text_line->width_pixel += advance_word;
+		String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
 
-		Codepoint_GetData(font, '\n', &codepoint);
-		Codepoint_GetPosition(&codepoint, &rect_line_search);
+		line_start = false;
+    }
 
-		Array_Add(a_lines_width, (u64)rect_line_search.x);
-	}
+	return height_max;
 }
 
-///@Hint: will add out-of-bound textures to the rendering queue
 instant void
-Text_Render(
+Text_AddLines(
+	Array<Vertex> *a_vertex,
 	ShaderSet *shader_set,
 	Font *font,
-	String *s_data,
 	Rect rect,
 	Color32 color,
-	TEXT_ALIGN_X_TYPE align_x
+	Array<Text_Line> *a_text_lines,
+	TEXT_ALIGN_X_TYPE align_x,
+	float x_offset,
+	float y_offset
 ) {
 	Assert(shader_set);
-	Assert(shader_set->window);
 	Assert(font);
-	Assert(s_data);
+	Assert(a_text_lines);
 
+	u64 width_max = rect.w;
 	RectF rect_position = {rect.x, 0, 0, rect.y};
 
-	/// reuse the same buffer for better performance
-	static Array<Vertex> a_vertex;
-	static Array<String> as_words;
-	static Array<u64>    a_lines_width;
+	FOR_ARRAY(*a_text_lines, it_line) {
+		Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
 
-	_String_SplitWordsStatic(s_data, &as_words);
+		u64 it_data = 0;
 
-	if (align_x == TEXT_ALIGN_X_MIDDLE) {
-		_Text_CalcLinesWidthStatic(font, &as_words, rect, &a_lines_width);
-	}
-
-	u64 line_width_index = 0;
-	u64 line_width = 0;
-
-	if (align_x == TEXT_ALIGN_X_MIDDLE) {
-		line_width = ARRAY_IT(a_lines_width, line_width_index);
-	}
-
-	FOR_ARRAY(as_words, it_words) {
-		String *ts_word = &ARRAY_IT(as_words, it_words);
-
-		u64 advance_word = Codepoint_GetStringAdvance(font, ts_word);
-
-		u64 it_word_start = 0;
-		u64 width_max = rect.x + rect.w;
-
-		/// word wrap
-		if (rect.w AND rect_position.x + advance_word >= width_max) {
-			if (align_x == TEXT_ALIGN_X_MIDDLE) {
-				line_width = ARRAY_IT(a_lines_width, ++line_width_index);
-			}
-
-			Codepoint_SetNewline(font, &rect_position, rect.x);
-
-			if (it_words AND String_StartWith(ts_word, " ")) {
-				it_word_start = 1;
-			}
-		}
-
-		Rect rect_window = {0, 0, shader_set->window->width, shader_set->window->height};
-
-		/// multiple ' '
-		if (!ts_word->length) {
+		while(it_data < t_text_line->s_data.length) {
 			Codepoint codepoint;
 
-			Codepoint_GetData(font, ' ', &codepoint);
-			Codepoint_GetPosition(&codepoint, &rect_position);
-		}
-
-		FOR_START(it_word_start, ts_word->length, it) {
-			char ch = ts_word->value[it];
-
-			Codepoint codepoint;
+			s8 ch = t_text_line->s_data.value[it_data];
 
 			Codepoint_GetData(font, ch, &codepoint);
 			Codepoint_GetPosition(&codepoint, &rect_position);
 
-			///@Hint: ' ' does not have a texture
+			/// for unavailable characters like ' '
 			if (!Texture_IsEmpty(&codepoint.texture)) {
-				Rect rect_texture = {rect_position.x, rect_position.y, 10, 10};
-
-				if (!Rect_IsIntersecting(&rect_texture, &rect_window))
-					continue;
-
 				Vertex *t_vertex;
-				Vertex_FindOrAdd(&a_vertex, &codepoint.texture, &t_vertex);
+				Vertex_FindOrAdd(a_vertex, &codepoint.texture, &t_vertex);
+
+				u64 x_align_offset = 0;
+
+				if (0) {}
+				else if (align_x == TEXT_ALIGN_X_MIDDLE)
+					x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
+				else if (align_x == TEXT_ALIGN_X_RIGHT)
+					x_align_offset = (width_max - t_text_line->width_pixel);
 
 				Vertex_Buffer<float> *t_attribute;
 
-				u64 x_offset = 0;
-
-				if (align_x == TEXT_ALIGN_X_MIDDLE) {
-					x_offset = (width_max - line_width) >> 1;
-				}
-
 				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, x_offset + rect_position.x);
-				Array_Add(&t_attribute->a_buffer, rect_position.y);
+				Array_Add(&t_attribute->a_buffer, x_offset + rect_position.x + x_align_offset);
+				Array_Add(&t_attribute->a_buffer, y_offset + rect_position.y);
 
 				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
 				Array_Add(&t_attribute->a_buffer, color.r);
 				Array_Add(&t_attribute->a_buffer, color.g);
 				Array_Add(&t_attribute->a_buffer, color.b);
 			}
+
+			++it_data;
 		}
 
-		if (String_EndWith(ts_word, "\n")) {
-			if (align_x == TEXT_ALIGN_X_MIDDLE) {
-				line_width = ARRAY_IT(a_lines_width, ++line_width_index);
-			}
-
-			Codepoint_SetNewline(font, &rect_position, rect.x);
-		}
+		Codepoint_SetNewline(font, &rect_position, rect.x);
 	}
+}
 
-	FOR_ARRAY(a_vertex, it) {
-		Vertex *t_vertex = &ARRAY_IT(a_vertex, it);
-		Vertex_BindAttributes(shader_set, t_vertex);
+instant void
+Text_AddLines(
+	Array<Vertex>    *a_vertex,
+	Text *text,
+	Array<Text_Line> *a_text_lines
+) {
+	Assert(text);
 
-		Vertex_Render(shader_set, t_vertex);
+	Text_AddLines(	a_vertex,
+					text->shader_set,
+					text->font,
+					text->rect,
+					text->color,
+					a_text_lines,
+					text->align_x,
+					text->x_offset,
+					text->y_offset);
+}
 
-		Vertex_ClearAttributes(t_vertex);
-	}
+instant void
+Text_Render(
+	Text *text,
+	Array<Vertex> *a_vertex
+) {
+	Assert(text);
+	Assert(a_vertex);
+
+	Vertex_Render(text->shader_set, a_vertex);
 }
 
 instant void
@@ -5470,39 +5738,88 @@ Text_Render(
 ) {
 	Assert(text);
 
-	Text_Render(text->shader_set, text->font, &text->s_data, text->rect, text->color, text->align_x);
+	static Array<String>    as_words;
+	static Array<Text_Line> a_text_lines;
+	static Array<Vertex>    a_vertex;
+
+	String_SplitWordsStatic(&text->s_data, &as_words);
+	Text_BuildLinesStatic(text->font, text->rect, &as_words, &a_text_lines);
+
+	Text_AddLines(&a_vertex, text, &a_text_lines);
+
+	Text_Render(text, &a_vertex);
 }
 
+instant void
+Text_GetSize(
+	Text *text,
+	s32 *width,
+	s32 *height
+) {
+	Assert(text);
+
+	static Array<String>    as_words;
+	static Array<Text_Line> a_text_lines;
+
+	if (height) {
+		String_SplitWordsStatic(&text->s_data, &as_words);
+		*height = Text_BuildLinesStatic(text->font, text->rect, &as_words, &a_text_lines);
+	}
+
+	IF_SET(width)  = text->rect.w;
+}
 
 /// ::: Widget
 /// ===========================================================================
 struct Widget_Settings {
-	Color32 color_background    = Color_MakeGrey(0.9f);
-	Color32 color_outline       = {0, 0, 0, 1};
-	Color32 color_outline_focus = {0, 0, 1, 1};
-	Color32 color_font          = {0, 0, 0, 1};
-	Color32 color_progress      = {0.2, 0.2, 0.6, 1};
+	Color32 color_background       = Color_MakeGrey(0.9f);
+	Color32 color_outline          = {0   , 0   , 0   , 1};
+	Color32 color_outline_selected = {0.3f, 0.3f, 1   , 1};
+	Color32 color_outline_inactive = {0.5f, 0.5f, 1   , 1};
+	Color32 color_font             = {1   , 0   , 0   , 1};
+	Color32 color_progress         = {0.2f, 0.2f, 0.6f, 1};
 
-	u32  border_size         = 0;
-	bool is_focusable        = true;
+	u32  border_size   = 0;
+	u32  spacing       = 1;
+	bool is_focusable  = true;
+	bool is_scrollable = false;
 };
 
 enum WIDGET_TYPE {
 	WIDGET_LABEL,
-	WIDGET_BUTTON
+	WIDGET_BUTTON,
+	WIDGET_LISTBOX
 };
 
 struct Widget {
 	WIDGET_TYPE type;
 	Rect rect_box;
+	Rect rect_content;
 	Text text;
 	Vertex vertex_rect;
 	Window *window;
 
 	bool has_focus;
 
+	Array<String> as_row_data;
+	u64 active_row_id = 0;
+
 	Widget_Settings setting;
 };
+
+instant void
+Widget_AddRow(
+	Widget *widget,
+	const char *c_row_data,
+	u64 c_length = 0
+) {
+	if (!c_row_data)
+		return;
+
+	String *ts_data;
+	Array_AddEmpty(&widget->as_row_data, &ts_data);
+	String_Copy(ts_data, c_row_data, c_length);
+}
 
 instant bool
 Mouse_IsHovering(
@@ -5514,6 +5831,19 @@ Mouse_IsHovering(
 	Mouse_GetPosition(&t_point.x, &t_point.y, widget->window);
 
     return Rect_IsIntersecting(&t_point, &widget->rect_box);
+}
+
+instant bool
+Mouse_IsHovering(
+	Mouse *mouse,
+	Widget *widget
+) {
+	Assert(mouse);
+	Assert(widget);
+
+	Mouse_GetPosition(mouse, widget->window);
+
+    return Rect_IsIntersecting(&mouse->point, &widget->rect_box);
 }
 
 instant void
@@ -5552,7 +5882,7 @@ Widget_Redraw(
 				Rect_Resize(&rect_box, -1);
 
 				if (widget->has_focus)
-					Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_outline_focus);
+					Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_outline_selected);
 				else
 					Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_outline);
 
@@ -5563,8 +5893,24 @@ Widget_Redraw(
 			widget->text.rect = rect_box;
 		} break;
 
+		case WIDGET_LISTBOX: {
+			Vertex *t_vertex = &widget->vertex_rect;
+			Rect    rect_box =  widget->rect_box;
+
+			if (!t_vertex->array_id)
+				*t_vertex = Vertex_Create();
+			else
+				Vertex_ClearAttributes(t_vertex);
+
+			Rect t_rect_box = rect_box;
+			t_rect_box.w += 5;
+
+			Vertex_AddRect32(t_vertex, t_rect_box, widget->setting.color_background);
+		} break;
+
 		default:
-			AssertMessage(false, "Unhandled widget background drawing.");
+			AssertMessage(	false,
+							"Unhandled widget background drawing.");
 	}
 }
 
@@ -5582,9 +5928,10 @@ Widget_CreateLabel(
 
 	Widget t_widget = {};
 
-	t_widget.type     = WIDGET_LABEL;
-	t_widget.rect_box = rect_box;
-	t_widget.window   = window;
+	t_widget.type         = WIDGET_LABEL;
+	t_widget.rect_box     = rect_box;
+	t_widget.rect_content = rect_box;
+	t_widget.window       = window;
 
 	t_widget.setting.is_focusable = false;
 
@@ -5616,11 +5963,12 @@ Widget_CreateButton(
 
 	t_widget.setting.border_size = 2;
 	t_widget.setting.color_outline = {0.2f, 0.2f, 1.0f};
-	t_widget.setting.color_outline_focus = {0.5f, 0.5f, 0.0f};
+	t_widget.setting.color_outline_selected = {0.5f, 0.5f, 0.0f};
 
-	t_widget.type     = WIDGET_BUTTON;
-	t_widget.rect_box = rect_box;
-	t_widget.window   = window;
+	t_widget.type         = WIDGET_BUTTON;
+	t_widget.rect_box     = rect_box;
+	t_widget.rect_content = rect_box;
+	t_widget.window       = window;
 
 	t_widget.text.align_x    = text_align_x;
 	t_widget.text.rect       = t_widget.rect_box;
@@ -5634,6 +5982,47 @@ Widget_CreateButton(
 	return t_widget;
 }
 
+instant Widget
+Widget_CreateListbox(
+	Window *window,
+	Font *font,
+	Rect rect_box
+) {
+	Assert(window);
+	Assert(font);
+
+	Widget t_widget = {};
+
+	t_widget.setting.color_outline = {0.8f, 0.8f, 0.88f};
+
+	t_widget.type         = WIDGET_LISTBOX;
+	t_widget.rect_box     = rect_box;
+	t_widget.rect_content = rect_box;
+	t_widget.window       = window;
+
+	t_widget.setting.is_focusable = true;
+	t_widget.setting.is_scrollable = true;
+
+	t_widget.text.rect  = t_widget.rect_box;
+	t_widget.text.font  = font;
+	t_widget.text.color = t_widget.setting.color_font;
+
+	Widget_Redraw(&t_widget);
+
+	return t_widget;
+}
+
+instant void
+Widget_GetTextOffset(
+	Widget *widget,
+	Point *point
+) {
+	Assert(widget);
+	Assert(point);
+
+	*point = {widget->text.x_offset, widget->text.y_offset};
+}
+
 instant void
 Widget_Render(
 	ShaderSet *shader_set,
@@ -5644,11 +6033,81 @@ Widget_Render(
 
 	widget->text.shader_set = shader_set;
 
-	ShaderSet_Load(shader_set, &shader_rect, widget->window);
+	/// draw non-list data
+	if (!widget->as_row_data.count) {
+		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
+		Rect_Render(shader_set, &widget->vertex_rect);
+
+		ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
+		Text_Render(&widget->text);
+		return;
+	}
+
+	static Array<Vertex> a_vertex;
+	static Array<String> as_words;
+	static Array<Text_Line> a_text_lines;
+	Rect rect_row;
+
+	Point pt_offset;
+	Widget_GetTextOffset(widget, &pt_offset);
+
+	OpenGL_Scissor(shader_set->window, widget->rect_box);
+
+	widget->rect_content   = widget->rect_box;
+	widget->rect_content.h = 0;
+
+	/// render item background(s)
+	/// =======================================================================
+	rect_row = widget->rect_box;
+	rect_row.x += pt_offset.x;
+	rect_row.y += pt_offset.y;
+	rect_row.h  = 0;
+
+	Vertex_ClearAttributes(&widget->vertex_rect);
+	Widget_Redraw(widget);
+
+	FOR_ARRAY(widget->as_row_data, it_row) {
+		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
+
+        String_SplitWordsStatic(ts_data, &as_words);
+        rect_row.h = Text_BuildLinesStatic(widget->text.font, rect_row, &as_words, &a_text_lines);
+
+		if (Rect_IsIntersecting(&rect_row, &widget->rect_box)) {
+			Color32 t_color_rect = widget->setting.color_outline;
+
+			if (widget->active_row_id == it_row) {
+				if (widget->has_focus)
+					t_color_rect = widget->setting.color_outline_selected;
+				else
+					t_color_rect = widget->setting.color_outline_inactive;
+			}
+
+			Vertex_AddRect32(&widget->vertex_rect, rect_row, t_color_rect);
+
+			/// store item data, so the data is drawn upon the background
+			/// and as batch rendering
+			widget->text.rect = rect_row;
+			widget->text.rect.x -= pt_offset.x;
+			widget->text.rect.y -= pt_offset.y;
+
+			Text_AddLines(&a_vertex, &widget->text, &a_text_lines);
+		}
+
+		s32 height_row_step = rect_row.h + widget->setting.spacing;
+
+		rect_row.y             += height_row_step;
+		widget->rect_content.h += height_row_step;
+	}
+
+	ShaderSet_Use(shader_set, SHADER_PROG_RECT);
 	Rect_Render(shader_set, &widget->vertex_rect);
 
-	ShaderSet_Load(shader_set, &shader_text, widget->window);
-	Text_Render(&widget->text);
+	/// render item data
+	/// =======================================================================
+	ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
+	Text_Render(&widget->text, &a_vertex);
+
+	OpenGL_Scissor_Disable();
 }
 
 instant void
@@ -5693,6 +6152,10 @@ Widget_Destroy(
 ///   0: left
 ///   1: middle
 ///   2: right
+///
+/// keyboard trigger
+///	  VK_RETURN
+///   VK_SPACE
 instant bool
 Widget_OnClick(
 	Widget *widget,
@@ -5706,6 +6169,8 @@ Widget_OnClick(
 	Keyboard *keyboard = widget->window->keyboard;
 	Mouse    *mouse    = widget->window->mouse;
 
+	///@Idea: might be better in a seperate space,
+	///       and let this function only handle mouse input
 	if ((IF_USE(keyboard).up[VK_RETURN]) OR
 		(IF_USE(keyboard).up[VK_SPACE]))
 	{
@@ -5732,12 +6197,10 @@ Widget_OnClick(
 
 instant void
 _Widget_UpdateFocusForward(
-	Array<Widget *> *ap_widgets,
-	Widget **widget_focus
+	Array<Widget *> *ap_widgets
 ) {
 	Assert(ap_widgets);
 
-	bool result = false;
 	bool focus_set_next = false;
 
 	Widget *t_widget_focus_check = 0;
@@ -5750,8 +6213,6 @@ _Widget_UpdateFocusForward(
 
 		if (!t_widget->setting.is_focusable)
 			continue;
-
-		result = false;
 
 		Keyboard *keyboard = t_widget->window->keyboard;
 		Mouse    *mouse    = t_widget->window->mouse;
@@ -5771,33 +6232,10 @@ _Widget_UpdateFocusForward(
 					Widget_Redraw(t_widget);
 				}
 			}
-
-			///@Performance: IsHovering does not have to retrieve
-			///              the mouse position again, when the
-			///              updated mouse information is already
-			///              stored in the window structure
-			///	             (in case the data was retrieved in
-			///              the message loop)
-			///
-			if (IF_USE(mouse).up[0]) {
-				if (Mouse_IsHovering(t_widget)) {
-					result = true;
-				}
-
-				if (t_widget->has_focus != result) {
-					t_widget->has_focus = result;
-					Widget_Redraw(t_widget);
-				}
-			}
 		}
 
-		/// find who has focus without changing focus
-		if (t_widget->has_focus) {
+		if (t_widget->has_focus)
 			t_widget_focus_check = t_widget;
-
-			if (widget_focus)
-				*widget_focus = t_widget;
-		}
 	}
 
 	/// search for next focus from the beginning,
@@ -5812,24 +6250,19 @@ _Widget_UpdateFocusForward(
 
 				Widget_Redraw(t_widget);
 
-				if (widget_focus)
-					*widget_focus = t_widget;
-
 				break;
 			}
 		}
 	}
 }
 
-///@Hint: reversed loop copy of forward function
+///@Hint: copy of forward function with reversed loop
 instant void
 _Widget_UpdateFocusBackward(
-	Array<Widget *> *ap_widgets,
-	Widget **widget_focus
+	Array<Widget *> *ap_widgets
 ) {
 	Assert(ap_widgets);
 
-	bool result = false;
 	bool focus_set_prev = false;
 
 	Widget *t_widget_focus_check = 0;
@@ -5842,8 +6275,6 @@ _Widget_UpdateFocusBackward(
 
 		if (!t_widget->setting.is_focusable)
 			continue;
-
-		result = false;
 
 		Keyboard *keyboard = t_widget->window->keyboard;
 		Mouse    *mouse    = t_widget->window->mouse;
@@ -5863,27 +6294,10 @@ _Widget_UpdateFocusBackward(
 					Widget_Redraw(t_widget);
 				}
 			}
-
-			if (IF_USE(mouse).up[0]) {
-				if (Mouse_IsHovering(t_widget)) {
-					result = true;
-				}
-
-				if (t_widget->has_focus != result) {
-					t_widget->has_focus = result;
-					Widget_Redraw(t_widget);
-				}
-			}
 		}
 
-		if (t_widget->has_focus) {
+		if (t_widget->has_focus)
 			t_widget_focus_check = t_widget;
-
-			if (widget_focus)
-				*widget_focus = t_widget;
-
-			break;
-		}
 	}
 
 	if (focus_set_prev OR !t_widget_focus_check) {
@@ -5895,9 +6309,6 @@ _Widget_UpdateFocusBackward(
 
 				Widget_Redraw(t_widget);
 
-				if (widget_focus)
-					*widget_focus = t_widget;
-
 				break;
 			}
 		}
@@ -5907,11 +6318,210 @@ _Widget_UpdateFocusBackward(
 instant void
 Widget_UpdateFocus(
 	Array<Widget *> *ap_widgets,
-	bool reverse,
-	Widget **widget_focus
+	bool reverse
 ) {
 	if (!reverse)
-		_Widget_UpdateFocusForward(ap_widgets, widget_focus);
+		_Widget_UpdateFocusForward(ap_widgets);
 	else
-		_Widget_UpdateFocusBackward(ap_widgets, widget_focus);
+		_Widget_UpdateFocusBackward(ap_widgets);
 }
+
+instant void
+Widget_ClampTextOffset(
+	Widget *widget
+) {
+	Assert(widget);
+
+	/// do not show negative space below the last visible
+	if (widget->text.y_offset + widget->rect_content.h < widget->rect_box.h)
+		widget->text.y_offset = widget->rect_box.h - widget->rect_content.h;
+
+	/// do not show negative space above the first visible
+	if (widget->text.y_offset > 0)
+		widget->text.y_offset = 0;
+
+	/// avoid scrolling, when all content is visible
+	if (widget->rect_content.h <= widget->rect_box.h)
+		widget->text.y_offset = 0;
+}
+
+instant void
+Widget_GetActiveRowRect(
+	Widget *widget,
+	Rect *rect_row
+) {
+	Assert(widget);
+    Assert(rect_row);
+
+    *rect_row = {};
+
+    String ts_data_backup = widget->text.s_data;
+
+	Rect rect_item  = widget->rect_box;
+	rect_item.x    += widget->text.x_offset;
+	rect_item.y    += widget->text.y_offset;
+
+    FOR_ARRAY(widget->as_row_data, it_row) {
+		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
+		widget->text.s_data = *ts_data;
+
+		s32 width, height;
+		Text_GetSize(&widget->text, &width, &height);
+
+		rect_item.w = width;
+		rect_item.h = height;
+
+		if (widget->active_row_id == it_row) {
+			*rect_row = rect_item;
+			break;
+		}
+
+		rect_item.y += rect_item.h + widget->setting.spacing;
+    }
+
+    widget->text.s_data = ts_data_backup;
+}
+
+instant u64
+Widget_GetActiveRowID(
+	Widget *widget,
+	Mouse *mouse
+) {
+    Assert(widget);
+    Assert(mouse);
+
+    if (!Mouse_IsHovering(mouse, widget))
+		return widget->active_row_id;
+
+    u64 active_row_id = 0;
+
+    String ts_data_backup = widget->text.s_data;
+
+	Rect rect_item  = widget->rect_box;
+	rect_item.x    += widget->text.x_offset;
+	rect_item.y    += widget->text.y_offset;
+
+    FOR_ARRAY(widget->as_row_data, it_row) {
+		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
+		widget->text.s_data = *ts_data;
+
+		s32 width, height;
+		Text_GetSize(&widget->text, &width, &height);
+
+		rect_item.w = width;
+		rect_item.h = height;
+
+		if (Rect_IsIntersecting(&mouse->point , &rect_item)) {
+			active_row_id = it_row;
+			break;
+		}
+
+		rect_item.y += rect_item.h + widget->setting.spacing;
+    }
+
+    widget->text.s_data = ts_data_backup;
+
+    return active_row_id;
+}
+
+instant void
+Widget_UpdateInput(
+	Widget *widget
+) {
+	Assert(widget);
+
+    Keyboard *keyboard = widget->window->keyboard;
+    Mouse    *mouse    = widget->window->mouse;
+
+    if (!widget->setting.is_focusable)
+		return;
+
+	bool got_focus = widget->has_focus;
+	u64  prev_active_row = widget->active_row_id;
+
+	bool is_scrollable = widget->setting.is_scrollable;
+
+    if (mouse) {
+		bool is_hovering = Mouse_IsHovering(mouse, widget);
+
+		if (mouse->up[0]) {
+			got_focus = is_hovering;
+
+			if (is_scrollable)
+				widget->active_row_id = Widget_GetActiveRowID(widget, mouse);
+		}
+
+		if (is_hovering AND is_scrollable) {
+			widget->text.y_offset += mouse->wheel;
+			Widget_ClampTextOffset(widget);
+		}
+    }
+
+    if (keyboard AND widget->has_focus) {
+		if (is_scrollable) {
+			if (widget->active_row_id) {
+				if (keyboard->down[VK_UP]) {
+					--widget->active_row_id;
+				}
+
+				if (keyboard->down[VK_HOME]) {
+					widget->active_row_id = 0;
+				}
+			}
+
+			if (widget->active_row_id < widget->as_row_data.count - 1) {
+				if (keyboard->down[VK_DOWN]) {
+					++widget->active_row_id;
+				}
+
+				if (keyboard->down[VK_END]) {
+					widget->active_row_id = widget->as_row_data.count - 1;
+				}
+			}
+		}
+    }
+
+    if (prev_active_row != widget->active_row_id AND is_scrollable) {
+		Rect rect_active_row;
+        Widget_GetActiveRowRect(widget, &rect_active_row);
+
+        if (!Rect_IsVisibleFully(&rect_active_row, &widget->rect_box)) {
+			widget->text.y_offset -= (rect_active_row.y - widget->rect_box.y);
+        }
+    }
+
+	if (widget->has_focus != got_focus) {
+		widget->has_focus = got_focus;
+		Widget_Redraw(widget);
+	}
+}
+
+instant void
+Widget_UpdateInput(
+	Array<Widget *> *ap_widgets
+) {
+	Assert(ap_widgets);
+
+	FOR_ARRAY(*ap_widgets, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+		Widget_UpdateInput(t_widget);
+	}
+}
+
+instant void
+Widget_GetSelectedRow(
+	Widget *widget,
+	String *s_row_data
+) {
+	Assert(widget);
+	Assert(s_row_data);
+
+	if (s_row_data) {
+		Assert(!widget->active_row_id OR widget->active_row_id < widget->as_row_data.count);
+		String *ts_row_data = &ARRAY_IT(widget->as_row_data, widget->active_row_id);
+
+		String_Clear(s_row_data);
+		String_Append(s_row_data, ts_row_data->value, ts_row_data->length);
+	}
+}
+

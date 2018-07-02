@@ -346,13 +346,13 @@ Test_Arrays(
 
 		///@Performance: text could be processed without having to split
 		///              data multiple times
-		Array<String> as_lines = Array_Split(&s_data, "\r\n", ARRAY_DELIMITER_BACK);
+		Array<String> as_lines = Array_Split(&s_data, "\r\n", DELIMITER_ADD_BACK);
 		String_Destroy(&s_data);
 
 		Array<String> as_words;
 
 		FOR_ARRAY(as_lines, it_lines) {
-			Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ", ARRAY_DELIMITER_FRONT);
+			Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ", DELIMITER_ADD_FRONT);
 
 			FOR_ARRAY(tas_words, it_words) {
 				Array_Add(&as_words, ARRAY_IT(tas_words, it_words));
