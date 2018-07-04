@@ -439,7 +439,7 @@ Test_Files(
     	String s_filename;
     	String_Append(&s_filename, __FILE__);
 
-		File file = File_Open(&s_filename, "r");
+		File file = File_Open(s_filename.value, "r", s_filename.length);
 		AssertMessage(file.fp          , "File could not be opened.");
 		AssertMessage(File_Size(&file) , "Could not read file size.");
 

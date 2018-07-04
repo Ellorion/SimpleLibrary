@@ -964,6 +964,20 @@ Rect_Resize(
 	rect->h += (pixel_offset << 1);
 }
 
+
+instant void
+Rect_AddPadding(
+	Rect *rect,
+	Rect rect_padding
+) {
+	Assert(rect);
+
+	rect->x += rect_padding.x;
+	rect->y += rect_padding.y;
+	rect->w -= (rect_padding.x + rect_padding.w);
+	rect->h -= (rect_padding.y + rect_padding.h);
+}
+
 instant Color32
 Color_MakeGrey(
 	float value,
@@ -1460,6 +1474,10 @@ String_IsEqual(
 	if (!s_data OR !c_data)
 		return false;
 
+	/// in case one nothing
+	if (!s_data->value OR !s_data->length)
+		return false;
+
 	u64 len_c = String_Length(c_data);
 
 	if (!length) {
@@ -1529,6 +1547,22 @@ String_Copy(
 	*dest = '\0';
 
 	dest = result;
+}
+
+instant char *
+String_CreateCBufferCopy(
+	const char *c_data,
+	u64 c_length = 0
+) {
+	Assert(c_data);
+
+	if (!c_length)
+		c_length = String_Length(c_data);
+
+	char *c_buffer = Memory_Create(char, c_length + 1);
+	String_Copy(c_buffer, c_data, c_length);
+
+	return c_buffer;
 }
 
 instant s64
@@ -2661,21 +2695,20 @@ File_CreateDirectory(
 
 instant File
 File_Open(
-	String *s_filename,
-	const char *mode
+	const char *c_filename,
+	const char *mode,
+	u64 c_length = 0
 ) {
-	Assert(s_filename);
+	Assert(c_filename);
 	Assert(mode);
 
 	File file = {};
 
-	if (s_filename->length) {
-		char *c_filename = String_CreateCBufferCopy(s_filename);
+	char *tc_filename = String_CreateCBufferCopy(c_filename, c_length);
 
-		file.fp = fopen(c_filename, mode);
+	file.fp = fopen(tc_filename, mode);
 
-		Memory_Free(c_filename);
-	}
+	Memory_Free(tc_filename);
 
 	return file;
 }
@@ -2749,17 +2782,18 @@ File_Read(
 
 instant String
 File_ReadAll(
-	String *s_filename,
+	const char *c_filename,
+	u64 c_length = 0,
 	bool as_binary = true
 ) {
-    Assert(s_filename);
+    Assert(c_filename);
 
     File file;
 
     if (as_binary)
-		file = File_Open(s_filename, "rb");
+		file = File_Open(c_filename, "rb", c_length);
 	else
-		file = File_Open(s_filename, "r");
+		file = File_Open(c_filename, "r" , c_length);
 
 	String s_data = File_Read(&file);
 
@@ -3532,7 +3566,7 @@ Image_LoadBMP32(
 		return result;
 	}
 
-	File file = File_Open(s_filename, "rb");
+	File file = File_Open(s_filename->value, "rb", s_filename->length);
 
 	String s_data = File_Read(&file);
 
@@ -3786,10 +3820,10 @@ R"(
 
 		mat4 matrix_mod = proj_matrix;
 
-		vec4 v_pos_1 = matrix_mod * vec4(pt.x       , pt.y       , 0, 1) * scale_matrix;
-		vec4 v_pos_2 = matrix_mod * vec4(pt.x       , pt.y + pt.w, 0, 1) * scale_matrix;
-		vec4 v_pos_3 = matrix_mod * vec4(pt.x + pt.z, pt.y       , 0, 1) * scale_matrix;
-		vec4 v_pos_4 = matrix_mod * vec4(pt.x + pt.z, pt.y + pt.w, 0, 1) * scale_matrix;
+		vec4 v_pos_1 = matrix_mod * vec4(pt.x, pt.y, 0, 1) * scale_matrix;
+		vec4 v_pos_2 = matrix_mod * vec4(pt.x, pt.w, 0, 1) * scale_matrix;
+		vec4 v_pos_3 = matrix_mod * vec4(pt.z, pt.y, 0, 1) * scale_matrix;
+		vec4 v_pos_4 = matrix_mod * vec4(pt.z, pt.w, 0, 1) * scale_matrix;
 
 		/// v1
 		gl_Position = v_pos_1;
@@ -4696,8 +4730,8 @@ Vertex_AddRect32(
 	Vertex_FindOrAddAttribute(vertex, 4, "vertex_position", &t_attribute);
 	Array_Add(&t_attribute->a_buffer, (float)rect.x);
 	Array_Add(&t_attribute->a_buffer, (float)rect.y);
-	Array_Add(&t_attribute->a_buffer, (float)rect.w);
-	Array_Add(&t_attribute->a_buffer, (float)rect.h);
+	Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
+	Array_Add(&t_attribute->a_buffer, (float)rect.y + rect.h);
 
 	Vertex_FindOrAddAttribute(vertex, 4, "rect_color", &t_attribute);
 	Array_Add(&t_attribute->a_buffer, (float)color.r);
@@ -5295,7 +5329,7 @@ Font_Load(
 	Assert(s_file);
 
     Font font;
-    font.s_data = File_ReadAll(s_file, true);
+    font.s_data = File_ReadAll(s_file->value, s_file->length, true);
     font.size = size;
 
     if (!font.s_data.length) {
@@ -5333,6 +5367,14 @@ Font_Destroy(
 	*font = {};
 }
 
+instant s32
+Font_GetLineHeight(
+	Font *font
+) {
+	Assert(font);
+
+	return (font->ascent - font->descent + font->linegap + 1);
+}
 
 /// ::: Font (TrueType) ::: Codepoint
 /// ===========================================================================
@@ -5434,9 +5476,9 @@ Codepoint_GetPosition(
 	///         set the correct start position for the
 	///         next codepoint
 
-	rect->x = rect->x + codepoint->left_side_bearing + rect->w;
+	rect->x = rect->x + rect->w + codepoint->left_side_bearing;
 	rect->y = rect->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->font->descent;
-	rect->w = (float)codepoint->advance;
+	rect->w = (float)codepoint->advance - codepoint->left_side_bearing;
 }
 
 instant s32
@@ -5483,7 +5525,7 @@ Codepoint_SetNewline(
 	Assert(font);
 	Assert(rect_position);
 
-	rect_position->h += (font->ascent - font->descent + font->linegap + 1);
+	rect_position->h += Font_GetLineHeight(font);
 	rect_position->x = x_offset_start;
 	rect_position->w = 0;
 }
@@ -5507,13 +5549,21 @@ enum TEXT_ALIGN_X_TYPE {
 	TEXT_ALIGN_X_RIGHT
 };
 
+enum TEXT_ALIGN_Y_TYPE {
+	TEXT_ALIGN_Y_TOP,
+	TEXT_ALIGN_Y_CENTER,
+	TEXT_ALIGN_Y_BOTTOM
+};
+
 struct Text {
 	ShaderSet *shader_set = 0;
 	Font *font = 0;
 	String s_data = {};
 	Rect rect = {};
+	Rect rect_padding = {};
 	Color32 color;
 	TEXT_ALIGN_X_TYPE align_x = TEXT_ALIGN_X_LEFT;
+	TEXT_ALIGN_Y_TYPE align_y = TEXT_ALIGN_Y_TOP;
 	float x_offset = 0;
 	float y_offset = 0;
 };
@@ -5558,14 +5608,19 @@ struct Text_Line {
 
 instant s32
 Text_BuildLinesStatic(
-	Font *font,
-	Rect rect,
+	Text *text,
 	Array<String> *as_words,
 	Array<Text_Line> *a_text_line
 ) {
-	Assert(font);
+	Assert(text);
+	Assert(text->font);
 	Assert(as_words);
 	Assert(a_text_line);
+
+	Font *font = text->font;
+	Rect  rect = text->rect;
+
+	Rect_AddPadding(&rect, text->rect_padding);
 
 	FOR_ARRAY(*a_text_line, it_line) {
 		Text_Line *t_text_line = &ARRAY_IT(*a_text_line, it_line);
@@ -5577,8 +5632,7 @@ Text_BuildLinesStatic(
 	Assert(a_text_line->count == 0);
 
 	s32 height_max  = 0;
-	s32 height_line = font->size + font->linegap;
-	u64 width_max   = rect.x + rect.w;
+	s32 height_line = Font_GetLineHeight(font);
 	bool line_start = true;
 
 	u64 advance_space = Codepoint_GetAdvance(font, ' ');
@@ -5586,7 +5640,7 @@ Text_BuildLinesStatic(
 	if (as_words->count)
 		height_max += height_line;
 
-	Rect rect_line_current = {rect.x, rect.y, 0, height_line};
+	Rect rect_line_current = {rect.x, rect.y, 0, 0};
 
 	Text_Line *t_text_line;
 	Array_AddEmpty(a_text_line, &t_text_line);
@@ -5603,12 +5657,12 @@ Text_BuildLinesStatic(
 		}
 
 		/// word wrap
-		if (rect.w AND rect_line_current.x + advance_word >= width_max) {
+		if (rect.w AND (rect_line_current.x - rect.x) + advance_word >= rect.w) {
 			Array_AddEmpty(a_text_line, &t_text_line);
 			line_start = true;
 
 			rect_line_current.x  = rect.x;
-			rect_line_current.y += rect_line_current.h;
+			rect_line_current.y += height_line;
 
 			height_max += height_line;
 		}
@@ -5621,7 +5675,7 @@ Text_BuildLinesStatic(
 			line_start = true;
 
 			rect_line_current.x  = rect.x;
-			rect_line_current.y += rect_line_current.h;
+			rect_line_current.y += height_line;
 
 			height_max += height_line;
 
@@ -5644,6 +5698,7 @@ Text_AddLines(
 	ShaderSet *shader_set,
 	Font *font,
 	Rect rect,
+	Rect rect_padding,
 	Color32 color,
 	Array<Text_Line> *a_text_lines,
 	TEXT_ALIGN_X_TYPE align_x,
@@ -5653,6 +5708,8 @@ Text_AddLines(
 	Assert(shader_set);
 	Assert(font);
 	Assert(a_text_lines);
+
+	Rect_AddPadding(&rect, rect_padding);
 
 	u64 width_max = rect.w;
 	RectF rect_position = {rect.x, 0, 0, rect.y};
@@ -5714,6 +5771,7 @@ Text_AddLines(
 					text->shader_set,
 					text->font,
 					text->rect,
+					text->rect_padding,
 					text->color,
 					a_text_lines,
 					text->align_x,
@@ -5742,12 +5800,22 @@ Text_Render(
 	static Array<Text_Line> a_text_lines;
 	static Array<Vertex>    a_vertex;
 
+	OpenGL_Scissor(text->shader_set->window, text->rect);
+
 	String_SplitWordsStatic(&text->s_data, &as_words);
-	Text_BuildLinesStatic(text->font, text->rect, &as_words, &a_text_lines);
+	s32 text_height = Text_BuildLinesStatic(text, &as_words, &a_text_lines);
+
+	if (0) {}
+	else if (text->align_y == TEXT_ALIGN_Y_CENTER)
+		text->y_offset = (text->rect.h - text_height) >> 1;
+	else if (text->align_y == TEXT_ALIGN_Y_BOTTOM)
+		text->y_offset = (text->rect.h - text_height);
 
 	Text_AddLines(&a_vertex, text, &a_text_lines);
 
 	Text_Render(text, &a_vertex);
+
+	OpenGL_Scissor_Disable();
 }
 
 instant void
@@ -5763,7 +5831,7 @@ Text_GetSize(
 
 	if (height) {
 		String_SplitWordsStatic(&text->s_data, &as_words);
-		*height = Text_BuildLinesStatic(text->font, text->rect, &as_words, &a_text_lines);
+		*height = Text_BuildLinesStatic(text, &as_words, &a_text_lines);
 	}
 
 	IF_SET(width)  = text->rect.w;
@@ -5960,7 +6028,6 @@ Widget_CreateButton(
 	Font *font,
 	Rect rect_box,
 	const char *c_data = 0,
-	TEXT_ALIGN_X_TYPE text_align_x = TEXT_ALIGN_X_MIDDLE,
 	u64 c_length = 0
 ) {
 	Assert(window);
@@ -5977,7 +6044,8 @@ Widget_CreateButton(
 	t_widget.rect_content = rect_box;
 	t_widget.window       = window;
 
-	t_widget.text.align_x    = text_align_x;
+	t_widget.text.align_x    = TEXT_ALIGN_X_MIDDLE;
+	t_widget.text.align_y    = TEXT_ALIGN_Y_CENTER;
 	t_widget.text.rect       = t_widget.rect_box;
 	t_widget.text.font       = font;
 	t_widget.text.color      = t_widget.setting.color_font;
@@ -6077,7 +6145,9 @@ Widget_Render(
 		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
 
         String_SplitWordsStatic(ts_data, &as_words);
-        rect_row.h = Text_BuildLinesStatic(widget->text.font, rect_row, &as_words, &a_text_lines);
+
+        widget->text.rect = rect_row;
+        rect_row.h = Text_BuildLinesStatic(&widget->text, &as_words, &a_text_lines);
 
 		if (Rect_IsIntersecting(&rect_row, &widget->rect_box)) {
 			Color32 t_color_rect = widget->setting.color_outline;
