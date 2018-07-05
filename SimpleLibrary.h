@@ -964,7 +964,6 @@ Rect_Resize(
 	rect->h += (pixel_offset << 1);
 }
 
-
 instant void
 Rect_AddPadding(
 	Rect *rect,
@@ -5842,7 +5841,8 @@ Text_GetSize(
 enum WIDGET_TYPE {
 	WIDGET_LABEL,
 	WIDGET_BUTTON,
-	WIDGET_LISTBOX
+	WIDGET_LISTBOX,
+	WIDGET_CHECKBOX,
 };
 
 enum WIDGET_SCROLL_TYPE {
@@ -5875,6 +5875,7 @@ struct Widget {
 	Window *window;
 
 	bool has_focus;
+	bool is_checked = false;
 
 	Array<String> as_row_data;
 	u64 active_row_id = 0;
@@ -5927,30 +5928,19 @@ Widget_Redraw(
 ) {
 	Assert(widget);
 
+	Vertex *t_vertex = &widget->vertex_rect;
+	Rect    rect_box =  widget->rect_box;
+
+	if (!t_vertex->array_id) *t_vertex = Vertex_Create();
+	else                     Vertex_ClearAttributes(t_vertex);
+
 	switch (widget->type) {
-		case WIDGET_LABEL: {
-			Vertex *t_vertex = &widget->vertex_rect;
-			Rect    rect_box =  widget->rect_box;
-
-			if (!t_vertex->array_id)
-				*t_vertex = Vertex_Create();
-			else
-				Vertex_ClearAttributes(t_vertex);
-
+		case WIDGET_LABEL:
+		case WIDGET_LISTBOX: {
 			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
-
-			widget->text.rect = rect_box;
 		} break;
 
 		case WIDGET_BUTTON: {
-			Vertex *t_vertex = &widget->vertex_rect;
-			Rect    rect_box =  widget->rect_box;
-
-			if (!t_vertex->array_id)
-				*t_vertex = Vertex_Create();
-			else
-				Vertex_ClearAttributes(t_vertex);
-
 			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
 
 			if (widget->setting.border_size) {
@@ -5964,28 +5954,34 @@ Widget_Redraw(
 				Rect_Resize(&rect_box, -widget->setting.border_size);
 				Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
 			}
-
-			widget->text.rect = rect_box;
 		} break;
 
-		case WIDGET_LISTBOX: {
-			Vertex *t_vertex = &widget->vertex_rect;
-			Rect    rect_box =  widget->rect_box;
+		case WIDGET_CHECKBOX: {
+			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
 
-			if (!t_vertex->array_id)
-				*t_vertex = Vertex_Create();
+			Rect rect_check = {rect_box.x + 2, rect_box.y + 2, 16, 16};
+
+			if (widget->has_focus)
+				Vertex_AddRect32(t_vertex, rect_check, widget->setting.color_outline);
 			else
-				Vertex_ClearAttributes(t_vertex);
+				Vertex_AddRect32(t_vertex, rect_check, widget->setting.color_outline_inactive);
 
-			Rect t_rect_box = rect_box;
-			t_rect_box.w += 5;
+			Assert(widget->setting.border_size);
+			Assert(widget->setting.border_size < 20);
 
-			Vertex_AddRect32(t_vertex, t_rect_box, widget->setting.color_background);
+			Rect_Resize(&rect_check, -widget->setting.border_size);
+			Vertex_AddRect32(t_vertex, rect_check, widget->setting.color_background);
+
+			if (widget->is_checked) {
+				Rect_Resize(&rect_check, -1);
+				Vertex_AddRect32(t_vertex, rect_check, widget->setting.color_outline_selected);
+			}
 		} break;
+
 
 		default:
 			AssertMessage(	false,
-							"Unhandled widget background drawing.");
+							"Redrawing: Unhandled widget background drawing.");
 	}
 }
 
@@ -6081,6 +6077,42 @@ Widget_CreateListbox(
 	t_widget.text.rect  = t_widget.rect_box;
 	t_widget.text.font  = font;
 	t_widget.text.color = t_widget.setting.color_font;
+
+	Widget_Redraw(&t_widget);
+
+	return t_widget;
+}
+
+instant Widget
+Widget_CreateCheckbox(
+	Window *window,
+	Font *font,
+	Rect rect_box,
+	const char *c_data,
+	bool checked,
+	u64 c_length = 0
+) {
+	Assert(window);
+	Assert(font);
+
+	Widget t_widget = {};
+
+	t_widget.type         = WIDGET_CHECKBOX;
+	t_widget.rect_box     = rect_box;
+	t_widget.rect_content = rect_box;
+	t_widget.window       = window;
+	t_widget.is_checked   = checked;
+
+	t_widget.setting.is_focusable = true;
+	t_widget.setting.border_size  = 2;
+
+	t_widget.text.rect       = t_widget.rect_box;
+	t_widget.text.font       = font;
+	t_widget.text.color      = t_widget.setting.color_font;
+
+	t_widget.text.rect_padding = {22, 0, 0, 0};
+
+	String_Append(&t_widget.text.s_data, c_data, c_length);
 
 	Widget_Redraw(&t_widget);
 
@@ -6510,6 +6542,8 @@ Widget_UpdateInput(
     Keyboard *keyboard = widget->window->keyboard;
     Mouse    *mouse    = widget->window->mouse;
 
+    bool redraw_required = false;
+
     if (!widget->setting.is_focusable)
 		return;
 
@@ -6526,6 +6560,16 @@ Widget_UpdateInput(
 
 			if (is_scrollable)
 				widget->active_row_id = Widget_GetActiveRowID(widget, mouse);
+
+			if (got_focus) {
+				widget->is_checked = !widget->is_checked;
+				redraw_required = true;
+			}
+
+			if (widget->has_focus != got_focus) {
+				widget->has_focus = got_focus;
+				redraw_required = true;
+			}
 		}
 
 		if (is_hovering AND is_scrollable) {
@@ -6555,6 +6599,11 @@ Widget_UpdateInput(
 					widget->active_row_id = widget->as_row_data.count - 1;
 				}
 			}
+		}
+
+		if (keyboard->up[VK_SPACE]) {
+			widget->is_checked = !widget->is_checked;
+			redraw_required = true;
 		}
     }
 
@@ -6592,8 +6641,7 @@ Widget_UpdateInput(
         Widget_ClampTextOffset(widget);
     }
 
-	if (widget->has_focus != got_focus) {
-		widget->has_focus = got_focus;
+	if (redraw_required) {
 		Widget_Redraw(widget);
 	}
 }
