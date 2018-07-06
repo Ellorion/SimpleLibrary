@@ -6057,7 +6057,6 @@ Text_Render(
 ) {
 	Assert(text);
 
-	/// asdf
 	OpenGL_Scissor(text->shader_set->window, text->rect);
 
 	if (Text_HasChanged(text)) {
@@ -6488,46 +6487,46 @@ Widget_Render(
 
 	Text *t_text = &widget->text;
 
-	if (Text_HasChanged(&widget->as_row_data)) {
-		/// clear existing data
-		Vertex_ClearAttributes(&t_text->a_vertex);
-		Vertex_ClearAttributes(&widget->vertex_rect);
-		Widget_Redraw(widget);
+	Vertex_ClearAttributes(&widget->vertex_rect);
+	Widget_Redraw(widget);
 
-		FOR_ARRAY(widget->as_row_data, it_row) {
-			String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
+	Vertex_ClearAttributes(&t_text->a_vertex);
 
-			String_SplitWordsStatic(ts_data, &t_text->as_words);
+	FOR_ARRAY(widget->as_row_data, it_row) {
+		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
 
-			t_text->rect = rect_row;
-			rect_row.h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines);
+		String_SplitWordsStatic(ts_data, &t_text->as_words);
 
-			if (Rect_IsIntersecting(&rect_row, &widget->rect_box)) {
-				Color32 t_color_rect = widget->setting.color_outline;
+		t_text->rect = rect_row;
+		rect_row.h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines);
 
-				if (widget->active_row_id == it_row) {
-					if (widget->has_focus)
-						t_color_rect = widget->setting.color_outline_selected;
-					else
-						t_color_rect = widget->setting.color_outline_inactive;
-				}
+		if (Rect_IsIntersecting(&rect_row, &widget->rect_box)) {
+			Color32 t_color_rect = widget->setting.color_outline;
 
-				Vertex_AddRect32(&widget->vertex_rect, rect_row, t_color_rect);
-
-				/// store item data, so the data is drawn upon the background
-				/// and as batch rendering
-				t_text->rect = rect_row;
-				t_text->rect.x -= pt_offset.x;
-				t_text->rect.y -= pt_offset.y;
-
-				Text_AddLines(&t_text->a_vertex, t_text, &t_text->a_text_lines);
+			if (widget->active_row_id == it_row) {
+				if (widget->has_focus)
+					t_color_rect = widget->setting.color_outline_selected;
+				else
+					t_color_rect = widget->setting.color_outline_inactive;
 			}
 
-			s32 height_row_step = rect_row.h + widget->setting.spacing;
+			Vertex_AddRect32(&widget->vertex_rect, rect_row, t_color_rect);
 
-			rect_row.y             += height_row_step;
-			widget->rect_content.h += height_row_step;
+			/// store item data, so the data is drawn upon the background
+			/// and as batch rendering
+			t_text->rect = rect_row;
+			t_text->rect.x -= pt_offset.x;
+			t_text->rect.y -= pt_offset.y;
+
+			Text_AddLines(&t_text->a_vertex, t_text, &t_text->a_text_lines);
 		}
+
+		s32 height_row_step = rect_row.h + widget->setting.spacing;
+
+		rect_row.y             += height_row_step;
+		widget->rect_content.h += height_row_step;
+
+		ts_data->changed = false;
 	}
 
 	ShaderSet_Use(shader_set, SHADER_PROG_RECT);
