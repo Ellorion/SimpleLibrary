@@ -1293,8 +1293,9 @@ Time_Move(
 #define String_Split Array_Split
 
 struct String {
-	u64   length = 0;
-	char *value  = 0;
+	bool  changed = false;
+	u64   length  = 0;
+	char *value   = 0;
 };
 
 instant void
@@ -1360,6 +1361,8 @@ String_Append(
 	Memory_Copy(s_data->value + s_data->length, (char *)c_data, length_append);
 	s_data->length += length_append;
 
+	s_data->changed = true;
+
 	return true;
 }
 
@@ -1384,6 +1387,8 @@ String_Insert(
 	}
 
 	s_data->length += c_length;
+
+	s_data->changed = true;
 
 	return c_length;
 }
@@ -1543,6 +1548,8 @@ String_Copy(
 	s_dest->value = Memory_Create(char, length);
 	Memory_Copy(s_dest->value, c_source, length);
 	s_dest->length = length;
+
+	s_dest->changed = true;
 }
 
 instant void
@@ -1709,7 +1716,10 @@ String_Cut(
 	String *s_data,
 	u32 length
 ) {
-	if (s_data AND length < s_data->length)  s_data->length = length;
+	if (s_data AND length < s_data->length) {
+		s_data->length  = length;
+		s_data->changed = true;
+	}
 }
 
 instant bool
@@ -1746,6 +1756,8 @@ String_ToLower(
 		}
 		++index;
 	}
+
+	s_data->changed = true;
 }
 
 instant void
@@ -1764,6 +1776,8 @@ String_ToUpper(
 		}
 		++index;
 	}
+
+	s_data->changed = true;
 }
 
 instant void
@@ -1781,6 +1795,8 @@ String_Reverse(
 		s_data->value[it] = s_data->value[length - it - 1];
 		s_data->value[length - it - 1] = temp;
 	}
+
+	s_data->changed = true;
 }
 
 instant void
@@ -1803,6 +1819,8 @@ String_TrimLeft(
 		s_data->value  += length;
 		s_data->length -= length;
     }
+
+    s_data->changed = true;
 }
 
 instant void
@@ -1821,6 +1839,8 @@ String_TrimRight(
     }
 
     s_data->length = length + 1;
+
+    s_data->changed = true;
 }
 
 instant u64
@@ -1845,6 +1865,8 @@ String_Remove(
 	Memory_Copy(s_data->value + index_start, s_data->value + index_end, length);
 	s_data->length -= rm_count;
 
+	s_data->changed = true;
+
 	return rm_count;
 }
 
@@ -1855,6 +1877,8 @@ String_Clear(
 	Assert(s_data);
 
 	s_data->length = 0;
+
+	s_data->changed = true;
 }
 
 instant void
@@ -1877,6 +1901,8 @@ String_Replace(
 		String_Insert(s_data, pos_found, replace);
 		pos_start += pos_found + replace_length;
 	}
+
+	s_data->changed = true;
 }
 
 instant void
@@ -1892,6 +1918,8 @@ String_Replace(
 	char *c_replace = String_CreateCBufferCopy(s_replace);
 	String_Replace(s_data, find, c_replace);
 	Memory_Free(c_replace);
+
+	s_data->changed = true;
 }
 
 instant s64
@@ -1920,6 +1948,8 @@ String_Insert(
 		length = 1;
 		String_Insert(s_data, index_start, &c_data, length);
 	}
+
+	s_data->changed = true;
 
 	return length;
 }
@@ -2799,6 +2829,8 @@ File_Read(
 	s_data.length = length;
 	fread(s_data.value, sizeof(char), sizeof(char) * length, file->fp);
 
+	s_data.changed = true;
+
 	return s_data;
 }
 
@@ -2820,6 +2852,8 @@ File_ReadAll(
 	String s_data = File_Read(&file);
 
 	File_Close(&file);
+
+	s_data.changed = true;
 
 	return s_data;
 }
@@ -4780,6 +4814,22 @@ Vertex_ClearAttributes(
 	}
 }
 
+instant void
+Vertex_ClearAttributes(
+	Array<Vertex> *a_vertex
+) {
+	Assert(a_vertex);
+
+	FOR_ARRAY(*a_vertex, it_vertex) {
+		Vertex *t_vertex = &ARRAY_IT(*a_vertex, it_vertex);
+
+		FOR_ARRAY(t_vertex->a_attributes, it_attrib) {
+			auto *t_attribute = &ARRAY_IT(t_vertex->a_attributes, it_attrib);
+			Array_ClearContainer(&t_attribute->a_buffer);
+		}
+	}
+}
+
 inline void
 Vertex_Render(
 	ShaderSet *shader_set,
@@ -4819,8 +4869,6 @@ Vertex_Render(
 		Vertex_BindAttributes(shader_set, t_vertex);
 
 		Vertex_Render(shader_set, t_vertex);
-
-		Vertex_ClearAttributes(t_vertex);
 	}
 }
 
@@ -5735,6 +5783,11 @@ enum TEXT_ALIGN_Y_TYPE {
 	TEXT_ALIGN_Y_BOTTOM
 };
 
+struct Text_Line {
+	u64 width_pixel;
+	String s_data;
+};
+
 struct Text {
 	ShaderSet *shader_set = 0;
 	Font *font = 0;
@@ -5746,6 +5799,10 @@ struct Text {
 	TEXT_ALIGN_Y_TYPE align_y = TEXT_ALIGN_Y_TOP;
 	float x_offset = 0;
 	float y_offset = 0;
+
+	Array<String>    as_words;
+	Array<Text_Line> a_text_lines;
+	Array<Vertex>    a_vertex;
 };
 
 instant Text
@@ -5781,10 +5838,34 @@ Text_Destroy(
 	String_Destroy(&text->s_data);
 }
 
-struct Text_Line {
-	u64 width_pixel;
-	String s_data;
-};
+instant bool
+Text_HasChanged(
+	Text *text
+) {
+	Assert(text);
+
+	return text->s_data.changed;
+}
+
+instant bool
+Text_HasChanged(
+	Array<String> *as_data
+) {
+	Assert(as_data);
+
+	bool anything_changed = false;
+
+	FOR_ARRAY(*as_data, it) {
+		String *ts_data = &ARRAY_IT(*as_data, it);
+
+		if (ts_data->changed) {
+			anything_changed = true;
+			break;
+		}
+	}
+
+	return anything_changed;
+}
 
 instant s32
 Text_BuildLinesStatic(
@@ -5976,24 +6057,27 @@ Text_Render(
 ) {
 	Assert(text);
 
-	static Array<String>    as_words;
-	static Array<Text_Line> a_text_lines;
-	static Array<Vertex>    a_vertex;
-
+	/// asdf
 	OpenGL_Scissor(text->shader_set->window, text->rect);
 
-	String_SplitWordsStatic(&text->s_data, &as_words);
-	s32 text_height = Text_BuildLinesStatic(text, &as_words, &a_text_lines);
+	if (Text_HasChanged(text)) {
+		String_SplitWordsStatic(&text->s_data, &text->as_words);
+		s32 text_height = Text_BuildLinesStatic(text, &text->as_words, &text->a_text_lines);
 
-	if (0) {}
-	else if (text->align_y == TEXT_ALIGN_Y_CENTER)
-		text->y_offset = (text->rect.h - text_height) >> 1;
-	else if (text->align_y == TEXT_ALIGN_Y_BOTTOM)
-		text->y_offset = (text->rect.h - text_height);
+		if (0) {}
+		else if (text->align_y == TEXT_ALIGN_Y_CENTER)
+			text->y_offset = (text->rect.h - text_height) >> 1;
+		else if (text->align_y == TEXT_ALIGN_Y_BOTTOM)
+			text->y_offset = (text->rect.h - text_height);
 
-	Text_AddLines(&a_vertex, text, &a_text_lines);
+		Vertex_ClearAttributes(&text->a_vertex);
 
-	Text_Render(text, &a_vertex);
+		Text_AddLines(&text->a_vertex, text, &text->a_text_lines);
+
+		text->s_data.changed = false;
+	}
+
+	Text_Render(text, &text->a_vertex);
 
 	OpenGL_Scissor_Disable();
 }
@@ -6385,9 +6469,6 @@ Widget_Render(
 		return;
 	}
 
-	static Array<Vertex> a_vertex;
-	static Array<String> as_words;
-	static Array<Text_Line> a_text_lines;
 	Rect rect_row;
 
 	Point pt_offset;
@@ -6405,42 +6486,48 @@ Widget_Render(
 	rect_row.y += pt_offset.y;
 	rect_row.h  = 0;
 
-	Vertex_ClearAttributes(&widget->vertex_rect);
-	Widget_Redraw(widget);
+	Text *t_text = &widget->text;
 
-	FOR_ARRAY(widget->as_row_data, it_row) {
-		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
+	if (Text_HasChanged(&widget->as_row_data)) {
+		/// clear existing data
+		Vertex_ClearAttributes(&t_text->a_vertex);
+		Vertex_ClearAttributes(&widget->vertex_rect);
+		Widget_Redraw(widget);
 
-        String_SplitWordsStatic(ts_data, &as_words);
+		FOR_ARRAY(widget->as_row_data, it_row) {
+			String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
 
-        widget->text.rect = rect_row;
-        rect_row.h = Text_BuildLinesStatic(&widget->text, &as_words, &a_text_lines);
+			String_SplitWordsStatic(ts_data, &t_text->as_words);
 
-		if (Rect_IsIntersecting(&rect_row, &widget->rect_box)) {
-			Color32 t_color_rect = widget->setting.color_outline;
+			t_text->rect = rect_row;
+			rect_row.h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines);
 
-			if (widget->active_row_id == it_row) {
-				if (widget->has_focus)
-					t_color_rect = widget->setting.color_outline_selected;
-				else
-					t_color_rect = widget->setting.color_outline_inactive;
+			if (Rect_IsIntersecting(&rect_row, &widget->rect_box)) {
+				Color32 t_color_rect = widget->setting.color_outline;
+
+				if (widget->active_row_id == it_row) {
+					if (widget->has_focus)
+						t_color_rect = widget->setting.color_outline_selected;
+					else
+						t_color_rect = widget->setting.color_outline_inactive;
+				}
+
+				Vertex_AddRect32(&widget->vertex_rect, rect_row, t_color_rect);
+
+				/// store item data, so the data is drawn upon the background
+				/// and as batch rendering
+				t_text->rect = rect_row;
+				t_text->rect.x -= pt_offset.x;
+				t_text->rect.y -= pt_offset.y;
+
+				Text_AddLines(&t_text->a_vertex, t_text, &t_text->a_text_lines);
 			}
 
-			Vertex_AddRect32(&widget->vertex_rect, rect_row, t_color_rect);
+			s32 height_row_step = rect_row.h + widget->setting.spacing;
 
-			/// store item data, so the data is drawn upon the background
-			/// and as batch rendering
-			widget->text.rect = rect_row;
-			widget->text.rect.x -= pt_offset.x;
-			widget->text.rect.y -= pt_offset.y;
-
-			Text_AddLines(&a_vertex, &widget->text, &a_text_lines);
+			rect_row.y             += height_row_step;
+			widget->rect_content.h += height_row_step;
 		}
-
-		s32 height_row_step = rect_row.h + widget->setting.spacing;
-
-		rect_row.y             += height_row_step;
-		widget->rect_content.h += height_row_step;
 	}
 
 	ShaderSet_Use(shader_set, SHADER_PROG_RECT);
@@ -6449,7 +6536,7 @@ Widget_Render(
 	/// render item data
 	/// =======================================================================
 	ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
-	Text_Render(&widget->text, &a_vertex);
+	Text_Render(t_text, &t_text->a_vertex);
 
 	OpenGL_Scissor_Disable();
 }
