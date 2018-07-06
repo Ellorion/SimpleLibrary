@@ -6625,6 +6625,29 @@ Widget_OnClick(
 	return result;
 }
 
+instant bool
+Widget_OnDoubleClick(
+	Widget *widget,
+	u16 mouse_button = 0
+) {
+	Assert(widget);
+	Assert(widget->window);
+
+	bool result = false;
+
+	Mouse *mouse = widget->window->mouse;
+
+	if (mouse) {
+		if (mouse->double_click[0]) {
+			if (Mouse_IsHovering(mouse, widget)) {
+				result = true;
+			}
+		}
+	}
+
+	return result;
+}
+
 instant void
 _Widget_UpdateFocusForward(
 	Array<Widget *> *ap_widgets
@@ -6986,13 +7009,25 @@ Widget_GetSelectedRow(
 ) {
 	Assert(widget);
 	Assert(s_row_data);
+	Assert(!widget->active_row_id OR widget->active_row_id < widget->as_row_data.count);
 
-	if (s_row_data) {
-		Assert(!widget->active_row_id OR widget->active_row_id < widget->as_row_data.count);
-		String *ts_row_data = &ARRAY_IT(widget->as_row_data, widget->active_row_id);
-
-		String_Clear(s_row_data);
-		String_Append(s_row_data, ts_row_data->value, ts_row_data->length);
+	if (!widget->as_row_data.count) {
+		*s_row_data = {};
+		return;
 	}
+
+	String *ts_row_data = &ARRAY_IT(widget->as_row_data, widget->active_row_id);
+
+	String_Clear(s_row_data);
+	String_Append(s_row_data, ts_row_data->value, ts_row_data->length);
 }
 
+instant u64
+Widget_GetSelectedRow(
+	Widget *widget
+) {
+	Assert(widget);
+	Assert(!widget->active_row_id OR widget->active_row_id < widget->as_row_data.count);
+
+	return widget->active_row_id;
+}
