@@ -849,8 +849,8 @@ Rect_GetAspect(
 	s32 *height_dst,
 	float *off_x,
 	float *off_y,
-	float *scale_x = 0,
-	float *scale_y = 0,
+	float *ratio_x = 0,
+	float *ratio_y = 0,
 	bool scale_to_dest = false
 ) {
 	Assert(width_dst);
@@ -864,9 +864,9 @@ Rect_GetAspect(
 		float ratio = (aspect_dst / aspect_src);
 		float offset = *width_dst / ratio;
 
-		if (off_x)  *off_x = floor((*width_dst - offset) / 2);
-		if (scale_x)  *scale_x = ratio;
-		if (scale_y)  *scale_y = 1;
+		if (off_x)  *off_x += floor((*width_dst - offset) / 2);
+		if (ratio_x)  *ratio_x = ratio;
+		if (ratio_y)  *ratio_y = 1;
 
 		*width_dst = floor(offset);
     }
@@ -874,17 +874,39 @@ Rect_GetAspect(
 		float ratio = (aspect_src / aspect_dst);
 		float offset = *height_dst / ratio;
 
-		if (off_y)  *off_y = floor((*height_dst - offset) / 2);
-		if (scale_x)  *scale_x = 1;
-		if (scale_y)  *scale_y = ratio;
+		if (off_y)  *off_y += floor((*height_dst - offset) / 2);
+		if (ratio_x)  *ratio_x = 1;
+		if (ratio_y)  *ratio_y = ratio;
 
 		*height_dst = floor(offset);
     }
 
     if (scale_to_dest) {
-		if (scale_x)  *scale_x = (float)*width_dst  / width_src;
-		if (scale_y)  *scale_y = (float)*height_dst / height_src;
+		if (ratio_x)  *ratio_x = (float)*width_dst  / width_src;
+		if (ratio_y)  *ratio_y = (float)*height_dst / height_src;
     }
+}
+
+instant void
+Rect_GetAspect(
+	Rect *rect_convert_to_dest,
+	s32 width_src,
+	s32 height_src,
+	float *ratio_x = 0,
+	float *ratio_y = 0,
+	bool scale_to_dest = false
+) {
+	Assert(rect_convert_to_dest);
+
+	Rect_GetAspect(	 width_src,
+					 height_src,
+					&rect_convert_to_dest->w,
+					&rect_convert_to_dest->h,
+					&rect_convert_to_dest->x,
+					&rect_convert_to_dest->y,
+					ratio_x,
+					ratio_y,
+					scale_to_dest);
 }
 
 instant bool
@@ -2620,13 +2642,14 @@ File_HasExtension(
 
 instant bool
 File_Exists(
-	String *s_pathfile
+	const char *c_filename,
+	u64 c_length = 0
 ) {
-	Assert(s_pathfile);
+	Assert(c_filename);
 
 	WIN32_FIND_DATA file_data;
 
-	char *c_search_file = String_CreateCBufferCopy(s_pathfile);
+	char *c_search_file = String_CreateCBufferCopy(c_filename, c_length);
 
 	bool result = false;
 
@@ -2653,7 +2676,7 @@ File_Exists(
 	String_Append(&ts_filename, "/", 1);
 	String_Append(&ts_filename, s_filename->value, s_filename->length);
 
-	bool result = File_Exists(&ts_filename);
+	bool result = File_Exists(ts_filename.value, ts_filename.length);
 
 	String_Destroy(&ts_filename);
 
@@ -3548,24 +3571,20 @@ struct Image {
 };
 
 /// 32-bit BMP only!
-instant bool
+instant Image
 Image_LoadBMP32(
-	Image  *image,
-	String *s_filename
+	const char *c_filename,
+	u64 c_length = 0
 ) {
-	Assert(image);
-	Assert(!image->data);
-	Assert(s_filename);
+	Assert(c_filename);
 
-	bool result = false;
+	Image result = {};
 
-	*image = {};
-
-	if (!File_Exists(s_filename)) {
+	if (!File_Exists(c_filename, c_length)) {
 		return result;
 	}
 
-	File file = File_Open(s_filename->value, "rb", s_filename->length);
+	File file = File_Open(c_filename, "rb", c_length);
 
 	String s_data = File_Read(&file);
 
@@ -3580,17 +3599,15 @@ Image_LoadBMP32(
 		BITMAPINFOHEADER *bmp_info = (BITMAPINFOHEADER *)s_data_it.value;
 
 		///@Info: make sure you free the memory after usage!
-		image->data   = Memory_Create(u8, bmp_info->biSizeImage);
-		image->width  = bmp_info->biWidth;
-		image->height = bmp_info->biHeight;
-		image->bits   = bmp_info->biBitCount / 8;
+		result.data   = Memory_Create(u8, bmp_info->biSizeImage);
+		result.width  = bmp_info->biWidth;
+		result.height = bmp_info->biHeight;
+		result.bits   = bmp_info->biBitCount / 8;
 
 		s_data_it = s_data;
 		s_data_it.value  += bmp_header->bfOffBits;
 		s_data_it.length -= bmp_header->bfOffBits;
-		Memory_Copy(image->data, s_data_it.value, bmp_info->biSizeImage);
-
-		result = true;
+		Memory_Copy(result.data, s_data_it.value, bmp_info->biSizeImage);
 	}
 
 	String_Destroy(&s_data);
@@ -3663,19 +3680,15 @@ Texture_GetSizeAndBind(
 	if (height) glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, height);
 }
 
-instant void
+instant Texture
 Texture_Load(
-	Texture *texture,
 	const u8 *data,
 	s32 width,
 	s32 height,
 	bool greyscale = false,
 	bool linearFilter = false
 ) {
-	Assert(texture);
-
-	/// check for potential memory leak
-	Assert(texture->ID == 0);
+	Texture result = {};
 
     u32 id_texture;
 
@@ -3706,7 +3719,9 @@ Texture_Load(
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRROR_CLAMP_TO_EDGE);
 
-    texture->ID = id_texture;
+    result.ID = id_texture;
+
+    return result;
 }
 
 instant void
@@ -3719,13 +3734,12 @@ Texture_Destroy(
 	texture->ID = 0;
 }
 
-instant void
+instant Texture
 Texture_Create(
-	Texture *texture,
 	s32 width,
 	s32 height
 ) {
-	Texture_Load(texture, 0, width, height);
+	return Texture_Load(0, width, height);
 }
 
 instant bool
@@ -3741,7 +3755,8 @@ Texture_IsEqual(
 enum SHADER_PROG_TYPE {
 	SHADER_PROG_RECT = 0,
 	SHADER_PROG_TEXT,
-	SHADER_PROG_TEXTURE,
+	SHADER_PROG_TEXTURE_FULL,
+	SHADER_PROG_TEXTURE_SIZE,
 	SHADER_PROG_COUNT
 };
 
@@ -3982,8 +3997,8 @@ R"(
 	}
 )"};
 
-static const Shader shader_texture = {
-	SHADER_PROG_TEXTURE,
+static const Shader shader_texture_full = {
+	SHADER_PROG_TEXTURE_FULL,
 R"(
 	#version 330 core
 
@@ -4112,9 +4127,143 @@ R"(
 	}
 )"};
 
+static const Shader shader_texture_size = {
+	SHADER_PROG_TEXTURE_SIZE,
+R"(
+	#version 330 core
+
+	uniform vec4 viewport = vec4(0, 0, 800, 480);
+	uniform float scale_x = 1.0f;
+	uniform float scale_y = 1.0f;
+
+	in vec4 vertex_position;
+
+	float left   = 0.0f;
+	float right  = viewport.z;
+	float top    = 0.0f;
+	float bottom = viewport.w;
+
+    mat4 proj_matrix = mat4(
+		 2.0f / (right - left), 0                    ,  0,  0,
+		 0                    , 2.0f / (top - bottom),  0,  0,
+		 0                    , 0                    ,  1,  0,
+		-(right + left)   / (right - left),
+		-(top   + bottom) / (top   - bottom),
+		 0,
+		 1
+	);
+
+	mat4 scale_matrix = mat4(
+		scale_x , 0      , 0, 0,
+		0       , scale_y, 0, 0,
+		0       , 0      , 1, 0,
+		0       , 0      , 0, 1
+	);
+
+	out Vertex_Data {
+		mat4 proj_matrix;
+		mat4 scale_matrix;
+	} o_Vertex;
+
+	void main() {
+		gl_Position           = vertex_position;
+		o_Vertex.proj_matrix  = proj_matrix;
+		o_Vertex.scale_matrix = scale_matrix;
+	}
+)",
+
+R"(
+	#version 330 core
+
+	layout(points) in;
+	layout(triangle_strip, max_vertices = 4) out;
+
+	uniform bool flip_h = false;
+
+	in Vertex_Data {
+		mat4 proj_matrix;
+		mat4 scale_matrix;
+	} i_Vertex[];
+
+	out vec2 tex_coords;
+
+	void main() {
+		vec4 pt           = gl_in[0].gl_Position;
+		mat4 proj_matrix  = i_Vertex[0].proj_matrix;
+		mat4 scale_matrix = i_Vertex[0].scale_matrix;
+
+		mat4 matrix_mod = proj_matrix;
+
+		vec4 pos_top_left     = matrix_mod * vec4(pt.x, pt.y, 0, 1) * scale_matrix;
+		vec4 pos_top_right    = matrix_mod * vec4(pt.x, pt.w, 0, 1) * scale_matrix;
+		vec4 pos_bottom_left  = matrix_mod * vec4(pt.z, pt.y, 0, 1) * scale_matrix;
+		vec4 pos_bottom_right = matrix_mod * vec4(pt.z, pt.w, 0, 1) * scale_matrix;
+
+		///@Info:
+		/// position: right hand side
+		/// u/v     : left  hand side
+		///
+		/// BOTH in triangle_strip order
+
+		if (!flip_h) {
+			gl_Position = pos_top_left;
+			tex_coords = vec2(0, 0);
+			EmitVertex();
+
+			gl_Position = pos_bottom_left;
+			tex_coords = vec2(1, 0);
+			EmitVertex();
+
+			gl_Position = pos_top_right;
+			tex_coords = vec2(0, 1);
+			EmitVertex();
+
+			gl_Position = pos_bottom_right;
+			tex_coords = vec2(1, 1);
+			EmitVertex();
+		}
+		else {
+			gl_Position = pos_top_left;
+			tex_coords = vec2(0, 1);
+			EmitVertex();
+
+			gl_Position = pos_bottom_left;
+			tex_coords = vec2(1, 1);
+			EmitVertex();
+
+			gl_Position = pos_top_right;
+			tex_coords = vec2(0, 0);
+			EmitVertex();
+
+			gl_Position = pos_bottom_right;
+			tex_coords = vec2(1, 0);
+			EmitVertex();
+
+		}
+
+		EndPrimitive();
+	}
+)",
+
+R"(
+	#version 330 core
+
+	layout(origin_upper_left) in vec4 gl_FragCoord;
+
+	uniform sampler2D fragment_texture;
+
+	in vec2 tex_coords;
+
+	void main() {
+		gl_FragColor = texture2D(fragment_texture, tex_coords);
+	}
+)"};
+
+
 /// ::: Shader
 /// ===========================================================================
 struct ShaderProgram {
+	SHADER_PROG_TYPE type;
 	u32 id = 0;
 	u32 vertex_id   = 0;
 	u32 geometry_id = 0;
@@ -4203,6 +4352,8 @@ ShaderSet_Add(
 		Memory_Free(c_error_msg);
 	}
 
+	shader_prog->type = shader->type;
+
 	return array_id;
 }
 
@@ -4217,7 +4368,8 @@ ShaderSet_Create(
 
 	ShaderSet_Add(&t_shader_set, &shader_rect);
 	ShaderSet_Add(&t_shader_set, &shader_text);
-	ShaderSet_Add(&t_shader_set, &shader_texture);
+	ShaderSet_Add(&t_shader_set, &shader_texture_full);
+	ShaderSet_Add(&t_shader_set, &shader_texture_size);
 
 	AssertMessage(	t_shader_set.a_shaders.count == SHADER_PROG_COUNT,
 					"Shader missing compared to SHADER_PROG_TYPE count.");
@@ -4372,8 +4524,9 @@ ShaderSet_Use(
 
 	switch (type) {
 		case SHADER_PROG_RECT:
-		case SHADER_PROG_TEXTURE:
-		case SHADER_PROG_TEXT: {
+		case SHADER_PROG_TEXT:
+		case SHADER_PROG_TEXTURE_FULL:
+		case SHADER_PROG_TEXTURE_SIZE: {
 			shader_set->active_id = type;
 		} break;
 
@@ -4416,7 +4569,7 @@ struct Vertex_Buffer {
 };
 
 struct Vertex_Settings {
-	bool flip = false;
+	bool  flip_texture = false;
 	float scale_x = 1.0f;
 	float scale_y = 1.0f;
 };
@@ -4507,12 +4660,21 @@ Vertex_SetTexture(
 	Shader_BindAndUseIndex0(shader_set, "fragment_texture", &vertex->texture);
 }
 
+instant void
+Vertex_CreateStatic(
+	Vertex *vertex
+) {
+	Assert(vertex);
+
+	glGenVertexArrays(1, &vertex->array_id);
+}
+
 instant Vertex
 Vertex_Create(
 ) {
 	Vertex vertex = {};
 
-	glGenVertexArrays(1, &vertex.array_id);
+	Vertex_CreateStatic(&vertex);
 
 	return vertex;
 }
@@ -4529,7 +4691,7 @@ Vertex_Create(
 
 	if (texture->ID) {
 		Vertex_SetTexture(shader_set, &vertex, texture);
-		vertex.settings.flip = true;
+		vertex.settings.flip_texture = true;
 	}
 
 	glGenVertexArrays(1, &vertex.array_id);
@@ -4581,6 +4743,7 @@ Vertex_Load(
 	if (vertex->texture.ID) {
 		Vertex_SetTexture(shader_set, vertex, &vertex->texture);
 	}
+
 }
 
 inline void
@@ -4629,12 +4792,14 @@ Vertex_Render(
 	///@Hint: vertex positions have to be the first entry in the array
 	Vertex_Buffer<float> *a_positions = &ARRAY_IT(vertex->a_attributes, 0);
 
+	Assert(String_IsEqual(a_positions->name, "vertex_position"));
+
 	AssertMessage(	a_positions->id,
 					"No Attributes found.\n    Forgot to bind the attributes?");
 
 	Assert(a_positions->group_count);
 
-	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip);
+	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip_texture);
 	Shader_SetValue(shader_set, "scale_x", vertex->settings.scale_x);
 	Shader_SetValue(shader_set, "scale_y", vertex->settings.scale_y);
 
@@ -4737,6 +4902,22 @@ Vertex_AddRect32(
 	Array_Add(&t_attribute->a_buffer, (float)color.g);
 	Array_Add(&t_attribute->a_buffer, (float)color.b);
 	Array_Add(&t_attribute->a_buffer, (float)color.a);
+}
+
+instant void
+Vertex_AddRectTexture(
+	Vertex *vertex,
+	Rect rect
+) {
+	Assert(vertex);
+
+	Vertex_Buffer<float> *t_attribute;
+
+	Vertex_FindOrAddAttribute(vertex, 4, "vertex_position", &t_attribute);
+	Array_Add(&t_attribute->a_buffer, (float)rect.x);
+	Array_Add(&t_attribute->a_buffer, (float)rect.y);
+	Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
+	Array_Add(&t_attribute->a_buffer, (float)rect.y + rect.h);
 }
 
 instant void
@@ -5401,7 +5582,7 @@ Codepoint_ToTexture(
 		);
 
 	if (bitmap) {
-		Texture_Load(&result, bitmap, w, h, true, font->filter_linear);
+		result = Texture_Load(bitmap, w, h, true, font->filter_linear);
 		free(bitmap);
 	}
 
@@ -5843,6 +6024,7 @@ enum WIDGET_TYPE {
 	WIDGET_BUTTON,
 	WIDGET_LISTBOX,
 	WIDGET_CHECKBOX,
+	WIDGET_PICTUREBOX
 };
 
 enum WIDGET_SCROLL_TYPE {
@@ -5931,7 +6113,7 @@ Widget_Redraw(
 	Vertex *t_vertex = &widget->vertex_rect;
 	Rect    rect_box =  widget->rect_box;
 
-	if (!t_vertex->array_id) *t_vertex = Vertex_Create();
+	if (!t_vertex->array_id) Vertex_CreateStatic(t_vertex);
 	else                     Vertex_ClearAttributes(t_vertex);
 
 	switch (widget->type) {
@@ -5978,6 +6160,9 @@ Widget_Redraw(
 			}
 		} break;
 
+		case WIDGET_PICTUREBOX: {
+			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
+		} break;
 
 		default:
 			AssertMessage(	false,
@@ -6119,6 +6304,33 @@ Widget_CreateCheckbox(
 	return t_widget;
 }
 
+instant Widget
+Widget_CreatePictureBox(
+	Window *window,
+	Rect rect_box,
+	Texture *texture = 0
+) {
+	Assert(window);
+
+	Widget t_widget = {};
+
+	t_widget.type         = WIDGET_PICTUREBOX;
+	t_widget.rect_box     = rect_box;
+	t_widget.rect_content = rect_box;
+	t_widget.window       = window;
+
+	if (texture)
+		t_widget.vertex_rect.texture = *texture;
+
+	t_widget.vertex_rect.settings.flip_texture = true;
+
+	t_widget.setting.is_focusable = false;
+
+	Widget_Redraw(&t_widget);
+
+	return t_widget;
+}
+
 instant void
 Widget_GetTextOffset(
 	Widget *widget,
@@ -6142,11 +6354,34 @@ Widget_Render(
 
 	/// draw non-list data
 	if (!widget->as_row_data.count) {
-		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
-		Rect_Render(shader_set, &widget->vertex_rect);
+		if (widget->vertex_rect.a_attributes.count) {
+			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
+			Rect_Render(shader_set, &widget->vertex_rect);
+		}
 
-		ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
-		Text_Render(&widget->text);
+		if (widget->vertex_rect.texture.ID) {
+			ShaderSet_Use(shader_set, SHADER_PROG_TEXTURE_SIZE);
+
+			s32 width, height;
+			Texture_GetSizeAndBind(&widget->vertex_rect.texture, &width, &height);
+
+			Rect rect_tex_aspect = widget->rect_box;
+			Rect_GetAspect(&rect_tex_aspect, width, height);
+
+			static Vertex vertex_texture = Vertex_Create();
+			Vertex_SetTexture(shader_set, &vertex_texture, &widget->vertex_rect.texture);
+			vertex_texture.settings = widget->vertex_rect.settings;
+
+			Vertex_AddRectTexture(&vertex_texture, rect_tex_aspect);
+			Rect_Render(shader_set, &vertex_texture);
+
+			Vertex_ClearAttributes(&vertex_texture);
+		}
+
+		if (widget->text.s_data.length) {
+			ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
+			Text_Render(&widget->text);
+		}
 		return;
 	}
 
