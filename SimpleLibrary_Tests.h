@@ -460,7 +460,7 @@ Test_Files(
 		String_Append(&s_pathfile, __FILE__);
 
 		if (String_FindRev(&s_pathfile, "\\", &pos_found)) {
-			File_ReadDirectory(&as_files, s_pathfile.value, pos_found);
+			File_ReadDirectory(&as_files, s_pathfile.value, 0, pos_found);
 			AssertMessage(as_files.count, "Reading directory listing failed.");
 			Array_Destroy(&as_files);
 		}

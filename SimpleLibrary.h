@@ -705,6 +705,9 @@ __inline__ static void debug_break(void)
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #define instant static inline
 
 /// ::: Iterators
@@ -797,9 +800,9 @@ struct RectI {
 };
 
 struct Color32 {
-	float r = 1.0f;
-	float g = 1.0f;
-	float b = 1.0f;
+	float r = 0.0f;
+	float g = 0.0f;
+	float b = 0.0f;
 	float a = 1.0f;
 };
 
@@ -1007,6 +1010,18 @@ Color_MakeGrey(
 	return {value, value, value, alpha};
 }
 
+instant void
+Clamp(
+	s64 *value,
+	s64 min,
+	s64 max
+) {
+	Assert(value);
+
+	if (*value < min)  *value = min;
+	if (*value > max)  *value = max;
+}
+
 /// ::: Memory
 /// ===========================================================================
 #define Memory_Create(type, length) \
@@ -1158,6 +1173,52 @@ Memory_Set(
 
 	while (length-- > 0)
 		*cDest++ = cData;
+}
+
+/// ::: Convert
+/// ===========================================================================
+instant char *
+ToCString(
+	s64 value,
+	u32 len = 0
+) {
+    u64 tmpValue   = value;
+	u8  digitCount = 0;
+
+	/// make space for '-' sign
+	if (value < 0)  ++digitCount;
+
+	/// calc number of digits
+	do {
+		value /= 10;
+		++digitCount;
+	} while (value);
+
+    /// include null-terminate char
+	char *buffer = Memory_Create(char, digitCount + 1);
+
+	/// display negative sign and stay in ascii number
+	/// range by removing the sign from the value
+	value = tmpValue;
+	if (value < 0) {
+		*buffer = '-';
+		value *= -1;
+	}
+
+	if (len AND len > digitCount)
+		digitCount = len;
+
+	/// convert digits to char array
+	do {
+		int digit = value % 10;
+		buffer[--digitCount] = digit + '0';
+		value /= 10;
+	} while (digitCount);
+
+	if (len)
+		buffer[len] = 0;
+
+	return buffer;
 }
 
 /// ::: Time
@@ -1738,6 +1799,27 @@ String_EndWith(
 	ts_data.length = length;
 
 	return String_IsEqual(&ts_data, endwith, length);
+}
+
+instant bool
+String_EndWith(
+	const char *c_data,
+	const char *endwith,
+	u64 c_length = 0
+) {
+	if (!c_length)
+		c_length = String_Length(c_data);
+
+	String ts_data;
+	ts_data.value  = (char *)c_data;
+	ts_data.length = c_length;
+
+	u64 length_endwith = String_Length(endwith);
+
+	ts_data.value  = ts_data.value + (ts_data.length - length_endwith);
+	ts_data.length = length_endwith;
+
+	return String_IsEqual(&ts_data, endwith, length_endwith);
 }
 
 instant void
@@ -2671,6 +2753,48 @@ File_HasExtension(
 }
 
 instant bool
+File_HasExtension(
+	const char *c_filename,
+	const char *c_extension,
+	u64 c_length_filename = 0,
+	u64 c_length_extension = 0
+) {
+	Assert(c_filename);
+	Assert(c_extension);
+
+	bool result = false;
+
+	if (!c_length_filename)
+		c_length_filename = String_Length(c_filename);
+
+	if (!c_length_extension)
+		c_length_extension = String_Length(c_extension);
+
+	String s_extension;
+	s_extension.value  = (char *)c_extension;
+	s_extension.length = c_length_extension;
+
+	String s_filename;
+	s_filename.value  = (char *)c_filename;
+	s_filename.length = c_length_filename;
+
+	Array<String> as_extentions = Array_Split(&s_extension, "|");
+
+    FOR_ARRAY(as_extentions, it) {
+    	String s_data_it = ARRAY_IT(as_extentions, it);
+
+		if (String_EndWith(&s_filename, s_data_it.value, s_data_it.length)) {
+			result = true;
+			break;
+		}
+    }
+
+    Array_Destroy(&as_extentions);
+
+	return result;
+}
+
+instant bool
 File_Exists(
 	const char *c_filename,
 	u64 c_length = 0
@@ -2780,6 +2904,9 @@ File_Size(
 	File *file
 ) {
 	Assert(file);
+
+	if (!file->fp)
+		return 0;
 
 	fseek (file->fp, 0 ,SEEK_END);
 	u64 size = ftell(file->fp);
@@ -2920,14 +3047,14 @@ instant void
 File_ReadDirectory(
 	Array<String> *as_files,
 	const char *c_path,
+	const char *extension_filter = 0,
 	u64 c_length = 0,
 	bool prefix_path = true,
-	const char *extension_filter = 0,
 	const char *name_filter = 0
 ) {
 	Assert(as_files);
 
-	Array_ClearContainer(as_files);
+	Array_Clear(as_files);
 
 	if (!c_length)
 		c_length = String_Length(c_path);
@@ -3602,6 +3729,7 @@ struct Image {
 	s32   height = 0;
 	u32   bits   = 0;
 	u8   *data   = 0;
+	bool  flip_h = false;
 };
 
 /// 32-bit BMP only!
@@ -3638,9 +3766,12 @@ Image_LoadBMP32(
 		result.height = bmp_info->biHeight;
 		result.bits   = bmp_info->biBitCount / 8;
 
+		result.flip_h = (bmp_info->biHeight > 0);
+
 		s_data_it = s_data;
 		s_data_it.value  += bmp_header->bfOffBits;
 		s_data_it.length -= bmp_header->bfOffBits;
+
 		Memory_Copy(result.data, s_data_it.value, bmp_info->biSizeImage);
 	}
 
@@ -3662,6 +3793,7 @@ Image_Destroy(
 /// ===========================================================================
 struct Texture {
 	u32 ID = 0;
+	bool flip_h = false;
 };
 
 bool
@@ -3719,8 +3851,8 @@ Texture_Load(
 	const u8 *data,
 	s32 width,
 	s32 height,
-	bool greyscale = false,
-	bool linearFilter = false
+	u32 format_input,
+	bool linearFilter
 ) {
 	Texture result = {};
 
@@ -3729,26 +3861,17 @@ Texture_Load(
     glGenTextures(1, &id_texture);
     glBindTexture(GL_TEXTURE_2D, id_texture);
 
-    if (greyscale) {
-		/// useful for fonts
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		glTexImage2D(	GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0,
-						GL_ALPHA, GL_UNSIGNED_BYTE, data);
-    }
-    else {
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		glTexImage2D(	GL_TEXTURE_2D, 0, GL_RGBA , width, height, 0,
-						GL_ABGR_EXT, GL_UNSIGNED_BYTE, data);
-    }
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(	GL_TEXTURE_2D, 0, GL_RGBA , width, height, 0,
+					format_input, GL_UNSIGNED_BYTE, data);
 
-    if (linearFilter) {
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    }
-    else {
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    }
+	s32 param;
+
+	if (linearFilter) param = GL_LINEAR;
+	else              param = GL_NEAREST;
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, param);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, param);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRROR_CLAMP_TO_EDGE);
@@ -3768,12 +3891,65 @@ Texture_Destroy(
 	texture->ID = 0;
 }
 
+instant void
+Texture_Reload(
+	Texture *texture,
+	const char *c_filename,
+	u64 c_length = 0
+) {
+	Assert(texture);
+
+	if (File_HasExtension(c_filename, ".bmp", c_length)) {
+		u32 format_input;
+
+		/// 32-bit bmp only
+		Image image = Image_LoadBMP32(c_filename, c_length);
+
+		if (image.flip_h)  format_input = GL_ABGR_EXT;
+		else               format_input = GL_RGBA;
+
+		Texture_Destroy(texture);
+		*texture = Texture_Load(image.data, image.width, image.height, format_input, false);
+		texture->flip_h = image.flip_h;
+
+		Image_Destroy(&image);
+
+		return;
+	}
+
+	if (File_HasExtension(c_filename, ".jpg|.png", c_length)) {
+		char *tc_filename = String_CreateCBufferCopy(c_filename, c_length);
+
+		s32 width, height, bits;
+		u8 *c_data = stbi_load(tc_filename, &width, &height, &bits, 4);
+
+		Texture_Destroy(texture);
+		*texture = Texture_Load(c_data, width, height, GL_RGBA, true);
+
+		Memory_Free(tc_filename);
+
+		return;
+	}
+}
+
+instant Texture
+Texture_Load(
+	const char *c_filename,
+	u64 c_length = 0
+) {
+	Texture result;
+
+	Texture_Reload(&result, c_filename, c_length);
+
+	return result;
+}
+
 instant Texture
 Texture_Create(
 	s32 width,
 	s32 height
 ) {
-	return Texture_Load(0, width, height);
+	return Texture_Load(0, width, height, GL_RGBA, false);
 }
 
 instant bool
@@ -4603,7 +4779,7 @@ struct Vertex_Buffer {
 };
 
 struct Vertex_Settings {
-	bool  flip_texture = false;
+	bool  flip_h = false;
 	float scale_x = 1.0f;
 	float scale_y = 1.0f;
 };
@@ -4689,6 +4865,7 @@ Vertex_SetTexture(
 	Assert(texture);
 
 	vertex->texture = *texture;
+	vertex->settings.flip_h = texture->flip_h;
 
 	/// use this uniform in a shader, if the texture index has to change
 	Shader_BindAndUseIndex0(shader_set, "fragment_texture", &vertex->texture);
@@ -4725,7 +4902,6 @@ Vertex_Create(
 
 	if (texture->ID) {
 		Vertex_SetTexture(shader_set, &vertex, texture);
-		vertex.settings.flip_texture = true;
 	}
 
 	glGenVertexArrays(1, &vertex.array_id);
@@ -4849,7 +5025,7 @@ Vertex_Render(
 
 	Assert(a_positions->group_count);
 
-	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip_texture);
+	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip_h);
 	Shader_SetValue(shader_set, "scale_x", vertex->settings.scale_x);
 	Shader_SetValue(shader_set, "scale_y", vertex->settings.scale_y);
 
@@ -5003,6 +5179,12 @@ struct Mouse {
 };
 
 instant void
+Mouse_Show(
+) {
+	ShowCursor(true);
+}
+
+instant void
 Mouse_AutoHide(
 	u32 msg_message = 0,
 	u32 millisec = 2000
@@ -5015,7 +5197,7 @@ Mouse_AutoHide(
 		Time_Reset(&timer_mouse_move);
 		if (!is_cursor_visible) {
 			is_cursor_visible = true;
-			ShowCursor(true);
+			Mouse_Show();
 		}
 		return;
     }
@@ -5387,6 +5569,7 @@ typedef DWORD(WINAPI* proc_XInputGetState)(u64 joy_index, Joypad_State *state);
 struct Joypad {
 	HINSTANCE dll = 0;
 	Joypad_State state = {};
+	Joypad_State prev_state = {};
 
 	proc_XInputGetState GetState = 0;
 };
@@ -5421,53 +5604,86 @@ Joypad_GetInput(
 
 	if (!joypad->dll)  return false;
 
+	joypad->prev_state = joypad->state;
+
 	u64 result = joypad->GetState(joy_index, &joypad->state);
 
 	return (result != XINPUT_ERROR_DEVICE_NOT_CONNECTED);
 }
 
 ///@Hint: test for != 0
+///@Hint: "pressing" states
 
 /// DPad
 #define Joypad_IsPadUp(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_DPAD_UP)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_DPAD_UP)
 #define Joypad_IsPadDown(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_DPAD_DOWN)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_DPAD_DOWN)
 #define Joypad_IsPadLeft(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_DPAD_LEFT)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_DPAD_LEFT)
 #define Joypad_IsPadRight(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_DPAD_RIGHT)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_DPAD_RIGHT)
 
 /// Center buttons
 #define Joypad_IsStart(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_START)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_START)
 #define Joypad_IsSelect(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_BACK)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_BACK)
 
 /// Thumb button
 #define Joypad_IsThumbLeft(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_LEFT_THUMB)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_LEFT_THUMB)
 #define Joypad_IsThumbRight(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_RIGHT_THUMB)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_RIGHT_THUMB)
 
 /// Shoulder buttons
 #define Joypad_IsShoulderLeft(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_LEFT_SHOULDER)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_LEFT_SHOULDER)
 #define Joypad_IsShoulderRight(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_RIGHT_SHOULDER)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_RIGHT_SHOULDER)
 
 /// Control buttons
 #define Joypad_IsA(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_A)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_A)
 #define Joypad_IsB(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_B)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_B)
 #define Joypad_IsX(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_X)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_X)
 #define Joypad_IsY(ptr_joypad) \
-	((*ptr_joypad).state.Button & XINPUT_GAMEPAD_Y)
+	((*ptr_joypad).state.button & XINPUT_GAMEPAD_Y)
+
+///@Hint: "button up" states
+
+/// Center buttons
+#define Joypad_IsStart_UP(ptr_joypad) \
+	(   (  (*ptr_joypad).prev_state.button & XINPUT_GAMEPAD_START) \
+	 && (!((*ptr_joypad).state.button      & XINPUT_GAMEPAD_START)))
+
+#define Joypad_IsSelect_UP(ptr_joypad) \
+	(   (  (*ptr_joypad).prev_state.button & XINPUT_GAMEPAD_BACK) \
+	 && (!((*ptr_joypad).state.button      & XINPUT_GAMEPAD_BACK)))
+
+/// Control buttons
+#define Joypad_IsA_Up(ptr_joypad) \
+	(   (  (*ptr_joypad).prev_state.button & XINPUT_GAMEPAD_A) \
+	 && (!((*ptr_joypad).state.button      & XINPUT_GAMEPAD_A)))
+
+#define Joypad_IsB_Up(ptr_joypad) \
+	(   (  (*ptr_joypad).prev_state.button & XINPUT_GAMEPAD_B) \
+	 && (!((*ptr_joypad).state.button      & XINPUT_GAMEPAD_B)))
+
+#define Joypad_IsX_Up(ptr_joypad) \
+	(   (  (*ptr_joypad).prev_state.button & XINPUT_GAMEPAD_X) \
+	 && (!((*ptr_joypad).state.button      & XINPUT_GAMEPAD_X)))
+
+#define Joypad_IsY_Up(ptr_joypad) \
+	(   (  (*ptr_joypad).prev_state.button & XINPUT_GAMEPAD_Y) \
+	 && (!((*ptr_joypad).state.button      & XINPUT_GAMEPAD_Y)))
 
 /// for axis
 /// Returns: current section
+
+/// @Suggestion: deadzone = 8000
 instant s32
 Joypad_GetSection(
 	s16 axis_value,
@@ -5484,7 +5700,7 @@ Joypad_GetSection(
 
 		float steps = (float)((limit - deadzone) / section_max);
 
-		return axis_value / steps;
+		return (axis_value / steps);
 	}
 
 	return 0;
@@ -5561,7 +5777,9 @@ Font_Load(
     font.size = size;
 
     if (!font.s_data.length) {
-		LOG_ERROR("Font does not exists.");
+		char *c_filename = String_CreateCBufferCopy(s_file);
+
+		LOG_ERROR("Font \"" << c_filename << "\" does not exists.");
     }
 
     const u8 *c_data = (u8 *)font.s_data.value;
@@ -5630,7 +5848,7 @@ Codepoint_ToTexture(
 		);
 
 	if (bitmap) {
-		result = Texture_Load(bitmap, w, h, true, font->filter_linear);
+		result = Texture_Load(bitmap, w, h, GL_ALPHA, font->filter_linear);
 		free(bitmap);
 	}
 
@@ -6022,35 +6240,41 @@ Text_AddLines(
 
 instant void
 Text_AddLines(
-	Array<Vertex>    *a_vertex,
-	Text *text,
-	Array<Text_Line> *a_text_lines
+	Text *text
 ) {
 	Assert(text);
 
-	Text_AddLines(	a_vertex,
+	Text_AddLines( &text->a_vertex,
 					text->shader_set,
 					text->font,
 					text->rect,
 					text->rect_padding,
 					text->color,
-					a_text_lines,
+				   &text->a_text_lines,
 					text->align_x,
 					text->x_offset,
 					text->y_offset);
 }
 
 instant void
-Text_Render(
-	Text *text,
-	Array<Vertex> *a_vertex
+Text_Clear(
+	Text *text
 ) {
 	Assert(text);
-	Assert(a_vertex);
 
-	Vertex_Render(text->shader_set, a_vertex);
+	Vertex_ClearAttributes(&text->a_vertex);
 }
 
+instant void
+Text_RenderLines(
+	Text *text
+) {
+	Assert(text);
+
+	Vertex_Render(text->shader_set, &text->a_vertex);
+}
+
+///@Hint: single row
 instant void
 Text_Render(
 	Text *text
@@ -6069,14 +6293,13 @@ Text_Render(
 		else if (text->align_y == TEXT_ALIGN_Y_BOTTOM)
 			text->y_offset = (text->rect.h - text_height);
 
-		Vertex_ClearAttributes(&text->a_vertex);
-
-		Text_AddLines(&text->a_vertex, text, &text->a_text_lines);
+		Text_Clear(text);
+		Text_AddLines(text);
 
 		text->s_data.changed = false;
 	}
 
-	Text_Render(text, &text->a_vertex);
+	Vertex_Render(text->shader_set, &text->a_vertex);
 
 	OpenGL_Scissor_Disable();
 }
@@ -6405,8 +6628,6 @@ Widget_CreatePictureBox(
 	if (texture)
 		t_widget.vertex_rect.texture = *texture;
 
-	t_widget.vertex_rect.settings.flip_texture = true;
-
 	t_widget.setting.is_focusable = false;
 
 	Widget_Redraw(&t_widget);
@@ -6490,7 +6711,7 @@ Widget_Render(
 	Vertex_ClearAttributes(&widget->vertex_rect);
 	Widget_Redraw(widget);
 
-	Vertex_ClearAttributes(&t_text->a_vertex);
+	Text_Clear(t_text);
 
 	FOR_ARRAY(widget->as_row_data, it_row) {
 		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
@@ -6518,7 +6739,7 @@ Widget_Render(
 			t_text->rect.x -= pt_offset.x;
 			t_text->rect.y -= pt_offset.y;
 
-			Text_AddLines(&t_text->a_vertex, t_text, &t_text->a_text_lines);
+			Text_AddLines(t_text);
 		}
 
 		s32 height_row_step = rect_row.h + widget->setting.spacing;
@@ -6535,7 +6756,7 @@ Widget_Render(
 	/// render item data
 	/// =======================================================================
 	ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
-	Text_Render(t_text, &t_text->a_vertex);
+	Text_RenderLines(t_text);
 
 	OpenGL_Scissor_Disable();
 }
