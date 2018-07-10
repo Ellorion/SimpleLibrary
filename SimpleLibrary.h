@@ -677,6 +677,114 @@
 //}
 /// ===========================================================================
 
+/// Example: layout widgets
+/// ===========================================================================
+//instant void
+//Window_HandleEvents(
+//	Window *window
+//) {
+//	MSG msg;
+//	bool running = true;
+//
+//	ShaderSet shader_set = ShaderSet_Create(window);
+//
+//	OpenGL_UseBlending(true);
+//
+//	Keyboard *keyboard = window->keyboard;
+//
+//	String s_font;
+//	String_Append(&s_font, "test/AutourOne-Regular.ttf");
+//	Font font_20 = Font_Load(&s_font, 20);
+//
+//	Widget w_button_menu_1   = Widget_CreateButton(window, &font_20, {0, 0, 130, 30}, "menu_1");
+//	Widget w_button_menu_2   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "menu_2");
+//	Widget w_button_menu_3   = Widget_CreateButton(window, &font_20, {0, 0, 100, 50}, "menu_3");
+//	Widget w_button_top_1    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "top_1");
+//	Widget w_button_top_2    = Widget_CreateButton(window, &font_20, {0, 0, 100, 40}, "top_2");
+//	Widget w_button_top_3    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "top_3");
+//	Widget w_button_bottom_1 = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "bottom_1");
+//	Widget w_button_center_1 = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "center_1");
+//	Widget w_spreader        = Widget_CreateSpreader();
+//
+//	w_button_top_2.setting.auto_size = false;
+//
+//	/// render + tab-order
+//	Array<Widget *> ap_widgets;
+//	Array_Add(&ap_widgets, &w_button_menu_1);
+//	Array_Add(&ap_widgets, &w_button_menu_2);
+//	Array_Add(&ap_widgets, &w_button_menu_3);
+//	Array_Add(&ap_widgets, &w_button_top_1);
+//	Array_Add(&ap_widgets, &w_button_top_2);
+//	Array_Add(&ap_widgets, &w_button_top_3);
+//	Array_Add(&ap_widgets, &w_button_center_1);
+//	Array_Add(&ap_widgets, &w_button_bottom_1);
+//
+//	Layout layout = Layout_Create({0, 0, window->width, window->height}, true);
+//	layout.padding = 10;
+//
+//	Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT);
+//	Layout_Add(&layout, &w_button_bottom_1);
+//	Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, -1);
+//	Layout_Add(&layout, &w_button_top_1);
+//	Layout_Add(&layout, &w_button_top_2);
+//	Layout_Add(&layout, &w_button_top_3);
+//	Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT,  2);
+//	Layout_Add(&layout, &w_button_menu_1);
+//	Layout_Add(&layout, &w_button_menu_2);
+//	Layout_Add(&layout, &w_spreader);
+//	Layout_Add(&layout, &w_button_menu_3);
+//	Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT);
+//	Layout_Add(&layout, &w_button_center_1);
+//	Layout_Arrange(&layout);
+//
+//	while(running) {
+//		msg = {};
+//
+//		/// Events
+//		/// ===================================================================
+//		Window_ReadMessage(msg, running, window);
+//		OpenGL_AdjustScaleViewport(window);
+//
+//		/// hold shift-key to get reverse tab order
+//		Widget_UpdateInput(&ap_widgets);
+//		Widget_UpdateFocus(&ap_widgets, keyboard->pressing[VK_SHIFT]);
+//
+//		if (keyboard->up[VK_ESCAPE])
+//			running = false;
+//
+//		/// Render
+//		/// ===================================================================
+//		OpenGL_ClearScreen();
+//
+//		Widget_Render(&shader_set, &ap_widgets);
+//
+//		Window_Update(window);
+//	}
+//
+//	Widget_Destroy(&ap_widgets);
+//
+//	ShaderSet_Destroy(&shader_set);
+//}
+//
+//int main() {
+//	Window window;
+//
+//	Keyboard keyboard;
+//	Mouse    mouse;
+//
+//	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard, &mouse);
+//	Window_Show(&window);
+//
+//	OpenGL_Init(&window);
+//	Window_HandleEvents(&window);
+//
+//	OpenGL_Destroy(&window);
+//	Window_Destroy(&window);
+//
+//	return 0;
+//}
+/// ===========================================================================
+
 #include <iostream>
 #include <math.h>
 #include <windows.h>
@@ -3917,7 +4025,7 @@ Texture_Reload(
 		return;
 	}
 
-	if (File_HasExtension(c_filename, ".jpg|.png", c_length)) {
+	if (File_HasExtension(c_filename, ".jpg|.png|.gif", c_length)) {
 		char *tc_filename = String_CreateCBufferCopy(c_filename, c_length);
 
 		s32 width, height, bits;
@@ -4482,8 +4590,8 @@ struct ShaderProgram {
 
 struct ShaderSet {
 	Array<ShaderProgram> a_shaders;
-	u64 active_id = 0;
-	Window *window = 0;
+	s64 active_id  = -1;
+	Window *window =  0;
 };
 
 instant void
@@ -4621,7 +4729,7 @@ Shader_SetValue(
 	const char *name,
 	const float buffer
 ) {
-	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
 
 	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
@@ -4637,7 +4745,7 @@ Shader_SetValue(
 	const float *buffer,
 	u32 count
 ) {
-	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
 
 	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
@@ -4665,7 +4773,7 @@ Shader_SetValue(
 	const char *name,
 	int value
 ) {
-	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
 
 	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
@@ -4681,7 +4789,7 @@ Shader_SetValue(
 	int value_a,
 	int value_b
 ) {
-	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
 
 	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
@@ -4698,7 +4806,7 @@ Shader_SetValue(
 	float value_a,
 	float value_b
 ) {
-	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
 
 	s32 loc_id = glGetUniformLocation(shader_prog->id, name);
@@ -4730,7 +4838,7 @@ ShaderSet_Use(
 	Assert(shader_set);
 	Assert(shader_set->window);
 
-	u64 prev_active_id = shader_set->active_id;
+	s64 prev_active_id = shader_set->active_id;
 
 	switch (type) {
 		case SHADER_PROG_RECT:
@@ -4749,7 +4857,7 @@ ShaderSet_Use(
 	if (prev_active_id == shader_set->active_id)
 		return;
 
-	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
 
 	glUseProgram(shader_prog->id);
@@ -4917,7 +5025,7 @@ Vertex_Load(
 	Assert(shader_set);
 	Assert(vertex);
 
-	Assert(shader_set->active_id < shader_set->a_shaders.count);
+	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
 
 	FOR_ARRAY(vertex->a_attributes, it) {
@@ -5020,6 +5128,9 @@ Vertex_Render(
 
 	Assert(String_IsEqual(a_positions->name, "vertex_position"));
 
+	AssertMessage(	vertex->array_id,
+					"Vertex has not been created. Forgot to call Vertex_Create?");
+
 	AssertMessage(	a_positions->id,
 					"No Attributes found.\n    Forgot to bind the attributes?");
 
@@ -5064,6 +5175,9 @@ Vertex_FindOrAdd(
 
 	if (!Array_FindOrAddEmpty(a_vertex, t_vertex_find, &t_vertex_entry))
 		*t_vertex_entry = t_vertex_find;
+
+	if (!t_vertex_entry->array_id)
+		Vertex_CreateStatic(t_vertex_entry);
 
 	*entry = t_vertex_entry;
 }
@@ -6312,6 +6426,8 @@ Text_GetSize(
 ) {
 	Assert(text);
 
+	/// seperate storage, so independent text container keep
+	/// their already processed data
 	static Array<String>    as_words;
 	static Array<Text_Line> a_text_lines;
 
@@ -6330,7 +6446,8 @@ enum WIDGET_TYPE {
 	WIDGET_BUTTON,
 	WIDGET_LISTBOX,
 	WIDGET_CHECKBOX,
-	WIDGET_PICTUREBOX
+	WIDGET_PICTUREBOX,
+	WIDGET_SPREADER
 };
 
 enum WIDGET_SCROLL_TYPE {
@@ -6348,6 +6465,8 @@ struct Widget_Settings {
 
 	u32  border_size   = 0;
 	u32  spacing       = 1;
+	bool auto_size     = true;
+
 	bool is_focusable  = true;
 	bool is_scrollable = false;
 
@@ -6364,6 +6483,8 @@ struct Widget {
 
 	bool has_focus;
 	bool is_checked = false;
+
+	bool is_invalid = false;
 
 	Array<String> as_row_data;
 	u64 active_row_id = 0;
@@ -6504,7 +6625,7 @@ Widget_CreateLabel(
 
 	String_Append(&t_widget.text.s_data, c_data, c_length);
 
-	Widget_Redraw(&t_widget);
+	t_widget.is_invalid = true;
 
 	return t_widget;
 }
@@ -6539,7 +6660,7 @@ Widget_CreateButton(
 
 	String_Append(&t_widget.text.s_data, c_data, c_length);
 
-	Widget_Redraw(&t_widget);
+	t_widget.is_invalid = true;
 
 	return t_widget;
 }
@@ -6569,7 +6690,7 @@ Widget_CreateListbox(
 	t_widget.text.font  = font;
 	t_widget.text.color = t_widget.setting.color_font;
 
-	Widget_Redraw(&t_widget);
+	t_widget.is_invalid = true;
 
 	return t_widget;
 }
@@ -6605,7 +6726,7 @@ Widget_CreateCheckbox(
 
 	String_Append(&t_widget.text.s_data, c_data, c_length);
 
-	Widget_Redraw(&t_widget);
+	t_widget.is_invalid = true;
 
 	return t_widget;
 }
@@ -6630,9 +6751,21 @@ Widget_CreatePictureBox(
 
 	t_widget.setting.is_focusable = false;
 
-	Widget_Redraw(&t_widget);
+	t_widget.is_invalid = true;
 
 	return t_widget;
+}
+
+instant Widget
+Widget_CreateSpreader(
+) {
+	Widget t_widget;
+
+    t_widget.type = WIDGET_SPREADER;
+
+    t_widget.setting.is_focusable = false;
+
+    return t_widget;
 }
 
 instant void
@@ -6647,6 +6780,18 @@ Widget_GetTextOffset(
 }
 
 instant void
+Widget_Invalidate(
+	Widget *widget
+) {
+	Assert(widget);
+
+	widget->text.rect = widget->rect_box;
+	Widget_Redraw(widget);
+
+	widget->is_invalid = false;
+}
+
+instant void
 Widget_Render(
 	ShaderSet *shader_set,
 	Widget *widget
@@ -6655,6 +6800,9 @@ Widget_Render(
 	Assert(widget);
 
 	widget->text.shader_set = shader_set;
+
+	if (widget->is_invalid)
+		Widget_Invalidate(widget);
 
 	/// draw non-list data
 	if (!widget->as_row_data.count) {
@@ -7020,7 +7168,7 @@ Widget_ClampTextOffset(
 }
 
 instant void
-Widget_GetActiveRowRect(
+Widget_CalcActiveRowRect(
 	Widget *widget,
 	Rect *rect_row
 ) {
@@ -7057,7 +7205,7 @@ Widget_GetActiveRowRect(
 }
 
 instant u64
-Widget_GetActiveRowID(
+Widget_CalcActiveRowID(
 	Widget *widget,
 	Mouse *mouse
 ) {
@@ -7124,7 +7272,7 @@ Widget_UpdateInput(
 			got_focus = is_hovering;
 
 			if (is_scrollable)
-				widget->active_row_id = Widget_GetActiveRowID(widget, mouse);
+				widget->active_row_id = Widget_CalcActiveRowID(widget, mouse);
 
 			if (got_focus) {
 				widget->is_checked = !widget->is_checked;
@@ -7174,7 +7322,7 @@ Widget_UpdateInput(
 
     if (prev_active_row != widget->active_row_id AND is_scrollable) {
 		Rect rect_active_row;
-        Widget_GetActiveRowRect(widget, &rect_active_row);
+        Widget_CalcActiveRowRect(widget, &rect_active_row);
 
 		if (!Rect_IsVisibleFully(&rect_active_row, &widget->rect_box)) {
 			if (widget->setting.scroll_type == WIDGET_SCROLL_ITEM) {
@@ -7244,11 +7392,416 @@ Widget_GetSelectedRow(
 }
 
 instant u64
-Widget_GetSelectedRow(
+Widget_GetSelectedRowID(
 	Widget *widget
 ) {
 	Assert(widget);
 	Assert(!widget->active_row_id OR widget->active_row_id < widget->as_row_data.count);
 
 	return widget->active_row_id;
+}
+
+instant void
+Widget_ClearData(
+	Widget *widget
+) {
+	Assert(widget);
+
+	String_Clear(&widget->text.s_data);
+	Array_Clear(&widget->as_row_data);
+}
+
+/// ::: LAYOUT
+/// ===========================================================================
+#define LAYOUT_BLOCK_PADDING 5
+#define LAYOUT_BLOCK_SPACING 5
+
+#define LAYOUT_PADDING 5
+
+enum LAYOUT_TYPE {
+	LAYOUT_TYPE_X,
+	LAYOUT_TYPE_Y
+};
+
+enum LAYOUT_DOCK_TYPE {
+	LAYOUT_DOCK_TOPLEFT,
+	LAYOUT_DOCK_BOTTOMRIGHT
+};
+
+struct Layout_Block {
+	LAYOUT_TYPE type;
+	LAYOUT_DOCK_TYPE dock;
+	s32 expand_index = -1;
+	u32 padding = LAYOUT_BLOCK_PADDING;
+	u32 spacing = LAYOUT_BLOCK_SPACING;
+	Array<Widget *> ap_widgets;
+};
+
+struct Layout {
+	Rect rect_full;
+	Rect rect_remaining;
+	bool fill_last_block = true;
+	u32  padding = LAYOUT_PADDING;
+	Array<Layout_Block> a_blocks;
+};
+
+instant Layout
+Layout_Create(
+	Rect rect_area,
+	bool fill_last_block
+) {
+	Layout layout = {};
+	layout.rect_full       = rect_area;
+	layout.rect_remaining  = rect_area;
+	layout.fill_last_block = fill_last_block;
+
+	return layout;
+}
+
+instant void
+Layout_CreateBlock(
+	Layout *layout,
+	LAYOUT_TYPE type,
+	LAYOUT_DOCK_TYPE dock_direction,
+	s32 expand_index = -1,
+	Layout_Block **layout_block = 0
+) {
+	Assert(layout);
+
+	Layout_Block *t_block;
+
+	Array_AddEmpty(&layout->a_blocks, &t_block);
+
+	t_block->type = type;
+	t_block->dock = dock_direction;
+	t_block->expand_index = expand_index;
+
+	if (layout_block)
+		*layout_block = t_block;
+}
+
+instant void
+Layout_GetLastBlock(
+	Layout *layout,
+	Layout_Block **layout_block
+) {
+	Assert(layout);
+
+	if (!layout->a_blocks.count) {
+		AssertMessage(false, "GetLastBlock: No blocks in layout found.");
+		return;
+	}
+
+	*layout_block = &ARRAY_IT(layout->a_blocks, layout->a_blocks.count - 1);
+}
+
+instant void
+Layout_Add(
+	Layout *layout,
+	Widget *widget
+) {
+	Assert(layout);
+	Assert(widget);
+
+	Layout_Block *current_block;
+	Layout_GetLastBlock(layout, &current_block);
+
+	Array_Add(&current_block->ap_widgets, widget);
+}
+
+/// layout_block->expand_index (widgets):
+///  0-max: expand widget with matching index
+///     -1: balanced size (with auto-size)
+///     -2: left-align (no auto-size)
+///     -3: center-align (no auto-size)
+///     -4: right-align (no auto-size)
+///   else: see -1
+instant void
+Layout_ArrangeBlockX(
+	Layout *layout,
+	Layout_Block *layout_block
+) {
+	Assert(layout);
+	Assert(layout_block);
+	Assert(layout_block->type == LAYOUT_TYPE_X);
+
+	Layout_Block *t_block_last;
+	Layout_GetLastBlock(layout, &t_block_last);
+
+	bool is_last_block = (t_block_last == layout_block);
+
+	s64 widget_count = layout_block->ap_widgets.count;
+
+	if (!widget_count)
+		return;
+
+	s32 padding_size     = layout_block->padding;
+	s32 padding_border   = layout_block->padding >> 1;
+	s32 width_remaining  = layout->rect_remaining.w;
+
+	float it_x = padding_border;
+	float it_y = padding_border;
+
+	bool is_overwriting = (	    layout_block->expand_index >= -4
+							AND layout_block->expand_index != -1
+							AND layout_block->expand_index < widget_count);
+
+	s32 block_height = 0;
+	u64 widget_count_auto = widget_count;
+
+	/// pre-calc height for bottom alignment
+	FOR_ARRAY(layout_block->ap_widgets, it_block) {
+		Widget *t_widget = ARRAY_IT(layout_block->ap_widgets, it_block);
+
+		bool found_expander = ((s64)it_block == layout_block->expand_index);
+
+		block_height  = MAX(block_height, t_widget->rect_box.h);
+
+		/// ignore spreader
+		if (    t_widget->type == WIDGET_SPREADER
+			AND is_overwriting
+			AND !found_expander
+		) {
+			--widget_count_auto;
+			--widget_count;
+			continue;
+		}
+
+		if (is_overwriting) {
+			if (!found_expander) {
+				width_remaining -= t_widget->rect_box.w;
+				--widget_count_auto;
+			}
+		}
+		else if (!t_widget->setting.auto_size) {
+			width_remaining -= t_widget->rect_box.w;
+			--widget_count_auto;
+		}
+	}
+
+    width_remaining -= padding_size;
+	width_remaining -= layout_block->spacing * (widget_count - 1);
+
+    block_height += padding_size;
+
+    switch (layout_block->expand_index) {
+    	case -3: {
+    		it_x = (width_remaining + padding_border) >> 1;
+    	} break;
+
+    	case -4: {
+    		it_x = (width_remaining + padding_border);
+		} break;
+
+		default: break;
+    }
+
+    /// start drawing at the bottom
+	if (layout_block->dock == LAYOUT_DOCK_BOTTOMRIGHT) {
+		if (!is_last_block OR (is_last_block AND !layout->fill_last_block)) {
+			it_y += layout->rect_remaining.h - block_height;
+		}
+	}
+
+	s32 width_avg_auto = 0;
+
+	if (widget_count_auto)
+		width_avg_auto = width_remaining / widget_count_auto;
+
+	/// align horizontal
+    FOR_ARRAY(layout_block->ap_widgets, it_block) {
+		Widget *t_widget = ARRAY_IT(layout_block->ap_widgets, it_block);
+
+		/// center widgets in block
+		s32 center_block = (t_widget->rect_box.h - block_height) >> 1;
+
+		t_widget->rect_box.x = layout->rect_remaining.x + it_x;
+		t_widget->rect_box.y = layout->rect_remaining.y + it_y - center_block;
+
+		if (layout->fill_last_block AND is_last_block)
+			t_widget->rect_box.h = layout->rect_remaining.h - padding_size;
+
+		bool found_expander = ((s64)it_block == layout_block->expand_index);
+
+		if (is_overwriting) {
+			if (found_expander) {
+				t_widget->rect_box.w = width_avg_auto;
+			}
+		}
+		else {
+			if (t_widget->setting.auto_size)
+				t_widget->rect_box.w = width_avg_auto;
+		}
+
+		if (!t_widget->rect_box.w)
+			continue;
+
+		it_x += t_widget->rect_box.w + layout_block->spacing;
+    }
+
+    /// cut of the top
+	if (layout_block->dock == LAYOUT_DOCK_TOPLEFT)
+		layout->rect_remaining.y += block_height;
+
+    layout->rect_remaining.h -= block_height;
+}
+
+/// layout_block->expand_index (widgets):
+///  0-max: expand widget with matching index
+///     -1: balanced size (with auto-size)
+///     -2: top-align (no auto-size)
+///     -3: middle-align (no auto-size)
+///     -4: bottom-align (no auto-size)
+///   else: see -1
+instant void
+Layout_ArrangeBlockY(
+	Layout *layout,
+	Layout_Block *layout_block
+) {
+	Assert(layout);
+	Assert(layout_block);
+	Assert(layout_block->type == LAYOUT_TYPE_Y);
+
+	Layout_Block *t_block_last;
+	Layout_GetLastBlock(layout, &t_block_last);
+
+	bool is_last_block = (t_block_last == layout_block);
+
+	s64 widget_count = layout_block->ap_widgets.count;
+
+	if (!widget_count)
+		return;
+
+	s32 padding_size     = layout_block->padding;
+	s32 padding_border   = layout_block->padding >> 1;
+	s32 height_remaining = layout->rect_remaining.h;
+
+	float it_x = padding_border;
+	float it_y = padding_border;
+
+	bool is_overwriting = (	    layout_block->expand_index >= -4
+							AND layout_block->expand_index != -1
+							AND layout_block->expand_index < widget_count);
+
+	s32 block_width = 0;
+	u64 widget_count_auto = widget_count;
+
+	/// pre-calc width for bottom alignment
+	FOR_ARRAY(layout_block->ap_widgets, it_block) {
+		Widget *t_widget = ARRAY_IT(layout_block->ap_widgets, it_block);
+
+		bool found_expander = ((s64)it_block == layout_block->expand_index);
+
+		block_width = MAX(block_width, t_widget->rect_box.w);
+
+		/// ignore spreader
+		if (    t_widget->type == WIDGET_SPREADER
+			AND is_overwriting
+			AND !found_expander
+		) {
+			--widget_count_auto;
+			--widget_count;
+			continue;
+		}
+
+		if (is_overwriting) {
+			if (!found_expander) {
+				height_remaining -= t_widget->rect_box.h;
+				--widget_count_auto;
+			}
+		}
+		else if (!t_widget->setting.auto_size) {
+			height_remaining -= t_widget->rect_box.h;
+			--widget_count_auto;
+		}
+	}
+
+	height_remaining -= padding_size;
+	height_remaining -= layout_block->spacing * (widget_count - 1);
+
+    block_width += padding_size;
+
+    switch (layout_block->expand_index) {
+    	case -3: {
+    		it_y = (height_remaining + padding_border) >> 1;
+    	} break;
+
+    	case -4: {
+    		it_y = (height_remaining + padding_border);
+    	} break;
+
+		default: break;
+    }
+
+    /// start drawing right
+	if (layout_block->dock == LAYOUT_DOCK_BOTTOMRIGHT) {
+		if (!is_last_block OR (is_last_block AND !layout->fill_last_block)) {
+			it_x += layout->rect_remaining.w - block_width;
+		}
+	}
+
+	s32 height_avg_auto = 0;
+
+	if (widget_count_auto)
+		height_avg_auto = height_remaining / widget_count_auto;
+
+	/// align horizontal
+    FOR_ARRAY(layout_block->ap_widgets, it_block) {
+		Widget *t_widget = ARRAY_IT(layout_block->ap_widgets, it_block);
+
+		/// center widgets in block
+		s32 center_block = (t_widget->rect_box.w - block_width) >> 1;
+
+		t_widget->rect_box.x = layout->rect_remaining.x + it_x - center_block;
+		t_widget->rect_box.y = layout->rect_remaining.y + it_y;
+
+		if (layout->fill_last_block AND is_last_block)
+			t_widget->rect_box.w = layout->rect_remaining.w - padding_size;
+
+		bool found_expander = ((s64)it_block == layout_block->expand_index);
+
+		if (is_overwriting) {
+			if (found_expander) {
+				t_widget->rect_box.h = height_avg_auto;
+			}
+		}
+		else {
+			if (t_widget->setting.auto_size)
+				t_widget->rect_box.h = height_avg_auto;
+		}
+
+		if (!t_widget->rect_box.h)
+			continue;
+
+		it_y += t_widget->rect_box.h + layout_block->spacing;
+    }
+
+    /// cut of the left
+	if (layout_block->dock == LAYOUT_DOCK_TOPLEFT)
+		layout->rect_remaining.x += block_width;
+
+    layout->rect_remaining.w -= block_width;
+}
+
+instant void
+Layout_Arrange(
+	Layout *layout
+) {
+	Assert(layout);
+
+	layout->rect_remaining = layout->rect_full;
+	Rect_AddPadding(&layout->rect_remaining, {(float)layout->padding,
+                                              (float)layout->padding,
+												(s32)layout->padding,
+                                                (s32)layout->padding});
+
+	FOR_ARRAY(layout->a_blocks, it) {
+		Layout_Block *t_block = &ARRAY_IT(layout->a_blocks, it);
+
+		if (0) {}
+		else if (t_block->type == LAYOUT_TYPE_X)
+			Layout_ArrangeBlockX(layout, t_block);
+		else if (t_block->type == LAYOUT_TYPE_Y)
+			Layout_ArrangeBlockY(layout, t_block);
+	}
 }
