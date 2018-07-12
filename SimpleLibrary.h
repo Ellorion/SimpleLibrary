@@ -7413,8 +7413,8 @@ Widget_ClearData(
 
 /// ::: LAYOUT
 /// ===========================================================================
-#define LAYOUT_BLOCK_PADDING 5
-#define LAYOUT_BLOCK_SPACING 5
+#define LAYOUT_BLOCK_PADDING 4
+#define LAYOUT_BLOCK_SPACING 2
 
 #define LAYOUT_PADDING 5
 
@@ -7535,8 +7535,11 @@ Layout_ArrangeBlockX(
 	if (!widget_count)
 		return;
 
-	s32 padding_size     = layout_block->padding;
-	s32 padding_border   = layout_block->padding >> 1;
+	s32 padding_size = layout_block->padding;
+
+	if (padding_size % 2 != 0)  ++padding_size;
+
+	s32 padding_border   = padding_size >> 1;
 	s32 width_remaining  = layout->rect_remaining.w;
 
 	float it_x = padding_border;
@@ -7613,7 +7616,7 @@ Layout_ArrangeBlockX(
 		Widget *t_widget = ARRAY_IT(layout_block->ap_widgets, it_block);
 
 		/// center widgets in block
-		s32 center_block = (t_widget->rect_box.h - block_height) >> 1;
+		s32 center_block = (t_widget->rect_box.h - (block_height - padding_size)) >> 1;
 
 		t_widget->rect_box.x = layout->rect_remaining.x + it_x;
 		t_widget->rect_box.y = layout->rect_remaining.y + it_y - center_block;
@@ -7673,7 +7676,10 @@ Layout_ArrangeBlockY(
 		return;
 
 	s32 padding_size     = layout_block->padding;
-	s32 padding_border   = layout_block->padding >> 1;
+
+	if (padding_size % 2 != 0)  ++padding_size;
+
+	s32 padding_border   = padding_size >> 1;
 	s32 height_remaining = layout->rect_remaining.h;
 
 	float it_x = padding_border;
@@ -7750,7 +7756,7 @@ Layout_ArrangeBlockY(
 		Widget *t_widget = ARRAY_IT(layout_block->ap_widgets, it_block);
 
 		/// center widgets in block
-		s32 center_block = (t_widget->rect_box.w - block_width) >> 1;
+		s32 center_block = (t_widget->rect_box.w - (block_width - padding_size)) >> 1;
 
 		t_widget->rect_box.x = layout->rect_remaining.x + it_x - center_block;
 		t_widget->rect_box.y = layout->rect_remaining.y + it_y;
