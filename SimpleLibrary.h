@@ -7560,16 +7560,6 @@ Layout_ArrangeBlockX(
 
 		block_height  = MAX(block_height, t_widget->rect_box.h);
 
-		/// ignore spreader
-		if (    t_widget->type == WIDGET_SPREADER
-			AND is_overwriting
-			AND !found_expander
-		) {
-			--widget_count_auto;
-			--widget_count;
-			continue;
-		}
-
 		if (is_overwriting) {
 			if (!found_expander) {
 				width_remaining -= t_widget->rect_box.w;
@@ -7606,10 +7596,10 @@ Layout_ArrangeBlockX(
 		}
 	}
 
-	s32 width_avg_auto = 0;
+	float width_avg_auto = 0;
 
 	if (widget_count_auto)
-		width_avg_auto = width_remaining / widget_count_auto;
+		width_avg_auto = ceil((float)width_remaining / widget_count_auto);
 
 	/// align horizontal
     FOR_ARRAY(layout_block->ap_widgets, it_block) {
@@ -7626,20 +7616,24 @@ Layout_ArrangeBlockX(
 
 		bool found_expander = ((s64)it_block == layout_block->expand_index);
 
+		float x_step = t_widget->rect_box.w;
+
 		if (is_overwriting) {
-			if (found_expander) {
-				t_widget->rect_box.w = width_avg_auto;
-			}
+			if (found_expander)
+				x_step = width_avg_auto;
 		}
 		else {
 			if (t_widget->setting.auto_size)
-				t_widget->rect_box.w = width_avg_auto;
+				x_step = width_avg_auto;
 		}
 
-		if (!t_widget->rect_box.w)
-			continue;
+		float width_limit = layout->rect_remaining.w - layout_block->spacing - it_x;
 
-		it_x += t_widget->rect_box.w + layout_block->spacing;
+		if (x_step > width_limit)
+			x_step = width_limit;
+
+		t_widget->rect_box.w = x_step;
+		it_x += x_step + layout_block->spacing;
     }
 
     /// cut of the top
@@ -7700,16 +7694,6 @@ Layout_ArrangeBlockY(
 
 		block_width = MAX(block_width, t_widget->rect_box.w);
 
-		/// ignore spreader
-		if (    t_widget->type == WIDGET_SPREADER
-			AND is_overwriting
-			AND !found_expander
-		) {
-			--widget_count_auto;
-			--widget_count;
-			continue;
-		}
-
 		if (is_overwriting) {
 			if (!found_expander) {
 				height_remaining -= t_widget->rect_box.h;
@@ -7746,10 +7730,10 @@ Layout_ArrangeBlockY(
 		}
 	}
 
-	s32 height_avg_auto = 0;
+	float height_avg_auto = 0;
 
 	if (widget_count_auto)
-		height_avg_auto = height_remaining / widget_count_auto;
+		height_avg_auto = ceil((float)height_remaining / widget_count_auto);
 
 	/// align horizontal
     FOR_ARRAY(layout_block->ap_widgets, it_block) {
@@ -7766,20 +7750,24 @@ Layout_ArrangeBlockY(
 
 		bool found_expander = ((s64)it_block == layout_block->expand_index);
 
+		float y_step = t_widget->rect_box.h;
+
 		if (is_overwriting) {
-			if (found_expander) {
-				t_widget->rect_box.h = height_avg_auto;
-			}
+			if (found_expander)
+				y_step = height_avg_auto;
 		}
 		else {
 			if (t_widget->setting.auto_size)
-				t_widget->rect_box.h = height_avg_auto;
+				y_step = height_avg_auto;
 		}
 
-		if (!t_widget->rect_box.h)
-			continue;
+		float height_limit = layout->rect_remaining.h - layout_block->spacing - it_y;
 
-		it_y += t_widget->rect_box.h + layout_block->spacing;
+		if (y_step > height_limit)
+			y_step = height_limit;
+
+		t_widget->rect_box.h = y_step;
+		it_y += y_step + layout_block->spacing;
     }
 
     /// cut of the left
@@ -7796,6 +7784,9 @@ Layout_Arrange(
 	Assert(layout);
 
 	layout->rect_remaining = layout->rect_full;
+
+	if (layout->padding % 2 != 0) ++layout->padding;
+
 	Rect_AddPadding(&layout->rect_remaining, {(float)layout->padding,
                                               (float)layout->padding,
 												(s32)layout->padding,
