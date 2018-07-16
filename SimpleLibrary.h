@@ -713,7 +713,7 @@
 //	Widget w_button_top_2    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "top_2");
 //	Widget w_button_top_3    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "top_3");
 //	Widget w_button_center_1 = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "center_1");
-//	Widget w_spreader        = Widget_CreateSpreader();
+//	Widget w_spreader        = Widget_CreateSpreader(window);
 //	Widget w_numpic          = Widget_CreateNumberPicker(window, &font_20, {0, 0, 100, 30}, {0, 5, 3, 1});
 //
 //	w_button_top_2.layout_data.auto_width = false;
@@ -934,6 +934,31 @@ struct Tuple {
 	K first;
 	L second;
 };
+
+bool
+operator != (
+	Point p1,
+	Point p2
+) {
+	if (p1.x != p2.x OR p1.y != p2.y)
+		return true;
+
+	return false;
+}
+
+bool
+operator < (
+	Point p1,
+	Point p2
+) {
+	if (p1.x < p2.x AND p1.y <= p2.y)
+		return true;
+
+	if (p1.x <= p2.x AND p1.y < p2.y)
+		return true;
+
+	return false;
+}
 
 template<typename K, typename L>
 bool
@@ -5316,8 +5341,9 @@ struct Mouse {
 	s32  wheel = 0;
 	bool double_click[MOUSE_BUTTON_COUNT];
 
-	bool is_up;
-	bool is_down;
+	bool is_up        = false;
+	bool is_down      = false;
+	bool is_moving    = false;
 };
 
 instant void
@@ -5368,8 +5394,9 @@ Mouse_Reset(
 		mouse->up[it]   = false;
 	}
 
-	mouse->is_up   = false;
-	mouse->is_down = false;
+	mouse->is_up        = false;
+	mouse->is_down      = false;
+	mouse->is_moving    = false;
 
 	mouse->point_relative = {};
 }
@@ -5449,6 +5476,7 @@ Mouse_Update(
 	Mouse_Reset(mouse);
 
 	if (window AND msg->message == WM_MOUSEMOVE) {
+		mouse->is_moving = true;
 		Mouse_GetPosition(mouse, window);
 		return true;
 	}
@@ -6046,7 +6074,7 @@ Codepoint_GetData(
 }
 
 instant void
-Codepoint_GetPosition(
+Codepoint_GetPositionNext(
 	Codepoint *codepoint,
 	RectF *rect
 ) {
@@ -6148,6 +6176,22 @@ struct Text_Line {
 	String s_data;
 };
 
+struct Text_Cursor {
+	Point point_select_start = {};
+	Point point_select_end   = {};
+
+	Color32 color_cursor = {0.0f, 0.0f, 0.0f, 1.0f};
+	Color32 color_select = {0.5f, 0.5f, 1.0f, 1.0f};
+
+	u32 blink_inverval_ms = 500;
+	Timer timer_blinking;
+	bool is_blink_on = false;
+
+	Vertex vertex_select;
+	Vertex vertex_cursor;
+};
+
+
 struct Text {
 	ShaderSet *shader_set = 0;
 	Font *font = 0;
@@ -6160,9 +6204,13 @@ struct Text {
 	float x_offset = 0;
 	float y_offset = 0;
 
+	bool is_editable = false;
+
+	Text_Cursor cursor;
+
 	Array<String>    as_words;
 	Array<Text_Line> a_text_lines;
-	Array<Vertex>    a_vertex;
+	Array<Vertex>    a_vertex_chars;
 };
 
 instant Text
@@ -6314,8 +6362,114 @@ Text_BuildLinesStatic(
 }
 
 instant void
+Text_Cursor_SetSelection(
+	Text *text,
+	Point point_start,
+	Point point_end
+) {
+	bool is_adding_selection = false;
+	bool found_start  = false;
+	bool found_end    = false;
+	bool found_cursor = false;
+
+	Rect rect = text->rect;
+	Rect_AddPadding(&rect, text->rect_padding);
+
+	Text_Cursor *cursor = &text->cursor;
+
+	u64 width_max = rect.w;
+	Rect rect_position = {rect.x, rect.y, 0, Font_GetLineHeight(text->font)};
+
+	if (!text->is_editable)
+		return;
+
+	if (!Rect_IsIntersecting(&point_start, &rect))
+		return;
+
+	if (!Rect_IsIntersecting(&point_end, &rect))
+		return;
+
+	if (!cursor->vertex_select.array_id)
+		cursor->vertex_select = Vertex_Create();
+
+	Vertex_ClearAttributes(&cursor->vertex_select);
+
+	Codepoint codepoint_space;
+	Codepoint_GetData(text->font, ' ', &codepoint_space);
+
+	FOR_ARRAY(text->a_text_lines, it_line) {
+		Text_Line *t_text_line = &ARRAY_IT(text->a_text_lines, it_line);
+
+		u64 it_data = 0;
+		u64 x_align_offset = 0;
+
+		if (     text->align_x == TEXT_ALIGN_X_MIDDLE)
+			x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
+		else if (text->align_x == TEXT_ALIGN_X_RIGHT)
+			x_align_offset = (width_max - t_text_line->width_pixel);
+
+		bool is_line_end = false;
+		bool added_line_end = false;
+
+		while(it_data < t_text_line->s_data.length) {
+			Codepoint codepoint;
+
+			s8 ch = t_text_line->s_data.value[it_data];
+
+			Codepoint_GetData(text->font, ch, &codepoint);
+			rect_position.w = codepoint.advance;
+
+			/// makes line-breaks selectable
+			if ((ch == '\r' OR ch == '\n')) {
+				rect_position.w = width_max - (rect_position.w - rect_position.x);
+				is_line_end = true;
+			}
+
+			if (!found_start AND Rect_IsIntersecting(&point_start, &rect_position)) {
+				found_start = true;
+			}
+
+			if (!found_end AND Rect_IsIntersecting(&point_end, &rect_position)) {
+				found_end = true;
+			}
+
+			if ((found_start AND !found_end) OR (!found_start AND found_end)) {
+				if (is_line_end) {
+					/// do not show multible ' ' in case of '\r\n'
+					rect_position.w = (added_line_end ? 0 : codepoint_space.advance);
+					added_line_end = true;
+				}
+
+				Vertex_AddRect32(&cursor->vertex_select, rect_position, cursor->color_select);
+			}
+
+			if (found_end AND !found_cursor) {
+				if (!cursor->vertex_cursor.array_id)
+					cursor->vertex_cursor = Vertex_Create();
+
+				Vertex_ClearAttributes(&cursor->vertex_cursor);
+
+				Rect rect_cursor = rect_position;
+				rect_cursor.w = 2;
+
+				Vertex_AddRect32(&cursor->vertex_cursor, rect_cursor, cursor->color_cursor);
+
+				found_cursor = true;
+			}
+
+			++it_data;
+
+			rect_position.x += rect_position.w;
+		}
+
+		rect_position.x  = rect.x;
+		rect_position.y += rect_position.h;
+	}
+}
+
+instant void
 Text_AddLines(
-	Array<Vertex> *a_vertex,
+	Array<Vertex> *a_vertex_chars,
 	ShaderSet *shader_set,
 	Font *font,
 	Rect rect,
@@ -6324,16 +6478,26 @@ Text_AddLines(
 	Array<Text_Line> *a_text_lines,
 	TEXT_ALIGN_X_TYPE align_x,
 	float x_offset,
-	float y_offset
+	float y_offset,
+	bool is_editable,
+	Text_Cursor *cursor
 ) {
 	Assert(shader_set);
 	Assert(font);
 	Assert(a_text_lines);
+	Assert(!is_editable OR (is_editable AND cursor));
 
 	Rect_AddPadding(&rect, rect_padding);
 
 	u64 width_max = rect.w;
 	RectF rect_position = {rect.x, 0, 0, rect.y};
+
+	bool has_cursor = (is_editable AND cursor);
+
+	if (has_cursor)
+		Vertex_ClearAttributes(&cursor->vertex_select);
+
+	u64 it_index = 0;
 
 	FOR_ARRAY(*a_text_lines, it_line) {
 		Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
@@ -6346,20 +6510,20 @@ Text_AddLines(
 			s8 ch = t_text_line->s_data.value[it_data];
 
 			Codepoint_GetData(font, ch, &codepoint);
-			Codepoint_GetPosition(&codepoint, &rect_position);
+			Codepoint_GetPositionNext(&codepoint, &rect_position);
+
+			u64 x_align_offset = 0;
+
+			if (0) {}
+			else if (align_x == TEXT_ALIGN_X_MIDDLE)
+				x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
+			else if (align_x == TEXT_ALIGN_X_RIGHT)
+				x_align_offset = (width_max - t_text_line->width_pixel);
 
 			/// for unavailable characters like ' '
 			if (!Texture_IsEmpty(&codepoint.texture)) {
 				Vertex *t_vertex;
-				Vertex_FindOrAdd(a_vertex, &codepoint.texture, &t_vertex);
-
-				u64 x_align_offset = 0;
-
-				if (0) {}
-				else if (align_x == TEXT_ALIGN_X_MIDDLE)
-					x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
-				else if (align_x == TEXT_ALIGN_X_RIGHT)
-					x_align_offset = (width_max - t_text_line->width_pixel);
+				Vertex_FindOrAdd(a_vertex_chars, &codepoint.texture, &t_vertex);
 
 				Vertex_Buffer<float> *t_attribute;
 
@@ -6373,7 +6537,25 @@ Text_AddLines(
 				Array_Add(&t_attribute->a_buffer, color.b);
 			}
 
+//			if (has_cursor) {
+//				Rect rect_select;
+//				rect_select.x = x_offset + rect_position.x - codepoint.left_side_bearing + x_align_offset;
+//				rect_select.y = y_offset + rect_position.y - codepoint.rect_subpixel.y - codepoint.font->size - codepoint.font->descent;
+//				rect_select.w = codepoint.advance;
+//				rect_select.h = codepoint.font->size;
+//
+//				if (!cursor->vertex_select.array_id)
+//					cursor->vertex_select = Vertex_Create();
+//
+//				if (    it_index >= cursor->index_select_start
+//					AND it_index <  cursor->index_select_end
+//				) {
+//					Vertex_AddRect32(&cursor->vertex_select, rect_select, cursor->color_select);
+//				}
+//			}
+
 			++it_data;
+			++it_index;
 		}
 
 		Codepoint_SetNewline(font, &rect_position, rect.x);
@@ -6386,7 +6568,7 @@ Text_AddLines(
 ) {
 	Assert(text);
 
-	Text_AddLines( &text->a_vertex,
+	Text_AddLines( &text->a_vertex_chars,
 					text->shader_set,
 					text->font,
 					text->rect,
@@ -6395,7 +6577,9 @@ Text_AddLines(
 				   &text->a_text_lines,
 					text->align_x,
 					text->x_offset,
-					text->y_offset);
+					text->y_offset,
+					text->is_editable,
+				   &text->cursor);
 }
 
 instant void
@@ -6404,7 +6588,7 @@ Text_Clear(
 ) {
 	Assert(text);
 
-	Vertex_ClearAttributes(&text->a_vertex);
+	Vertex_ClearAttributes(&text->a_vertex_chars);
 }
 
 instant void
@@ -6413,7 +6597,7 @@ Text_RenderLines(
 ) {
 	Assert(text);
 
-	Vertex_Render(text->shader_set, &text->a_vertex);
+	Vertex_Render(text->shader_set, &text->a_vertex_chars);
 }
 
 ///@Hint: single row
@@ -6441,7 +6625,24 @@ Text_Render(
 		text->s_data.changed = false;
 	}
 
-	Vertex_Render(text->shader_set, &text->a_vertex);
+	if (text->is_editable AND text->cursor.vertex_select.a_attributes.count) {
+		ShaderSet_Use(text->shader_set, SHADER_PROG_RECT);
+		Rect_Render(text->shader_set, &text->cursor.vertex_select);
+	}
+
+	if (text->is_editable AND text->cursor.vertex_cursor.a_attributes.count) {
+		if (Time_HasElapsed(&text->cursor.timer_blinking, text->cursor.blink_inverval_ms)) {
+			text->cursor.is_blink_on = !text->cursor.is_blink_on;
+		}
+
+		if (text->cursor.is_blink_on) {
+			ShaderSet_Use(text->shader_set, SHADER_PROG_RECT);
+			Rect_Render(text->shader_set, &text->cursor.vertex_cursor);
+		}
+	}
+
+	ShaderSet_Use(text->shader_set, SHADER_PROG_TEXT);
+	Vertex_Render(text->shader_set, &text->a_vertex_chars);
 
 	OpenGL_Scissor_Disable();
 }
@@ -6905,7 +7106,8 @@ enum WIDGET_TYPE {
 	WIDGET_CHECKBOX,
 	WIDGET_PICTUREBOX,
 	WIDGET_SPREADER,
-	WIDGET_NUMBERPICKER
+	WIDGET_NUMBERPICKER,
+	WIDGET_TEXTBOX
 };
 
 enum WIDGET_SCROLL_TYPE {
@@ -6922,11 +7124,13 @@ struct Widget_Slide {
 
 struct Widget_Settings {
 	Color32 color_background       = Color_MakeGrey(0.9f);
-	Color32 color_outline          = {0   , 0   , 1.0f, 1};
-	Color32 color_outline_selected = {1.0f, 0.0f, 0.0f, 1};
-	Color32 color_outline_inactive = {0.5f, 0.5f, 1   , 1};
-	Color32 color_font             = {0   , 0   , 0   , 1};
-	Color32 color_progress         = {0.2f, 0.2f, 0.6f, 1};
+	Color32 color_outline          = {0.0f, 0.0f, 1.0f, 1.0f};
+	Color32 color_outline_selected = {1.0f, 0.0f, 0.0f, 1.0f};
+	Color32 color_outline_inactive = {0.5f, 0.5f, 1.0f, 1.0f};
+	Color32 color_font             = {0.0f, 0.0f, 0.0f, 1.0f};
+	Color32 color_progress         = {0.2f, 0.2f, 0.6f, 1.0f};
+	Color32 color_text_select      = {0.5f, 0.5f, 1.0f, 1.0f};
+	Color32 color_text_cursor      = {0.0f, 0.0f, 0.0f, 1.0f};
 
 	u32  border_size   = 0;
 	u32  spacing       = 1;
@@ -7022,6 +7226,7 @@ Widget_Redraw(
 		case WIDGET_SPREADER: {
 		} break;
 
+		case WIDGET_TEXTBOX:
 		case WIDGET_LABEL:
 		case WIDGET_LISTBOX: {
 			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
@@ -7159,7 +7364,6 @@ Widget_Render(
 		}
 
 		if (widget->text.s_data.length) {
-			ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
 			Text_Render(&widget->text);
 		}
 
@@ -7526,6 +7730,7 @@ Widget_UpdateInput(
 	Widget *widget
 ) {
 	Assert(widget);
+	Assert(widget->window);
 
     Keyboard *keyboard = widget->window->keyboard;
     Mouse    *mouse    = widget->window->mouse;
@@ -7545,34 +7750,64 @@ Widget_UpdateInput(
 
     bool redraw_required = false;
 
-    if (!widget->setting.is_focusable)
+	if (!widget->setting.is_focusable)
 		return;
 
 	bool got_focus = widget->has_focus;
 	u64  prev_active_row = widget->active_row_id;
+
+	bool has_text_cursor = widget->text.is_editable;
 
 	bool is_scrollable_list = widget->setting.is_scrollable_list;
 
     if (mouse) {
 		bool is_hovering = Mouse_IsHovering(mouse, widget);
 
+		if (has_text_cursor AND is_hovering) {
+			if (mouse->pressing[0]) {
+				if (mouse->is_down) {
+					widget->text.cursor.point_select_start = mouse->point;
+					widget->text.cursor.point_select_end   = mouse->point;
+
+					Vertex_ClearAttributes(&widget->text.cursor.vertex_select);
+				}
+				else {
+					widget->text.cursor.point_select_end = mouse->point;
+
+					Text_Cursor_SetSelection(&widget->text,
+											  widget->text.cursor.point_select_start,
+											  widget->text.cursor.point_select_end);
+				}
+			}
+
+//			if (mouse->is_up) {
+//				Text_Cursor_SetSelection(&widget->text,
+//												  widget->text.cursor.point_select_start,
+//												  widget->text.cursor.point_select_end);
+//			}
+		}
+
 		if (mouse->up[0]) {
 			got_focus = is_hovering;
 
+			/// listbox entry selection
 			if (is_scrollable_list)
 				widget->active_row_id = Widget_CalcActiveRowID(widget, mouse);
 
+			/// checkbox toggle
 			if (got_focus) {
 				widget->is_checked = !widget->is_checked;
 				redraw_required = true;
 			}
 
+			/// focus change
 			if (widget->has_focus != got_focus) {
 				widget->has_focus = got_focus;
 				redraw_required = true;
 			}
 		}
 
+		/// list scrolling
 		if (is_hovering AND is_scrollable_list) {
 			widget->text.y_offset += mouse->wheel;
 			Widget_ClampTextOffset(widget);
@@ -7892,10 +8127,14 @@ Widget_CreatePictureBox(
 
 instant Widget
 Widget_CreateSpreader(
+	Window *window
 ) {
+	Assert(window);
+
 	Widget t_widget;
 
     t_widget.type = WIDGET_SPREADER;
+    t_widget.window = window;
 
     t_widget.setting.is_focusable = false;
 
@@ -7988,10 +8227,10 @@ Widget_CreateNumberPicker(
 
 	t_widget.setting.is_focusable = false;
 
-	Widget w_label = Widget_CreateLabel(window, font, {0, 0, 50, 24});
+	Widget w_label       = Widget_CreateLabel( window, font, {0, 0, 50, 24});
 	Widget w_button_up   = Widget_CreateButton(window, font, {0, 0, 24, 24}, "<");
 	Widget w_button_down = Widget_CreateButton(window, font, {0, 0, 24, 24}, ">");
-	Widget w_spreader    = Widget_CreateSpreader();
+	Widget w_spreader    = Widget_CreateSpreader(window);
 
 	w_button_up.OwnerDraw   = Widget_RedrawNumberPickerButton;
 	w_button_down.OwnerDraw = Widget_RedrawNumberPickerButton;
