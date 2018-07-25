@@ -6490,6 +6490,15 @@ Text_AddLines(
 	Rect_AddPadding(&rect, rect_padding);
 
 	u64 width_max = rect.w;
+
+	if (!width_max) {
+		FOR_ARRAY(*a_text_lines, it_line) {
+			Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
+
+			width_max = MAX(width_max, t_text_line->width_pixel);
+		}
+	}
+
 	RectF rect_position = {rect.x, 0, 0, rect.y};
 
 	bool has_cursor = (is_editable AND cursor);
@@ -6514,8 +6523,7 @@ Text_AddLines(
 
 			u64 x_align_offset = 0;
 
-			if (0) {}
-			else if (align_x == TEXT_ALIGN_X_MIDDLE)
+			if (     align_x == TEXT_ALIGN_X_MIDDLE)
 				x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
 			else if (align_x == TEXT_ALIGN_X_RIGHT)
 				x_align_offset = (width_max - t_text_line->width_pixel);
@@ -6607,17 +6615,21 @@ Text_Render(
 ) {
 	Assert(text);
 
-	OpenGL_Scissor(text->shader_set->window, text->rect);
+	bool is_fixed_size = (text->rect.w OR text->rect.h);
+
+	if (is_fixed_size)
+		OpenGL_Scissor(text->shader_set->window, text->rect);
 
 	if (Text_HasChanged(text)) {
 		String_SplitWordsStatic(&text->s_data, &text->as_words);
 		s32 text_height = Text_BuildLinesStatic(text, &text->as_words, &text->a_text_lines);
 
-		if (0) {}
-		else if (text->align_y == TEXT_ALIGN_Y_CENTER)
-			text->y_offset = (text->rect.h - text_height) >> 1;
-		else if (text->align_y == TEXT_ALIGN_Y_BOTTOM)
-			text->y_offset = (text->rect.h - text_height);
+		if (text->rect.h) {
+			if (     text->align_y == TEXT_ALIGN_Y_CENTER)
+				text->y_offset = (text->rect.h - text_height) >> 1;
+			else if (text->align_y == TEXT_ALIGN_Y_BOTTOM)
+				text->y_offset = (text->rect.h - text_height);
+		}
 
 		Text_Clear(text);
 		Text_AddLines(text);
@@ -6644,7 +6656,8 @@ Text_Render(
 	ShaderSet_Use(text->shader_set, SHADER_PROG_TEXT);
 	Vertex_Render(text->shader_set, &text->a_vertex_chars);
 
-	OpenGL_Scissor_Disable();
+	if (is_fixed_size)
+		OpenGL_Scissor_Disable();
 }
 
 instant void
