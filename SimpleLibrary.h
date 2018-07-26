@@ -6378,6 +6378,15 @@ Text_Cursor_SetSelection(
 	Text_Cursor *cursor = &text->cursor;
 
 	u64 width_max = rect.w;
+
+	if (!width_max) {
+		FOR_ARRAY(text->a_text_lines, it_line) {
+			Text_Line *t_text_line = &ARRAY_IT(text->a_text_lines, it_line);
+
+			width_max = MAX(width_max, t_text_line->width_pixel);
+		}
+	}
+
 	Rect rect_position = {rect.x, rect.y, 0, Font_GetLineHeight(text->font)};
 
 	if (!text->is_editable)
@@ -6403,12 +6412,16 @@ Text_Cursor_SetSelection(
 		u64 it_data = 0;
 		u64 x_align_offset = 0;
 
-		if (     text->align_x == TEXT_ALIGN_X_MIDDLE)
-			x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
-		else if (text->align_x == TEXT_ALIGN_X_RIGHT)
-			x_align_offset = (width_max - t_text_line->width_pixel);
+		if (width_max > t_text_line->width_pixel) {
+			if (     text->align_x == TEXT_ALIGN_X_MIDDLE)
+				x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
+			else if (text->align_x == TEXT_ALIGN_X_RIGHT)
+				x_align_offset = (width_max - t_text_line->width_pixel);
+		}
 
-		bool is_line_end = false;
+		rect_position.x += x_align_offset;
+
+		bool is_line_end    = false;
 		bool added_line_end = false;
 
 		while(it_data < t_text_line->s_data.length) {
@@ -6469,25 +6482,17 @@ Text_Cursor_SetSelection(
 
 instant void
 Text_AddLines(
-	Array<Vertex> *a_vertex_chars,
-	ShaderSet *shader_set,
-	Font *font,
-	Rect rect,
-	Rect rect_padding,
-	Color32 color,
-	Array<Text_Line> *a_text_lines,
-	TEXT_ALIGN_X_TYPE align_x,
-	float x_offset,
-	float y_offset,
-	bool is_editable,
-	Text_Cursor *cursor
+	Text *text,
+	Array<Vertex>    *a_vertex_chars,
+	Array<Text_Line> *a_text_lines
 ) {
-	Assert(shader_set);
-	Assert(font);
+	Assert(text->shader_set);
+	Assert(text->font);
 	Assert(a_text_lines);
-	Assert(!is_editable OR (is_editable AND cursor));
 
-	Rect_AddPadding(&rect, rect_padding);
+	Rect rect = text->rect;
+
+	Rect_AddPadding(&rect, text->rect_padding);
 
 	u64 width_max = rect.w;
 
@@ -6501,10 +6506,10 @@ Text_AddLines(
 
 	RectF rect_position = {rect.x, 0, 0, rect.y};
 
-	bool has_cursor = (is_editable AND cursor);
+	bool has_cursor = text->is_editable;
 
 	if (has_cursor)
-		Vertex_ClearAttributes(&cursor->vertex_select);
+		Vertex_ClearAttributes(&text->cursor.vertex_select);
 
 	u64 it_index = 0;
 
@@ -6518,15 +6523,17 @@ Text_AddLines(
 
 			s8 ch = t_text_line->s_data.value[it_data];
 
-			Codepoint_GetData(font, ch, &codepoint);
+			Codepoint_GetData(text->font, ch, &codepoint);
 			Codepoint_GetPositionNext(&codepoint, &rect_position);
 
 			u64 x_align_offset = 0;
 
-			if (     align_x == TEXT_ALIGN_X_MIDDLE)
-				x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
-			else if (align_x == TEXT_ALIGN_X_RIGHT)
-				x_align_offset = (width_max - t_text_line->width_pixel);
+			if (width_max > t_text_line->width_pixel) {
+				if (     text->align_x == TEXT_ALIGN_X_MIDDLE)
+					x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
+				else if (text->align_x == TEXT_ALIGN_X_RIGHT)
+					x_align_offset = (width_max - t_text_line->width_pixel);
+			}
 
 			/// for unavailable characters like ' '
 			if (!Texture_IsEmpty(&codepoint.texture)) {
@@ -6536,37 +6543,20 @@ Text_AddLines(
 				Vertex_Buffer<float> *t_attribute;
 
 				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, x_offset + rect_position.x + x_align_offset);
-				Array_Add(&t_attribute->a_buffer, y_offset + rect_position.y);
+				Array_Add(&t_attribute->a_buffer, text->x_offset + rect_position.x + x_align_offset);
+				Array_Add(&t_attribute->a_buffer, text->y_offset + rect_position.y);
 
 				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, color.r);
-				Array_Add(&t_attribute->a_buffer, color.g);
-				Array_Add(&t_attribute->a_buffer, color.b);
+				Array_Add(&t_attribute->a_buffer, text->color.r);
+				Array_Add(&t_attribute->a_buffer, text->color.g);
+				Array_Add(&t_attribute->a_buffer, text->color.b);
 			}
-
-//			if (has_cursor) {
-//				Rect rect_select;
-//				rect_select.x = x_offset + rect_position.x - codepoint.left_side_bearing + x_align_offset;
-//				rect_select.y = y_offset + rect_position.y - codepoint.rect_subpixel.y - codepoint.font->size - codepoint.font->descent;
-//				rect_select.w = codepoint.advance;
-//				rect_select.h = codepoint.font->size;
-//
-//				if (!cursor->vertex_select.array_id)
-//					cursor->vertex_select = Vertex_Create();
-//
-//				if (    it_index >= cursor->index_select_start
-//					AND it_index <  cursor->index_select_end
-//				) {
-//					Vertex_AddRect32(&cursor->vertex_select, rect_select, cursor->color_select);
-//				}
-//			}
 
 			++it_data;
 			++it_index;
 		}
 
-		Codepoint_SetNewline(font, &rect_position, rect.x);
+		Codepoint_SetNewline(text->font, &rect_position, rect.x);
 	}
 }
 
@@ -6576,18 +6566,7 @@ Text_AddLines(
 ) {
 	Assert(text);
 
-	Text_AddLines( &text->a_vertex_chars,
-					text->shader_set,
-					text->font,
-					text->rect,
-					text->rect_padding,
-					text->color,
-				   &text->a_text_lines,
-					text->align_x,
-					text->x_offset,
-					text->y_offset,
-					text->is_editable,
-				   &text->cursor);
+	Text_AddLines(text, &text->a_vertex_chars, &text->a_text_lines);
 }
 
 instant void
@@ -6608,7 +6587,6 @@ Text_RenderLines(
 	Vertex_Render(text->shader_set, &text->a_vertex_chars);
 }
 
-///@Hint: single row
 instant void
 Text_Render(
 	Text *text
@@ -6620,6 +6598,7 @@ Text_Render(
 	if (is_fixed_size)
 		OpenGL_Scissor(text->shader_set->window, text->rect);
 
+	/// redraw text
 	if (Text_HasChanged(text)) {
 		String_SplitWordsStatic(&text->s_data, &text->as_words);
 		s32 text_height = Text_BuildLinesStatic(text, &text->as_words, &text->a_text_lines);
@@ -6637,11 +6616,13 @@ Text_Render(
 		text->s_data.changed = false;
 	}
 
+	/// redraw selection
 	if (text->is_editable AND text->cursor.vertex_select.a_attributes.count) {
 		ShaderSet_Use(text->shader_set, SHADER_PROG_RECT);
 		Rect_Render(text->shader_set, &text->cursor.vertex_select);
 	}
 
+	/// redraw cursor
 	if (text->is_editable AND text->cursor.vertex_cursor.a_attributes.count) {
 		if (Time_HasElapsed(&text->cursor.timer_blinking, text->cursor.blink_inverval_ms)) {
 			text->cursor.is_blink_on = !text->cursor.is_blink_on;
@@ -6653,6 +6634,7 @@ Text_Render(
 		}
 	}
 
+	/// redraw last computed text
 	ShaderSet_Use(text->shader_set, SHADER_PROG_TEXT);
 	Vertex_Render(text->shader_set, &text->a_vertex_chars);
 
