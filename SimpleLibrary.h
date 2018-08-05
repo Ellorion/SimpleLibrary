@@ -1589,6 +1589,8 @@ String_Destroy(
 
 	Memory_Free(s_data->value);
 	*s_data = {};
+
+	s_data->changed = true;
 }
 
 instant void
@@ -2078,8 +2080,7 @@ String_Reverse(
 
 instant void
 String_TrimLeft(
-	String *s_data,
-	bool move_pointer = true
+	String *s_data
 ) {
 	Assert(s_data);
 
@@ -2092,10 +2093,7 @@ String_TrimLeft(
 		else												   break;
     }
 
-    if (move_pointer) {
-		s_data->value  += length;
-		s_data->length -= length;
-    }
+    Memory_Copy(s_data->value, s_data->value + length, s_data->length - length);
 
     s_data->changed = true;
 }
@@ -2106,16 +2104,16 @@ String_TrimRight(
 ) {
 	Assert(s_data);
 
-	u64 length = s_data->length - 1;
+	u64 length = s_data->length;
 
     while(length > 0) {
-		if (s_data->value[length] <= 32 AND s_data->value[length] != 127)
+		if (s_data->value[length - 1] <= 32 AND s_data->value[length - 1] != 127)
 			--length;
 		else
 			break;
     }
 
-    s_data->length = length + 1;
+    s_data->length = length;
 
     s_data->changed = true;
 }
@@ -2128,7 +2126,8 @@ String_Remove(
 ) {
 	Assert(s_data);
 
-	if (index_start == index_end)    return 0;
+	if (index_start == index_end)
+		return 0;
 
 	if (index_start > index_end)
 		Swap(&index_start, &index_end);
@@ -2229,6 +2228,32 @@ String_Insert(
 	s_data->changed = true;
 
 	return length;
+}
+
+instant void
+String_Cut(
+	String *s_data,
+	const char *c_start,
+	const char *c_end
+) {
+	Assert(s_data);
+
+	s64 start = 0, end = 0;
+	u64 len_end = String_Length(c_end);
+
+	while (true) {
+		start = String_IndexOf(s_data, c_start);
+
+		if (start < 0)
+			break;
+
+		end = String_IndexOf(s_data, c_end, start);
+
+		if (end > start)
+			String_Remove(s_data, start, end + len_end);
+		else
+			break;
+	}
 }
 
 instant char *
@@ -3310,6 +3335,64 @@ File_ReadDirectory(
 
 	Memory_Free(c_search_path);
 	String_Destroy(&s_search_path);
+}
+
+instant void
+File_Rename(
+	const char *c_path,
+	u64 c_length_path,
+	const char *c_filename_old,
+	u64 c_length_file_old,
+	const char *c_filename_new,
+	u64 c_length_file_new
+) {
+	if (!c_length_path)
+		c_length_path = String_Length(c_path);
+
+	if (!c_length_file_old)
+		c_length_file_old = String_Length(c_filename_old);
+
+	if (!c_length_file_new)
+		c_length_file_new = String_Length(c_filename_new);
+
+	String s_file_old;
+	String_Append(&s_file_old, c_path, c_length_path);
+	String_Append(&s_file_old, "/", 1);
+	String_Append(&s_file_old, c_filename_old, c_length_file_old);
+
+	String s_file_new;
+	String_Append(&s_file_new, c_path, c_length_path);
+	String_Append(&s_file_new, "/", 1);
+	String_Append(&s_file_new, c_filename_new, c_length_file_new);
+
+	String_Destroy(&s_file_old);
+	String_Destroy(&s_file_new);
+
+	char *tc_file_old = String_CreateCBufferCopy(&s_file_old);
+	char *tc_file_new = String_CreateCBufferCopy(&s_file_new);
+
+//	LOG_DEBUG(tc_file_new + c_length_path + 1 << " - " << tc_file_old + c_length_path + 1);
+	MoveFile(tc_file_old, tc_file_new);
+
+	Memory_Free(tc_file_old);
+	Memory_Free(tc_file_new);
+}
+
+instant String
+File_GetExtension(
+	String *s_data
+) {
+	String s_result;
+
+	s64 pos_ext = String_IndexOfRev(s_data, ".");
+
+	if (!pos_ext) {
+		return s_result;
+	}
+
+	String_Copy(&s_result, s_data->value + pos_ext, s_data->length - pos_ext);
+
+	return s_result;
 }
 
 /// ::: Windows (OpenGL)
@@ -6220,6 +6303,7 @@ struct Text_Cursor {
 	u32 blink_inverval_ms = 500;
 	Timer timer_blinking;
 	bool is_blink_on = false;
+	bool show_cursor = false;
 
 	Vertex vertex_select;
 	Vertex vertex_cursor;
@@ -6418,10 +6502,12 @@ Text_Cursor_SetSelection(
 	bool found_end    = false;
 	bool found_cursor = false;
 
-	Rect rect = text->settings.rect;
-	Rect_AddPadding(&rect, text->settings.rect_padding);
+	const s32 width_cursor = 2;
 
 	Text_Cursor *cursor = &text->cursor;
+
+	Rect rect = text->settings.rect;
+	Rect_AddPadding(&rect, text->settings.rect_padding);
 
 	u64 width_max = rect.w;
 
@@ -6438,11 +6524,15 @@ Text_Cursor_SetSelection(
 	if (!text->settings.is_editable)
 		return;
 
-	if (!Rect_IsIntersecting(&point_start, &rect))
-		return;
+	/// pass through checking to display calc.
+	/// starting cursor position at the end
+	if (text->a_text_lines.count) {
+		if (!Rect_IsIntersecting(&point_start, &rect))
+			return;
 
-	if (!Rect_IsIntersecting(&point_end, &rect))
-		return;
+		if (!Rect_IsIntersecting(&point_end, &rect))
+			return;
+	}
 
 	if (!cursor->vertex_select.array_id)
 		cursor->vertex_select = Vertex_Create();
@@ -6451,6 +6541,8 @@ Text_Cursor_SetSelection(
 
 	Codepoint codepoint_space;
 	Codepoint_GetData(text->font, ' ', &codepoint_space);
+
+	Rect rect_position_last = rect_position;
 
 	FOR_ARRAY(text->a_text_lines, it_line) {
 		Text_Line *t_text_line = &ARRAY_IT(text->a_text_lines, it_line);
@@ -6509,7 +6601,7 @@ Text_Cursor_SetSelection(
 				Vertex_ClearAttributes(&cursor->vertex_cursor);
 
 				Rect rect_cursor = rect_position;
-				rect_cursor.w = 2;
+				rect_cursor.w = width_cursor;
 
 				Vertex_AddRect32(&cursor->vertex_cursor, rect_cursor, cursor->color_cursor);
 
@@ -6519,10 +6611,25 @@ Text_Cursor_SetSelection(
 			++it_data;
 
 			rect_position.x += rect_position.w;
+
+			rect_position_last = rect_position;
 		}
 
 		rect_position.x  = rect.x;
 		rect_position.y += rect_position.h;
+	}
+
+	/// render starting or truncated cursor position
+	if (!found_cursor) {
+		if (!cursor->vertex_cursor.array_id)
+			cursor->vertex_cursor = Vertex_Create();
+
+		Vertex_ClearAttributes(&cursor->vertex_cursor);
+
+		Rect rect_cursor = rect_position_last;
+		rect_cursor.w = width_cursor;
+
+		Vertex_AddRect32(&cursor->vertex_cursor, rect_cursor, cursor->color_cursor);
 	}
 }
 
@@ -6656,9 +6763,6 @@ Text_Render(
 				text->settings.rect_content.y = (text->settings.rect.h - text_height);
 		}
 
-		text->s_data.changed = false;
-		text->settings_prev = text->settings;
-
 		text->settings.rect_content.h = text_height;
 
 		if (text->settings.use_word_wrap) {
@@ -6679,7 +6783,12 @@ Text_Render(
 		Text_Clear(text);
 		Text_AddLines(text);
 
+		Text_Cursor_SetSelection(text, text->cursor.point_select_start, text->cursor.point_select_end);
+
 		Rect_Clamp(&text->settings.rect_content, text->settings.rect);
+
+		text->s_data.changed = false;
+		text->settings_prev = text->settings;
 	}
 
 	/// redraw selection
@@ -6689,7 +6798,7 @@ Text_Render(
 	}
 
 	/// redraw cursor
-	if (text->settings.is_editable AND text->cursor.vertex_cursor.a_attributes.count) {
+	if (text->cursor.show_cursor AND text->settings.is_editable AND text->cursor.vertex_cursor.a_attributes.count) {
 		if (Time_HasElapsed(&text->cursor.timer_blinking, text->cursor.blink_inverval_ms)) {
 			text->cursor.is_blink_on = !text->cursor.is_blink_on;
 		}
@@ -6700,9 +6809,11 @@ Text_Render(
 		}
 	}
 
-	/// redraw last computed text
-	ShaderSet_Use(text->shader_set, SHADER_PROG_TEXT);
-	Vertex_Render(text->shader_set, &text->a_vertex_chars);
+	if (text->a_vertex_chars.count) {
+		/// redraw last computed text
+		ShaderSet_Use(text->shader_set, SHADER_PROG_TEXT);
+		Vertex_Render(text->shader_set, &text->a_vertex_chars);
+	}
 
 	if (is_fixed_size)
 		OpenGL_Scissor_Disable();
@@ -7289,13 +7400,31 @@ Widget_Redraw(
 		case WIDGET_SPREADER: {
 		} break;
 
-		case WIDGET_TEXTBOX:
+		case WIDGET_TEXTBOX: {
+			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
+
+			if (widget->is_invalid) {
+				Vertex_ClearAttributes(&widget->text.cursor.vertex_cursor);
+				Vertex_ClearAttributes(&widget->text.cursor.vertex_select);
+			}
+
+			if (!widget->text.cursor.vertex_cursor.a_attributes.count) {
+				Text_Cursor_SetSelection(&widget->text, {}, {});
+			}
+
+			widget->text.cursor.show_cursor = widget->has_focus;
+			Time_Reset(&widget->text.cursor.timer_blinking);
+			widget->text.cursor.is_blink_on = true;
+		} break;
+
 		case WIDGET_LABEL:
 		case WIDGET_LISTBOX: {
 			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
 		} break;
 
 		case WIDGET_BUTTON: {
+			widget->text.settings.rect = widget->layout_data.rect;
+
 			Vertex_AddRect32(t_vertex, rect_box, widget->setting.color_background);
 
 			if (widget->setting.border_size) {
@@ -7382,7 +7511,7 @@ Widget_Invalidate(
 ) {
 	Assert(widget);
 
-	widget->text.settings.rect = widget->layout_data.rect;
+//	widget->text.settings.rect = widget->layout_data.rect;
 	Widget_Redraw(widget);
 
 	widget->is_invalid = false;
@@ -7427,9 +7556,7 @@ Widget_Render(
 			Vertex_ClearAttributes(&vertex_texture);
 		}
 
-		if (widget->text.s_data.length) {
-			Text_Render(&widget->text);
-		}
+		Text_Render(&widget->text);
 
 		FOR_ARRAY(widget->a_subwidgets, it_sub) {
 			Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
@@ -7622,7 +7749,8 @@ Widget_OnDoubleClick(
 instant void
 Widget_UpdateFocus(
 	Array<Widget *> *ap_widgets,
-	bool check_backward
+	bool check_backward,
+	Widget **widget_focus = 0
 ) {
 	Assert(ap_widgets);
 
@@ -7684,10 +7812,15 @@ Widget_UpdateFocus(
 				t_widget->has_focus = true;
 
 				Widget_Redraw(t_widget);
+				t_widget_focus_check = t_widget;
 
 				break;
 			}
 		}
+	}
+
+	if (widget_focus) {
+		*widget_focus = t_widget_focus_check;
 	}
 }
 
