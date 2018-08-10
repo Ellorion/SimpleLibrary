@@ -5703,6 +5703,14 @@ Mouse_Update(
     return true;
 }
 
+instant void
+Mouse_AutoClickLeft(
+) {
+	/// auto left mouse click on current mouse position
+	mouse_event(0x02, 0, 0, 0, 1);
+	mouse_event(0x04, 0, 0, 0, 1);
+}
+
 /// ::: Keyboard
 /// ===========================================================================
 #define KEYBOARD_KEYCOUNT 0xFFFF
@@ -6691,6 +6699,7 @@ Text_AddLines(
 
 	Rect rect = text->data.rect;
 
+	Rect_AddPadding(&rect, text->data.rect_margin);
 	Rect_AddPadding(&rect, text->data.rect_padding);
 
 	u64 width_max = rect.w;
@@ -7599,9 +7608,27 @@ Widget_Redraw(
 		} break;
 
 		case WIDGET_CHECKBOX: {
+			widget->text.data.rect = widget->layout_data.settings.rect;
+
 			Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
 
-			Rect rect_check = {rect_box.x + 2, rect_box.y + 2, 16, 16};
+			s32 check_offset = 2;
+			s32 check_h = widget->text.font->size - (check_offset << 1);
+			s32 check_w = check_h;
+
+			Rect rect_check = {
+				rect_box.x + check_offset,
+				rect_box.y + check_offset,
+				check_w,
+				check_h
+			};
+
+			widget->text.data.rect_margin = {
+				(float)check_offset * 2 + check_w + 2,
+				0,
+				0,
+				0
+			};
 
 			if (widget->data.has_focus)
 				Vertex_AddRect32(t_vertex, rect_check, widget->data.color_outline);
@@ -7610,6 +7637,8 @@ Widget_Redraw(
 
 			Assert(widget->data.border_size);
 			Assert(widget->data.border_size < 20);
+
+			widget->data.border_size = (widget->text.font->size / 10);
 
 			Rect_Resize(&rect_check, -widget->data.border_size);
 			Vertex_AddRect32(t_vertex, rect_check, widget->data.color_background);
@@ -7648,19 +7677,7 @@ Widget_Redraw(
 }
 
 instant void
-Widget_GetTextOffset(
-	Widget *widget,
-	Point *point
-) {
-	Assert(widget);
-	Assert(point);
-
-	*point = {	widget->text.data.rect.x,
-				widget->text.data.rect_content.y};
-}
-
-instant void
-Widget_Invalidate(
+Widget_InvalidateBackground(
 	Widget *widget
 ) {
 	Assert(widget);
@@ -7737,7 +7754,7 @@ Widget_Render(
 		}
 
 		if (Widget_HasChanged(widget))
-			Widget_Invalidate(widget);
+			Widget_InvalidateBackground(widget);
 
 		if (widget->vertex_rect.a_attributes.count) {
 			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
@@ -7775,7 +7792,7 @@ Widget_Render(
 	else {
 		if (Widget_HasChanged(widget)) {
 			Vertex_ClearAttributes(&widget->vertex_rect);
-			Widget_Invalidate(widget);
+			Widget_InvalidateBackground(widget);
 
 			Text *t_text = &widget->text;
 			Text_Clear(t_text);
@@ -8590,12 +8607,9 @@ Widget_CreateCheckbox(
 	t_widget.data.is_focusable = true;
 	t_widget.data.border_size  = 2;
 
-	t_widget.text.data.rect       = rect_box;
-	t_widget.text.data.color      = t_widget.data.color_font;
+	t_widget.text.data.color = t_widget.data.color_font;
 
-	t_widget.text.font       = font;
-
-	t_widget.text.data.rect_padding = {22, 0, 0, 0};
+	t_widget.text.font = font;
 
 	String_Append(&t_widget.text.s_data, c_data, c_length);
 
