@@ -797,6 +797,7 @@
 #include <iostream>
 #include <math.h>
 #include <windows.h>
+#include <shlobj.h>
 #include <GL/gl.h>
 #include "SimpleLibrary_OpenGLExt.h"
 
@@ -3272,8 +3273,7 @@ File_ReadDirectory(
 	const char *name_filter = 0
 ) {
 	Assert(as_files);
-
-	Array_Clear(as_files);
+	Assert(as_files->count == 0);
 
 	if (!c_length)
 		c_length = String_Length(c_path);
@@ -3446,6 +3446,35 @@ Dialog_OpenFile(
 		To_String(s_file, filename);
 		result = true;
     }
+
+    return result;
+}
+
+instant bool
+Dialog_OpenDirectory(
+	String *s_directory
+) {
+	Assert(s_directory);
+
+	bool result = false;
+
+	BROWSEINFO bi = {};
+
+	bi.lpszTitle = "Choose folder...";
+	bi.ulFlags |= BIF_EDITBOX | BIF_NEWDIALOGSTYLE;
+
+	LPITEMIDLIST pidl = SHBrowseForFolder(&bi);
+
+	if (pidl) {
+		static char directory[MAX_PATH] = {};
+
+		result = SHGetPathFromIDList(pidl, directory);
+
+		Memory_Free(pidl);
+
+		if (result)
+			To_String(s_directory, directory);
+	}
 
     return result;
 }
@@ -6641,7 +6670,8 @@ instant void
 Text_AddLines(
 	Text *text,
 	Array<Vertex>    *a_vertex_chars,
-	Array<Text_Line> *a_text_lines
+	Array<Text_Line> *a_text_lines,
+	bool include_offsets = true
 ) {
 	Assert(text->shader_set);
 	Assert(text->font);
@@ -6661,10 +6691,12 @@ Text_AddLines(
 		}
 	}
 
-	RectF rect_position = {	rect.x + text->settings.rect_content.x,
-							0,
-							0,
-							rect.y + text->settings.rect_content.y};
+	RectF rect_position = {	rect.x, 0, 0, rect.y};
+
+	if (include_offsets) {
+		rect_position.x += text->settings.rect_content.x;
+		rect_position.h += text->settings.rect_content.y;
+	}
 
 	bool has_cursor = text->settings.is_editable;
 
@@ -6722,11 +6754,12 @@ Text_AddLines(
 
 instant void
 Text_AddLines(
-	Text *text
+	Text *text,
+	bool include_offsets = true
 ) {
 	Assert(text);
 
-	Text_AddLines(text, &text->a_vertex_chars, &text->a_text_lines);
+	Text_AddLines(text, &text->a_vertex_chars, &text->a_text_lines, include_offsets);
 }
 
 instant void
@@ -6766,7 +6799,6 @@ Text_Update(
 		}
 
 		text->settings.rect_content.h = text_height;
-
 		text->settings.rect_content.w = 0;
 
 		FOR_ARRAY(text->a_text_lines, it_line) {
@@ -7362,12 +7394,16 @@ struct Widget_Settings {
 	Color32 color_font             = {0.0f, 0.0f, 0.0f, 1.0f};
 	Color32 color_progress         = {0.2f, 0.2f, 0.6f, 1.0f};
 
+	u64  active_row_id = 0;
+
 	u32  border_size   = 0;
 	u32  spacing       = 1;
 
 	bool is_focusable  = true;
 	bool is_scrollable = false;
+	bool is_checkable  = false;
 
+	bool has_focus  = false;
 	bool has_scrollable_list = false;
 
 	WIDGET_SCROLL_TYPE scroll_type = WIDGET_SCROLL_ITEM;
@@ -7381,16 +7417,15 @@ struct Widget {
 	Vertex vertex_rect;
 	Window *window;
 
-	bool has_focus  = false;
 	bool is_checked = false;
 	bool trigger_autosize = false;
 
 	Array<String> as_row_data;
-	u64 active_row_id = 0;
 
 	Array<Widget> a_subwidgets;
 
 	Widget_Settings settings;
+	Widget_Settings settings_prev;
 	Widget_Slide slide;
 
 	Widget_OwnerDraw OwnerDraw = 0;
@@ -7442,11 +7477,31 @@ Widget_HasChanged(
 ) {
 	Assert(widget);
 
-	bool result = !Memory_Compare(
+	bool result = false;
+
+	result = !Memory_Compare(
 						&widget->layout_data.settings,
 						&widget->layout_data.settings_prev,
 						 sizeof(widget->layout_data.settings)
 				  );
+
+	if (result)  return result;
+
+	result = !Memory_Compare(
+						&widget->settings,
+						&widget->settings_prev,
+						 sizeof(widget->settings)
+				  );
+
+	if (result)  return result;
+
+	result = !Memory_Compare(
+						&widget->text.settings,
+						&widget->text.settings_prev,
+						 sizeof(widget->text.settings)
+				  );
+
+	if (result)  return result;
 
 	return result;
 }
@@ -7483,7 +7538,7 @@ Widget_Redraw(
 				Text_Cursor_SetSelection(&widget->text, {}, {});
 			}
 
-			widget->text.cursor.show_cursor = widget->has_focus;
+			widget->text.cursor.show_cursor = widget->settings.has_focus;
 			Time_Reset(&widget->text.cursor.timer_blinking);
 			widget->text.cursor.is_blink_on = true;
 		} break;
@@ -7506,7 +7561,7 @@ Widget_Redraw(
 			if (widget->settings.border_size) {
 				Rect_Resize(&rect_box, -1);
 
-				if (widget->has_focus)
+				if (widget->settings.has_focus)
 					Vertex_AddRect32(t_vertex, rect_box, widget->settings.color_outline_selected);
 				else
 					Vertex_AddRect32(t_vertex, rect_box, widget->settings.color_outline);
@@ -7521,7 +7576,7 @@ Widget_Redraw(
 
 			Rect rect_check = {rect_box.x + 2, rect_box.y + 2, 16, 16};
 
-			if (widget->has_focus)
+			if (widget->settings.has_focus)
 				Vertex_AddRect32(t_vertex, rect_check, widget->settings.color_outline);
 			else
 				Vertex_AddRect32(t_vertex, rect_check, widget->settings.color_outline_inactive);
@@ -7690,81 +7745,145 @@ Widget_Render(
 
 		return;
 	}
+	else {
+		if (Widget_HasChanged(widget)) {
+			Vertex_ClearAttributes(&widget->vertex_rect);
+			Widget_Invalidate(widget);
 
-	if (Widget_HasChanged(widget))
-		Widget_Invalidate(widget);
+			Text *t_text = &widget->text;
+			Text_Clear(t_text);
 
-	Rect rect_row;
+			/// x y w
+			t_text->settings.rect = widget->layout_data.settings.rect;
+			Rect *rect_text        = &t_text->settings.rect;
 
-	Point pt_offset;
-	Widget_GetTextOffset(widget, &pt_offset);
+			rect_text->x += t_text->settings.rect_content.x;
+			rect_text->y += t_text->settings.rect_content.y;
 
-	OpenGL_Scissor(shader_set->window, widget->layout_data.settings.rect);
+			widget->rect_content.h = 0;
 
-	widget->rect_content   = widget->layout_data.settings.rect;
-	widget->rect_content.h = 0;
+			FOR_ARRAY(widget->as_row_data, it_row) {
+				String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
 
-	/// render item background(s)
-	/// =======================================================================
-	rect_row = widget->layout_data.settings.rect;
-	rect_row.x += pt_offset.x;
-	rect_row.y += pt_offset.y;
-	rect_row.h  = 0;
+				String_SplitWordsStatic(ts_data, &t_text->as_words);
+				rect_text->h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines);
 
-	Text *t_text = &widget->text;
+				if (Rect_IsIntersecting(rect_text, &widget->layout_data.settings.rect)) {
+					Color32 t_color_rect = widget->settings.color_outline;
 
-	Vertex_ClearAttributes(&widget->vertex_rect);
-	Widget_Redraw(widget);
+					if (widget->settings.active_row_id == it_row) {
+						if (widget->settings.has_focus)
+							t_color_rect = widget->settings.color_outline_selected;
+						else
+							t_color_rect = widget->settings.color_outline_inactive;
+					}
 
-	Text_Clear(t_text);
+					Vertex_AddRect32(&widget->vertex_rect, *rect_text, t_color_rect);
 
-	FOR_ARRAY(widget->as_row_data, it_row) {
-		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
+					Text_AddLines(t_text, false);
+				}
 
-		String_SplitWordsStatic(ts_data, &t_text->as_words);
+				s32 height_row_step = rect_text->h + widget->settings.spacing;
+				rect_text->y           += height_row_step;
+				widget->rect_content.h += height_row_step;
 
-		t_text->settings.rect = rect_row;
-		rect_row.h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines);
-
-		if (Rect_IsIntersecting(&rect_row, &widget->layout_data.settings.rect)) {
-			Color32 t_color_rect = widget->settings.color_outline;
-
-			if (widget->active_row_id == it_row) {
-				if (widget->has_focus)
-					t_color_rect = widget->settings.color_outline_selected;
-				else
-					t_color_rect = widget->settings.color_outline_inactive;
+				ts_data->changed = false;
 			}
 
-			Vertex_AddRect32(&widget->vertex_rect, rect_row, t_color_rect);
+			/// revert for scissor
+			*rect_text = widget->layout_data.settings.rect;
 
-			/// store item data, so the data is drawn upon the background
-			/// and as batch rendering
-			t_text->settings.rect = rect_row;
-
-			t_text->settings.rect.x -= pt_offset.x;
-			t_text->settings.rect.y -= pt_offset.y;
-
-			Text_AddLines(t_text);
+			widget->settings_prev = widget->settings;
+			widget->text.settings_prev = widget->text.settings;
 		}
 
-		s32 height_row_step = rect_row.h + widget->settings.spacing;
+		OpenGL_Scissor(shader_set->window, widget->layout_data.settings.rect);
 
-		rect_row.y             += height_row_step;
-		widget->rect_content.h += height_row_step;
+		/// render rectangles + background
+		if (widget->vertex_rect.a_attributes.count) {
+			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
+			Rect_Render(shader_set, &widget->vertex_rect);
+		}
 
-		ts_data->changed = false;
+		Text_Render(&widget->text, false);
+
+		OpenGL_Scissor_Disable();
 	}
 
-	ShaderSet_Use(shader_set, SHADER_PROG_RECT);
-	Rect_Render(shader_set, &widget->vertex_rect);
-
-	/// render item data
-	/// =======================================================================
-	ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
-	Text_RenderLines(t_text);
-
-	OpenGL_Scissor_Disable();
+//	if (Widget_HasChanged(widget))
+//		Widget_Invalidate(widget);
+//
+//	Rect rect_row;
+//
+//	Point pt_offset;
+//	Widget_GetTextOffset(widget, &pt_offset);
+//
+//	OpenGL_Scissor(shader_set->window, widget->layout_data.settings.rect);
+//
+//	widget->rect_content   = widget->layout_data.settings.rect;
+//	widget->rect_content.h = 0;
+//
+//	/// render item background(s)
+//	/// =======================================================================
+//	rect_row = widget->layout_data.settings.rect;
+//	rect_row.x += pt_offset.x;
+//	rect_row.y += pt_offset.y;
+//	rect_row.h  = 0;
+//
+//	Text *t_text = &widget->text;
+//
+//	Vertex_ClearAttributes(&widget->vertex_rect);
+//	Widget_Redraw(widget);
+//
+//	Text_Clear(t_text);
+//
+//	FOR_ARRAY(widget->as_row_data, it_row) {
+//		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
+//
+//		String_SplitWordsStatic(ts_data, &t_text->as_words);
+//
+//		t_text->settings.rect = rect_row;
+//		rect_row.h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines);
+//
+//		if (Rect_IsIntersecting(&rect_row, &widget->layout_data.settings.rect)) {
+//			Color32 t_color_rect = widget->settings.color_outline;
+//
+//			if (widget->active_row_id == it_row) {
+//				if (widget->has_focus)
+//					t_color_rect = widget->settings.color_outline_selected;
+//				else
+//					t_color_rect = widget->settings.color_outline_inactive;
+//			}
+//
+//			Vertex_AddRect32(&widget->vertex_rect, rect_row, t_color_rect);
+//
+//			/// store item data, so the data is drawn upon the background
+//			/// and as batch rendering
+//			t_text->settings.rect = rect_row;
+//
+//			t_text->settings.rect.x -= pt_offset.x;
+//			t_text->settings.rect.y -= pt_offset.y;
+//
+//			Text_AddLines(t_text);
+//		}
+//
+//		s32 height_row_step = rect_row.h + widget->settings.spacing;
+//
+//		rect_row.y             += height_row_step;
+//		widget->rect_content.h += height_row_step;
+//
+//		ts_data->changed = false;
+//	}
+//
+//	ShaderSet_Use(shader_set, SHADER_PROG_RECT);
+//	Rect_Render(shader_set, &widget->vertex_rect);
+//
+//	/// render item data
+//	/// =======================================================================
+//	ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
+//	Text_RenderLines(t_text);
+//
+//	OpenGL_Scissor_Disable();
 }
 
 instant void
@@ -7831,7 +7950,7 @@ Widget_OnClick(
 	if ((IF_USE(keyboard).up[VK_RETURN]) OR
 		(IF_USE(keyboard).up[VK_SPACE]))
 	{
-		if (widget->has_focus)
+		if (widget->settings.has_focus)
 			result = true;
 	}
 	else {
@@ -7910,15 +8029,15 @@ Widget_UpdateFocus(
 		Mouse    *mouse    = t_widget->window->mouse;
 
 		if (focus_set_next) {
-			t_widget->has_focus = true;
+			t_widget->settings.has_focus = true;
 			focus_set_next = false;
 
 			Widget_Redraw(t_widget);
 		}
 		else {
 			if (IF_USE(keyboard).up[VK_TAB]) {
-				if (t_widget->has_focus) {
-					t_widget->has_focus = false;
+				if (t_widget->settings.has_focus) {
+					t_widget->settings.has_focus = false;
 					focus_set_next = true;
 
 					Widget_Redraw(t_widget);
@@ -7926,7 +8045,7 @@ Widget_UpdateFocus(
 			}
 		}
 
-		if (t_widget->has_focus)
+		if (t_widget->settings.has_focus)
 			t_widget_focus_check = t_widget;
 	}
 
@@ -7938,7 +8057,7 @@ Widget_UpdateFocus(
 			Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
 
 			if (t_widget->settings.is_focusable) {
-				t_widget->has_focus = true;
+				t_widget->settings.has_focus = true;
 
 				Widget_Redraw(t_widget);
 				t_widget_focus_check = t_widget;
@@ -7979,7 +8098,7 @@ Widget_CalcActiveRowRect(
 		rect_item.w = width;
 		rect_item.h = height;
 
-		if (widget->active_row_id == it_row) {
+		if (widget->settings.active_row_id == it_row) {
 			*rect_row = rect_item;
 			break;
 		}
@@ -7999,7 +8118,7 @@ Widget_CalcActiveRowID(
     Assert(mouse);
 
     if (!Mouse_IsHovering(mouse, widget))
-		return widget->active_row_id;
+		return widget->settings.active_row_id;
 
     u64 active_row_id = 0;
 
@@ -8019,7 +8138,7 @@ Widget_CalcActiveRowID(
 		rect_item.w = width;
 		rect_item.h = height;
 
-		if (Rect_IsIntersecting(&mouse->point , &rect_item)) {
+		if (Rect_IsIntersecting(&mouse->point, &rect_item)) {
 			active_row_id = it_row;
 			break;
 		}
@@ -8062,8 +8181,8 @@ Widget_UpdateInput(
 	if (!widget->settings.is_focusable)
 		return;
 
-	bool got_focus = widget->has_focus;
-	u64  prev_active_row = widget->active_row_id;
+	bool got_focus = widget->settings.has_focus;
+	u64  prev_active_row = widget->settings.active_row_id;
 
 	bool has_text_cursor = widget->text.settings.is_editable;
 
@@ -8107,17 +8226,17 @@ Widget_UpdateInput(
 
 			/// listbox entry selection
 			if (is_scrollable_list)
-				widget->active_row_id = Widget_CalcActiveRowID(widget, mouse);
+				widget->settings.active_row_id = Widget_CalcActiveRowID(widget, mouse);
 
 			/// checkbox toggle
-			if (got_focus) {
+			if (got_focus AND widget->settings.is_checkable) {
 				widget->is_checked = !widget->is_checked;
 				redraw_required = true;
 			}
 
 			/// focus change
-			if (widget->has_focus != got_focus) {
-				widget->has_focus = got_focus;
+			if (widget->settings.has_focus != got_focus) {
+				widget->settings.has_focus = got_focus;
 				redraw_required = true;
 			}
 		}
@@ -8145,42 +8264,42 @@ Widget_UpdateInput(
 		}
     }
 
-    if (keyboard AND widget->has_focus) {
+    if (keyboard AND widget->settings.has_focus) {
 		if (is_scrollable_list) {
-			if (widget->active_row_id) {
+			if (widget->settings.active_row_id) {
 				if (keyboard->down[VK_UP]) {
-					--widget->active_row_id;
+					--widget->settings.active_row_id;
 				}
 
 				if (keyboard->down[VK_HOME]) {
-					widget->active_row_id = 0;
+					widget->settings.active_row_id = 0;
 				}
 			}
 
-			if (widget->active_row_id < widget->as_row_data.count - 1) {
+			if (widget->settings.active_row_id < widget->as_row_data.count - 1) {
 				if (keyboard->down[VK_DOWN]) {
-					++widget->active_row_id;
+					++widget->settings.active_row_id;
 				}
 
 				if (keyboard->down[VK_END]) {
-					widget->active_row_id = widget->as_row_data.count - 1;
+					widget->settings.active_row_id = widget->as_row_data.count - 1;
 				}
 			}
 		}
 
-		if (keyboard->up[VK_SPACE]) {
+		if (keyboard->up[VK_SPACE] AND widget->settings.is_checkable) {
 			widget->is_checked = !widget->is_checked;
 			redraw_required = true;
 		}
     }
 
-    if (prev_active_row != widget->active_row_id AND is_scrollable_list) {
+    if (prev_active_row != widget->settings.active_row_id AND is_scrollable_list) {
 		Rect rect_active_row;
         Widget_CalcActiveRowRect(widget, &rect_active_row);
 
 		if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
 			if (widget->settings.scroll_type == WIDGET_SCROLL_ITEM) {
-				if (widget->active_row_id < prev_active_row) {
+				if (widget->settings.active_row_id < prev_active_row) {
 					widget->text.settings.rect_content.y -= (rect_active_row.y - rect_widget->y);
 				}
 				else {
@@ -8190,7 +8309,7 @@ Widget_UpdateInput(
 			}
 			else if (widget->settings.scroll_type == WIDGET_SCROLL_BLOCK) {
 				if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
-					if (widget->active_row_id < prev_active_row) {
+					if (widget->settings.active_row_id < prev_active_row) {
 						widget->text.settings.rect_content.y -= (rect_active_row.y - rect_widget->y);
 						widget->text.settings.rect_content.y += (rect_widget->h - rect_active_row.h);
 					}
@@ -8232,14 +8351,14 @@ Widget_GetSelectedRow(
 ) {
 	Assert(widget);
 	Assert(s_row_data);
-	Assert(!widget->active_row_id OR widget->active_row_id < widget->as_row_data.count);
+	Assert(!widget->settings.active_row_id OR widget->settings.active_row_id < widget->as_row_data.count);
 
 	if (!widget->as_row_data.count) {
 		*s_row_data = {};
 		return;
 	}
 
-	String *ts_row_data = &ARRAY_IT(widget->as_row_data, widget->active_row_id);
+	String *ts_row_data = &ARRAY_IT(widget->as_row_data, widget->settings.active_row_id);
 
 	String_Clear(s_row_data);
 	String_Append(s_row_data, ts_row_data->value, ts_row_data->length);
@@ -8250,9 +8369,9 @@ Widget_GetSelectedRowID(
 	Widget *widget
 ) {
 	Assert(widget);
-	Assert(!widget->active_row_id OR widget->active_row_id < widget->as_row_data.count);
+	Assert(!widget->settings.active_row_id OR widget->settings.active_row_id < widget->as_row_data.count);
 
-	return widget->active_row_id;
+	return widget->settings.active_row_id;
 }
 
 instant void
@@ -8312,6 +8431,16 @@ Widget_CreateLabel(
 	t_widget.text.settings.rect_padding = {1, 1, 1, 1};
 
 	Rect *rect_padding = &t_widget.text.settings.rect_padding;
+
+	if (!rect_box.w) {
+		rect_box.w = font->size;
+		Widget_AddBorderSizes(&t_widget, &rect_box.w, 0);
+	}
+
+	if (!rect_box.h) {
+		rect_box.h = Font_GetLineHeight(font);
+		Widget_AddBorderSizes(&t_widget, 0, &rect_box.h);
+	}
 
 	t_widget.type         = WIDGET_LABEL;
 	t_widget.rect_content = rect_box;
@@ -8431,6 +8560,7 @@ Widget_CreateCheckbox(
 	t_widget.layout_data.settings.auto_height = true;
 	t_widget.layout_data.settings.auto_width  = true;
 
+	t_widget.settings.is_checkable = true;
 	t_widget.settings.is_focusable = true;
 	t_widget.settings.border_size  = 2;
 
@@ -8546,7 +8676,7 @@ Widget_RedrawNumberPickerButton(
 	if (!t_vertex->array_id) Vertex_CreateStatic(t_vertex);
 	else                     Vertex_ClearAttributes(t_vertex);
 
-	if (widget->has_focus)
+	if (widget->settings.has_focus)
 		Vertex_AddRect32(t_vertex, rect_box, widget->settings.color_outline_selected);
 	else
 		Vertex_AddRect32(t_vertex, rect_box, widget->settings.color_outline);
