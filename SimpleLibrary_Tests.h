@@ -451,22 +451,22 @@ Test_Files(
 		AssertMessage(File_Close(&file), "File could not be closed.");
     }
 
-    {
-    	Array<String> as_files;
-
-		s64 pos_found;
-		String s_pathfile;
-
-		String_Append(&s_pathfile, __FILE__);
-
-		if (String_FindRev(&s_pathfile, "\\", &pos_found)) {
-			File_ReadDirectory(&as_files, s_pathfile.value, 0, pos_found);
-			AssertMessage(as_files.count, "Reading directory listing failed.");
-			Array_Destroy(&as_files);
-		}
-
-		String_Destroy(&s_pathfile);
-    }
+//    {
+//    	Array<String> as_files;
+//
+//		s64 pos_found;
+//		String s_pathfile;
+//
+//		String_Append(&s_pathfile, __FILE__);
+//
+//		if (String_FindRev(&s_pathfile, "\\", &pos_found)) {
+//			File_ReadDirectory(&as_files, s_pathfile.value, 0, pos_found);
+//			AssertMessage(as_files.count, "Reading directory listing failed.");
+//			Array_Destroy(&as_files);
+//		}
+//
+//		String_Destroy(&s_pathfile);
+//    }
 }
 
 instant void

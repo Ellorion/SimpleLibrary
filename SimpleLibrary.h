@@ -3262,6 +3262,16 @@ File_HasChanged(
 	return has_changed;
 }
 
+enum DIR_ENTRY_TYPE {
+	DIR_ENTRY_FILE,
+	DIR_ENTRY_DIR
+};
+
+struct Directory_Entry {
+	String s_name;
+	DIR_ENTRY_TYPE type;
+};
+
 enum DIR_LIST_TYPE {
 	DIR_LIST_ONLY_FILES,
 	DIR_LIST_ONLY_DIR,
@@ -3271,7 +3281,7 @@ enum DIR_LIST_TYPE {
 /// does not list or includes subdirectories
 instant void
 File_ReadDirectory(
-	Array<String> *as_files,
+	Array<Directory_Entry> *a_entries,
 	const char *c_path,
 	const char *extension_filter = 0,
 	u64 c_length = 0,
@@ -3279,7 +3289,7 @@ File_ReadDirectory(
 	const char *name_filter = 0,
 	DIR_LIST_TYPE type = DIR_LIST_ONLY_FILES
 ) {
-	Assert(as_files);
+	Assert(a_entries);
 
 	if (!c_length)
 		c_length = String_Length(c_path);
@@ -3306,6 +3316,10 @@ File_ReadDirectory(
 			if (is_directory) {
 				if (type == DIR_LIST_ONLY_FILES)
 					continue;
+
+				if (String_IsEqual(file_data.cFileName, ".", 1) AND String_Length(file_data.cFileName) == 1) {
+					continue;
+				}
 			}
 			else {
 				 if (type == DIR_LIST_ONLY_DIR)
@@ -3333,7 +3347,16 @@ File_ReadDirectory(
 				}
 
 				String_Append(&ts_filename, file_data.cFileName);
-				Array_Add(as_files, ts_filename);
+
+				Directory_Entry dir_entry;
+				String_Append(&dir_entry.s_name, ts_filename.value, ts_filename.length);
+
+				if (is_directory)
+					dir_entry.type = DIR_ENTRY_DIR;
+				else
+					dir_entry.type = DIR_ENTRY_FILE;
+
+				Array_Add(a_entries, dir_entry);
 			}
 
 			String_Destroy(&s_filename);
@@ -3700,7 +3723,7 @@ instant void Mouse_Reset(Mouse *mouse);
 instant void Keyboard_Reset(Keyboard *keyboard);
 
 instant void
-Window_Update(
+Window_UpdateAndResetInput(
 	Window *window
 ) {
 	Assert(window);
@@ -7531,13 +7554,19 @@ Widget_HasChanged(
 
 	if (result)  return result;
 
-	result = !Memory_Compare(
-						&widget->text.data,
-						&widget->text.data_prev,
-						 sizeof(widget->text.data)
-				  );
+
+	FOR_ARRAY(widget->data.as_row_data, it) {
+		String *t_data = &ARRAY_IT(widget->data.as_row_data, it);
+
+		if (t_data->changed) {
+			result = true;
+			break;
+		}
+	}
 
 	if (result)  return result;
+
+	result = Text_HasChanged(&widget->text);
 
 	return result;
 }
@@ -7801,7 +7830,9 @@ Widget_Render(
 			t_text->data.rect = widget->layout_data.settings.rect;
 			Rect *rect_text        = &t_text->data.rect;
 
-			rect_text->x += t_text->data.rect_content.x;
+			s32 pad_left = 2;
+
+			rect_text->x += t_text->data.rect_content.x + pad_left;
 			rect_text->y += t_text->data.rect_content.y;
 
 			widget->rect_content.h = 0;
@@ -7822,7 +7853,10 @@ Widget_Render(
 							t_color_rect = widget->data.color_outline_inactive;
 					}
 
-					Vertex_AddRect32(&widget->vertex_rect, *rect_text, t_color_rect);
+					Rect rect_box = *rect_text;
+					rect_box.x -= pad_left;
+
+					Vertex_AddRect32(&widget->vertex_rect, rect_box, t_color_rect);
 
 					Text_AddLines(t_text, false);
 				}
@@ -7853,81 +7887,6 @@ Widget_Render(
 
 		OpenGL_Scissor_Disable();
 	}
-
-//	if (Widget_HasChanged(widget))
-//		Widget_Invalidate(widget);
-//
-//	Rect rect_row;
-//
-//	Point pt_offset;
-//	Widget_GetTextOffset(widget, &pt_offset);
-//
-//	OpenGL_Scissor(shader_set->window, widget->layout_data.settings.rect);
-//
-//	widget->rect_content   = widget->layout_data.settings.rect;
-//	widget->rect_content.h = 0;
-//
-//	/// render item background(s)
-//	/// =======================================================================
-//	rect_row = widget->layout_data.settings.rect;
-//	rect_row.x += pt_offset.x;
-//	rect_row.y += pt_offset.y;
-//	rect_row.h  = 0;
-//
-//	Text *t_text = &widget->text;
-//
-//	Vertex_ClearAttributes(&widget->vertex_rect);
-//	Widget_Redraw(widget);
-//
-//	Text_Clear(t_text);
-//
-//	FOR_ARRAY(widget->as_row_data, it_row) {
-//		String *ts_data = &ARRAY_IT(widget->as_row_data, it_row);
-//
-//		String_SplitWordsStatic(ts_data, &t_text->as_words);
-//
-//		t_text->settings.rect = rect_row;
-//		rect_row.h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines);
-//
-//		if (Rect_IsIntersecting(&rect_row, &widget->layout_data.settings.rect)) {
-//			Color32 t_color_rect = widget->settings.color_outline;
-//
-//			if (widget->active_row_id == it_row) {
-//				if (widget->has_focus)
-//					t_color_rect = widget->settings.color_outline_selected;
-//				else
-//					t_color_rect = widget->settings.color_outline_inactive;
-//			}
-//
-//			Vertex_AddRect32(&widget->vertex_rect, rect_row, t_color_rect);
-//
-//			/// store item data, so the data is drawn upon the background
-//			/// and as batch rendering
-//			t_text->settings.rect = rect_row;
-//
-//			t_text->settings.rect.x -= pt_offset.x;
-//			t_text->settings.rect.y -= pt_offset.y;
-//
-//			Text_AddLines(t_text);
-//		}
-//
-//		s32 height_row_step = rect_row.h + widget->settings.spacing;
-//
-//		rect_row.y             += height_row_step;
-//		widget->rect_content.h += height_row_step;
-//
-//		ts_data->changed = false;
-//	}
-//
-//	ShaderSet_Use(shader_set, SHADER_PROG_RECT);
-//	Rect_Render(shader_set, &widget->vertex_rect);
-//
-//	/// render item data
-//	/// =======================================================================
-//	ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
-//	Text_RenderLines(t_text);
-//
-//	OpenGL_Scissor_Disable();
 }
 
 instant void
@@ -8028,7 +7987,7 @@ Widget_OnDoubleClick(
 	Mouse *mouse = widget->window->mouse;
 
 	if (mouse) {
-		if (mouse->double_click[0]) {
+		if (mouse->double_click[mouse_button]) {
 			if (Mouse_IsHovering(mouse, widget)) {
 				result = true;
 			}
@@ -8114,6 +8073,26 @@ Widget_UpdateFocus(
 	if (widget_focus) {
 		*widget_focus = t_widget_focus_check;
 	}
+}
+
+instant void
+Widget_SetFocus(
+	Array<Widget *> *ap_widgets,
+	Widget *widget
+) {
+	Assert(ap_widgets);
+	Assert(widget);
+
+    FOR_ARRAY(*ap_widgets, it) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it);
+
+		if (t_widget->data.has_focus) {
+			t_widget->data.has_focus = false;
+			break;
+		}
+    }
+
+    widget->data.has_focus = true;
 }
 
 instant void
@@ -8287,22 +8266,12 @@ Widget_UpdateInput(
 
 		/// widget + list scrolling
 		if (is_hovering AND (is_scrollable_list OR is_scrollable)) {
-			if (mouse->wheel) {
-				int a = 1;
-			}
-
 			widget->text.data.rect_content.y += mouse->wheel;
 
 			if (is_scrollable_list) {
 				widget->text.data.rect_content.w  = widget->rect_content.w;
 				widget->text.data.rect_content.h  = widget->rect_content.h;
 			}
-
-			Text *t_text = &widget->text;
-
-//			Text_Cursor_SetSelection(t_text,
-//									 t_text->cursor.point_select_start,
-//									 t_text->cursor.point_select_end);
 
 			Rect_Clamp(&widget->text.data.rect_content, widget->layout_data.settings.rect);
 		}
@@ -8408,6 +8377,7 @@ Widget_GetSelectedRow(
 	String_Append(s_row_data, ts_row_data->value, ts_row_data->length);
 }
 
+
 instant u64
 Widget_GetSelectedRowID(
 	Widget *widget
@@ -8455,6 +8425,62 @@ Widget_AddRenderTabStop(
 		Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
 		Array_Add(ap_widgets, t_subwidget);
 	}
+}
+
+instant void
+Widget_LoadDirectoryList(
+	Widget *widget,
+	String *s_directory,
+	Array<Directory_Entry> *a_entries_rtn,
+	bool show_full_path = false
+) {
+	Assert(widget);
+	Assert(widget->type == WIDGET_LISTBOX);
+	Assert(s_directory);
+
+	/// in case the directory string came from the to be destroyed directory entries
+	static String ts_directory;
+	String_Append(&ts_directory, s_directory->value, s_directory->length);
+
+	FOR_ARRAY(*a_entries_rtn, it) {
+		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_rtn, it);
+		String_Destroy(&t_entry->s_name);
+	}
+
+	Array_ClearContainer(a_entries_rtn);
+
+	widget->data.active_row_id = 0;
+
+	/// remove "\" from directroy path (f.e. C:\) for consistency
+	if (String_EndWith(&ts_directory, "\\")) {
+		String_Remove(&ts_directory, ts_directory.length - 1, ts_directory.length);
+	}
+
+	File_ReadDirectory(a_entries_rtn, ts_directory.value, 0, ts_directory.length, true, 0, DIR_LIST_ONLY_DIR);
+	File_ReadDirectory(a_entries_rtn, ts_directory.value, 0, ts_directory.length, true, 0, DIR_LIST_ONLY_FILES);
+
+	Widget_ClearRows(widget);
+
+	FOR_ARRAY(*a_entries_rtn, it) {
+		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_rtn, it);
+
+		String ts_entry_name = t_entry->s_name;
+
+		if (!show_full_path) {
+			ts_entry_name.value  += ts_directory.length;
+			ts_entry_name.length -= ts_directory.length;
+		}
+
+		/// removing leading "\" to indicate file type
+		if (t_entry->type == DIR_ENTRY_FILE) {
+			ts_entry_name.value  += 1;
+			ts_entry_name.length -= 1;
+		}
+
+		Widget_AddRow(widget, ts_entry_name.value, ts_entry_name.length);
+	}
+
+	String_Clear(&ts_directory);
 }
 
 instant Widget
