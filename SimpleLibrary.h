@@ -6930,10 +6930,12 @@ Text_Update(
 		s32 text_height = Text_BuildLinesStatic(text, &text->as_words, &text->a_text_lines);
 
 		if (text->data.rect.h) {
+			s32 pad_height = text->data.rect_padding.y + text->data.rect_padding.h;
+
 			if (     text->data.align_y == TEXT_ALIGN_Y_CENTER)
-				text->data.rect_content.y = (text->data.rect.h - text_height) >> 1;
+				text->data.rect_content.y = (text->data.rect.h - pad_height - text_height) >> 1;
 			else if (text->data.align_y == TEXT_ALIGN_Y_BOTTOM)
-				text->data.rect_content.y = (text->data.rect.h - text_height);
+				text->data.rect_content.y = (text->data.rect.h - pad_height - text_height);
 		}
 
 		text->data.rect_content.h = text_height;
@@ -6945,7 +6947,7 @@ Text_Update(
 		}
 
 		Text_Clear(text);
-		Text_AddLines(text);
+		Text_AddLines(text, true);
 
 		Text_Cursor_SetSelection(text,
 								 text->cursor.point_select_start,
@@ -7526,7 +7528,7 @@ struct Widget_Slide {
 
 struct Widget_Data {
 	Color32 color_background       = Color_MakeGrey(0.9f);
-	Color32 color_outline          = {0.0f, 0.0f, 1.0f, 1.0f};
+	Color32 color_outline          = {0.8f, 0.8f, 0.8f, 1.0f}; //{0.0f, 0.0f, 1.0f, 1.0f};
 	Color32 color_outline_selected = {1.0f, 0.0f, 0.0f, 1.0f};
 	Color32 color_outline_inactive = {0.5f, 0.5f, 1.0f, 1.0f};
 	Color32 color_font             = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -7722,7 +7724,7 @@ Widget_Redraw(
 				if (widget->data.has_focus)
 					Vertex_AddRect32(t_vertex, rect_box, widget->data.color_outline_selected);
 				else
-					Vertex_AddRect32(t_vertex, rect_box, widget->data.color_outline);
+					Vertex_AddRect32(t_vertex, rect_box, widget->data.color_outline_inactive);
 
 				Rect_Resize(&rect_box, -widget->data.border_size);
 				Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
@@ -7739,8 +7741,8 @@ Widget_Redraw(
 			s32 check_w = check_h;
 
 			Rect rect_check = {
-				rect_box.x + check_offset,
-				rect_box.y + check_offset,
+				rect_box.x + check_offset + widget->text.data.rect_padding.x,
+				rect_box.y + check_offset + widget->text.data.rect_padding.y,
 				check_w,
 				check_h
 			};
@@ -7753,7 +7755,7 @@ Widget_Redraw(
 			};
 
 			if (widget->data.has_focus)
-				Vertex_AddRect32(t_vertex, rect_check, widget->data.color_outline);
+				Vertex_AddRect32(t_vertex, rect_check, widget->data.color_outline_selected);
 			else
 				Vertex_AddRect32(t_vertex, rect_check, widget->data.color_outline_inactive);
 
@@ -7821,7 +7823,11 @@ Widget_AddBorderSizes(
 
 	if (min_width) {
 		*min_width += rect_padding->x + rect_padding->w;
-		*min_width += widget->data.border_size << 1;
+
+		/// border size is used for the checbox,
+		/// not the border of the widget itself
+		if (widget->type != WIDGET_CHECKBOX)
+			*min_width += widget->data.border_size << 1;
 
 		*min_width +=   widget->text.data.rect_margin.x
 					  + widget->text.data.rect_margin.w;
@@ -7829,7 +7835,11 @@ Widget_AddBorderSizes(
 
 	if (min_height) {
 		*min_height += rect_padding->y + rect_padding->h;
-		*min_height += widget->data.border_size << 1;
+
+		/// border size is used for the checbox,
+		/// not the border of the widget itself
+		if (widget->type != WIDGET_CHECKBOX)
+			*min_height += widget->data.border_size << 1;
 
 		*min_height +=  widget->text.data.rect_margin.y
 					  + widget->text.data.rect_margin.h;
@@ -7877,7 +7887,6 @@ Widget_Render(
 
 		if (Widget_HasChanged(widget)) {
 			widget->data_prev = widget->data;
-			widget->text.data_prev = widget->text.data;
 
 			Widget_InvalidateBackground(widget);
 		}
@@ -8035,7 +8044,8 @@ Widget_Destroy(
 instant bool
 Widget_OnClick(
 	Widget *widget,
-	u16 mouse_button = 0
+	u16 mouse_button = 0,
+	bool handle_key_input = true
 ) {
 	Assert(widget);
 	Assert(widget->window);
@@ -8047,24 +8057,24 @@ Widget_OnClick(
 
 	///@Idea: might be better in a seperate space,
 	///       and let this function only handle mouse input
-	if ((IF_USE(keyboard).up[VK_RETURN]) OR
-		(IF_USE(keyboard).up[VK_SPACE]))
-	{
+	if (handle_key_input
+		AND(   (IF_USE(keyboard).up[VK_RETURN])
+		    OR (IF_USE(keyboard).up[VK_SPACE]))
+	) {
 		if (widget->data.has_focus)
 			result = true;
 	}
-	else {
-		///@Performance: IsHovering does not have to retrieve
-		///              the mouse position again, when the
-		///              updated mouse information is already
-		///              stored in the window structure
-		///	             (in case the data was retrieved in
-		///              the message loop)
-		///
-		if (IF_USE(mouse).up[mouse_button]) {
-			if (Mouse_IsHovering(widget)) {
-				result = true;
-			}
+
+	///@Performance: IsHovering does not have to retrieve
+	///              the mouse position again, when the
+	///              updated mouse information is already
+	///              stored in the window structure
+	///	             (in case the data was retrieved in
+	///              the message loop)
+	///
+	if (IF_USE(mouse).up[mouse_button]) {
+		if (Mouse_IsHovering(widget)) {
+			result = true;
 		}
 	}
 
@@ -8074,20 +8084,25 @@ Widget_OnClick(
 instant bool
 Widget_OnDoubleClick(
 	Widget *widget,
-	u16 mouse_button = 0
+	u16 mouse_button = 0,
+	bool handle_key_input = true
 ) {
 	Assert(widget);
 	Assert(widget->window);
 
 	bool result = false;
 
-	Mouse *mouse = widget->window->mouse;
+	Keyboard *keyboard = widget->window->keyboard;
+	Mouse    *mouse    = widget->window->mouse;
 
-	if (mouse) {
-		if (mouse->double_click[mouse_button]) {
-			if (Mouse_IsHovering(mouse, widget)) {
-				result = true;
-			}
+	if (handle_key_input AND IF_USE(keyboard).up[VK_RETURN]) {
+		if (widget->data.has_focus)
+			result = true;
+	}
+
+	if (IF_USE(mouse).double_click[mouse_button]) {
+		if (Mouse_IsHovering(mouse, widget)) {
+			result = true;
 		}
 	}
 
@@ -8387,7 +8402,10 @@ Widget_UpdateInput(
 			}
 		}
 
-		if (keyboard->up[VK_SPACE] AND widget->data.is_checkable) {
+		if (widget->data.is_checkable
+			AND (   keyboard->up[VK_SPACE]
+				 OR keyboard->up[VK_RETURN])
+		) {
 			widget->data.is_checked = !widget->data.is_checked;
 		}
     }
@@ -8632,6 +8650,7 @@ Widget_CreateButton(
 	t_widget.data.border_size = 2;
 
 	t_widget.text.data.rect_margin = {2, 1, 2, 1};
+	t_widget.text.data.rect_padding = {2, 2, 2, 2};
 
 	Rect *rect_padding = &t_widget.text.data.rect_padding;
 
@@ -8720,6 +8739,10 @@ Widget_CreateCheckbox(
 	t_widget.text.font = font;
 
 	String_Append(&t_widget.text.s_data, c_data, c_length);
+
+	t_widget.text.data.rect_padding = {2, 2, 2, 2};
+
+	t_widget.trigger_autosize = true;
 
 	return t_widget;
 }
