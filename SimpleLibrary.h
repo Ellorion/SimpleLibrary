@@ -1451,18 +1451,24 @@ instant bool
 Time_HasElapsed(
 	Timer *timer,
 	u32 interval_in_ms,
-	bool reset_elapsed = true
+	bool run_once = false
 ) {
 	Assert(timer);
 
+	if (!timer->lo_timer) {
+		Time_Reset(timer);
+		return false;
+	}
+
 	bool result = true;
 
-	if (Time_Get() - timer->lo_timer < interval_in_ms)
+	if (Time_Get() - timer->lo_timer < interval_in_ms) {
 		result = false;
+	}
 	else {
-		/// update timer when time has passed
-		if (reset_elapsed)
+		if (!run_once) {
 			timer->lo_timer = Time_Get();
+		}
 	}
 
 	return result;
@@ -2094,6 +2100,7 @@ String_TrimLeft(
     }
 
     Memory_Copy(s_data->value, s_data->value + length, s_data->length - length);
+    s_data->length -= length;
 
     s_data->changed = true;
 }
@@ -2334,7 +2341,6 @@ operator > (
 
 	return false;
 }
-
 
 /// ::: Array
 /// ===========================================================================
@@ -2810,6 +2816,35 @@ Array_Sort_Descending(
 	Array_Sort_Quick_Descending(&array->memory[0], &array->memory[array->count - 1]);
 }
 
+instant String
+String_GetDelimiterSection(
+	String *s_data,
+	const char *c_delimiter,
+	u64 index,
+	bool auto_trim = true
+) {
+	String s_result;
+
+	static Array<String> as_section;
+
+	Array_Clear(&as_section);
+	as_section = String_Split(s_data, c_delimiter);
+
+	FOR_ARRAY(as_section, it) {
+		if (it == index) {
+			String *ts_entry = &ARRAY_IT(as_section, it);
+
+			String_Append(&s_result, ts_entry->value, ts_entry->length);
+
+			break;
+		}
+	}
+
+	String_TrimLeft(&s_result);
+	String_TrimRight(&s_result);
+
+	return s_result;
+}
 
 /// ::: CPU
 /// ===========================================================================
@@ -3214,16 +3249,17 @@ struct File_Watcher {
 instant void
 File_Watch(
 	File_Watcher *file_watcher,
-	String *s_filename
+	const char *c_filename,
+	u64 c_length = 0
 ) {
 	Assert(file_watcher);
 
 	*file_watcher = {};
 
-	char *c_filename = String_CreateCBufferCopy(s_filename);
+	char *tc_filename = String_CreateCBufferCopy(c_filename, c_length);
 
 	file_watcher->file = CreateFile(
-			c_filename,
+			tc_filename,
 			0,
 			0,
 			NULL,
@@ -3235,7 +3271,7 @@ File_Watch(
 	if (file_watcher->file)
 		file_watcher->exists = true;
 
-	Memory_Free(c_filename);
+	Memory_Free(tc_filename);
 }
 
 instant bool
@@ -3720,7 +3756,7 @@ Window_Show(
 }
 
 instant void Mouse_Reset(Mouse *mouse);
-instant void Keyboard_Reset(Keyboard *keyboard);
+instant void Keyboard_ResetLastKey(Keyboard *keyboard);
 
 instant void
 Window_UpdateAndResetInput(
@@ -3731,7 +3767,7 @@ Window_UpdateAndResetInput(
 	SwapBuffers(window->hDC);
 
 	Mouse_Reset(window->mouse);
-	Keyboard_Reset(window->keyboard);
+	Keyboard_ResetLastKey(window->keyboard);
 }
 
 instant void
@@ -5754,8 +5790,10 @@ struct Keyboard {
     u8   key_states[256]	= {};
 };
 
+/// reset last key pressed
+/// to prevent continuous input events
 instant void
-Keyboard_Reset(
+Keyboard_ResetLastKey(
 	Keyboard *keyboard
 ) {
 	if (!keyboard)
@@ -5763,23 +5801,34 @@ Keyboard_Reset(
 
 	u32 vkey = keyboard->last_key_virtual;
 
-	if (keyboard->down[vkey]) {
-		keyboard->down[vkey] 		= false;
-		keyboard->is_down 			= false;
-		keyboard->is_key_sym 		= false;
-		keyboard->key_sym 			= 0;
-		keyboard->key_scan			= 0;
-		keyboard->last_key_virtual	= 0;
-	}
+	keyboard->down[vkey] 		= false;
+	keyboard->up[vkey] 			= false;
 
-	if (keyboard->up[vkey]) {
-		keyboard->up[vkey] 			= false;
-		keyboard->is_up 			= false;
-		keyboard->is_key_sym 		= false;
-		keyboard->key_scan			= 0;
-		keyboard->key_sym 			= 0;
-		keyboard->last_key_virtual	= 0;
-	}
+	keyboard->is_down 			= false;
+	keyboard->is_up 			= false;
+
+	keyboard->is_key_sym 		= false;
+	keyboard->key_sym 			= 0;
+	keyboard->key_scan			= 0;
+	keyboard->last_key_virtual	= 0;
+}
+
+instant void
+Keyboard_Reset(
+	Keyboard *keyboard,
+	bool full_reset = false
+) {
+	Assert(keyboard);
+
+	bool pressing[KEYBOARD_KEYCOUNT] = {};
+
+	if (!full_reset)
+		Memory_Copy(&pressing, &keyboard->pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
+
+    *keyboard = {};
+
+    if (!full_reset)
+		Memory_Copy(&keyboard->pressing, &pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
 }
 
 instant void
@@ -5838,17 +5887,19 @@ Keyboard_SetUp(
 	Assert(msg);
 
 	keyboard->key_scan = MapVirtualKey(msg->wParam, 0);
-
-	keyboard->down[msg->wParam] 		= false;
-	keyboard->up[msg->wParam] 			= true;
-	keyboard->pressing[msg->wParam] 	= false;
-	keyboard->repeating[msg->wParam] 	= false;
-
-	Keyboard_GetKeySym(keyboard, msg);
-
 	keyboard->last_key_virtual 	= msg->wParam;
-	keyboard->is_down 			= false;
-	keyboard->is_up				= true;
+
+	if (keyboard->pressing[msg->wParam]) {
+		keyboard->down[msg->wParam] 		= false;
+		keyboard->up[msg->wParam] 			= true;
+		keyboard->pressing[msg->wParam] 	= false;
+		keyboard->repeating[msg->wParam] 	= false;
+
+		Keyboard_GetKeySym(keyboard, msg);
+
+		keyboard->is_down 			= false;
+		keyboard->is_up				= true;
+	}
 }
 
 instant bool
@@ -5889,6 +5940,46 @@ Keyboard_Insert(
 	Assert(s_data);
 
 	String_Insert(s_data, s_data->length, keyboard->key_sym);
+}
+
+instant bool
+Keyboard_IsPressingAnyKey(
+	Keyboard *keyboard
+) {
+	Assert(keyboard);
+
+	bool result = false;
+
+	FOR(KEYBOARD_KEYCOUNT, it) {
+		if (keyboard->pressing[it]) {
+			result = true;
+			break;
+		}
+	}
+
+	return result;
+}
+
+instant void
+Keyboard_WaitForIdle(
+	Keyboard *keyboard,
+	bool *pending_event,
+	u32 delay_in_ms = 400
+) {
+	Assert(keyboard);
+	Assert(pending_event);
+
+	if (*pending_event) {
+		static Timer timer_input_delay;
+
+		if (Time_HasElapsed(&timer_input_delay, delay_in_ms, true)) {
+			if (!Keyboard_IsPressingAnyKey(keyboard)) {
+				*pending_event = false;
+			}
+		}
+
+		Keyboard_Reset(keyboard);
+	}
 }
 
 /// ::: Joypad
@@ -6130,25 +6221,28 @@ Font_Load(
 ) {
 	Assert(s_file);
 
-    Font font;
-    font.s_data = File_ReadAll(s_file->value, s_file->length, true);
-    font.size = size;
+    Font font = {};
+    String s_font_data = File_ReadAll(s_file->value, s_file->length, true);
 
-    if (!font.s_data.length) {
+    if (!s_font_data.length) {
 		char *c_filename = String_CreateCBufferCopy(s_file);
 
 		LOG_ERROR("Font \"" << c_filename << "\" does not exists.");
     }
+    else {
+		font.s_data = s_font_data;
+		font.size = size;
 
-    const u8 *c_data = (u8 *)font.s_data.value;
-    stbtt_InitFont(&font.info, c_data, stbtt_GetFontOffsetForIndex(c_data, 0));
+		const u8 *c_data = (u8 *)font.s_data.value;
+		stbtt_InitFont(&font.info, c_data, stbtt_GetFontOffsetForIndex(c_data, 0));
 
-	float scale = stbtt_ScaleForPixelHeight(&font.info, font.size);
+		float scale = stbtt_ScaleForPixelHeight(&font.info, font.size);
 
-	stbtt_GetFontVMetrics(&font.info, &font.ascent, &font.descent, &font.linegap);
-	font.ascent  *= scale;
-	font.descent *= scale;
-	font.linegap *= scale;
+		stbtt_GetFontVMetrics(&font.info, &font.ascent, &font.descent, &font.linegap);
+		font.ascent  *= scale;
+		font.descent *= scale;
+		font.linegap *= scale;
+    }
 
     return font;
 }
@@ -7098,7 +7192,7 @@ Layout_ArrangeBlockX(
 	Assert(layout_block);
 	Assert(layout_block->type == LAYOUT_TYPE_X);
 
-	Layout_Block *t_block_last;
+	Layout_Block *t_block_last = 0;
 	Layout_GetLastBlock(layout, &t_block_last);
 
 	bool is_last_block = (t_block_last == layout_block);
@@ -7236,7 +7330,7 @@ Layout_ArrangeBlockY(
 	Assert(layout_block);
 	Assert(layout_block->type == LAYOUT_TYPE_Y);
 
-	Layout_Block *t_block_last;
+	Layout_Block *t_block_last = 0;
 	Layout_GetLastBlock(layout, &t_block_last);
 
 	bool is_last_block = (t_block_last == layout_block);
@@ -7449,6 +7543,7 @@ struct Widget_Data {
 
 	bool has_focus  = false;
 	bool has_scrollable_list = false;
+	bool is_checked = false;
 
 	WIDGET_SCROLL_TYPE scroll_type = WIDGET_SCROLL_ITEM;
 
@@ -7463,7 +7558,6 @@ struct Widget {
 	Vertex vertex_rect;
 	Window *window;
 
-	bool is_checked = false;
 	bool trigger_autosize = false;
 
 	Array<Widget> a_subwidgets;
@@ -7553,7 +7647,6 @@ Widget_HasChanged(
 				  );
 
 	if (result)  return result;
-
 
 	FOR_ARRAY(widget->data.as_row_data, it) {
 		String *t_data = &ARRAY_IT(widget->data.as_row_data, it);
@@ -7672,7 +7765,7 @@ Widget_Redraw(
 			Rect_Resize(&rect_check, -widget->data.border_size);
 			Vertex_AddRect32(t_vertex, rect_check, widget->data.color_background);
 
-			if (widget->is_checked) {
+			if (widget->data.is_checked) {
 				Rect_Resize(&rect_check, -1);
 				Vertex_AddRect32(t_vertex, rect_check, widget->data.color_outline_selected);
 			}
@@ -7782,8 +7875,12 @@ Widget_Render(
 			widget->trigger_autosize = false;
 		}
 
-		if (Widget_HasChanged(widget))
+		if (Widget_HasChanged(widget)) {
+			widget->data_prev = widget->data;
+			widget->text.data_prev = widget->text.data;
+
 			Widget_InvalidateBackground(widget);
+		}
 
 		if (widget->vertex_rect.a_attributes.count) {
 			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
@@ -7820,6 +7917,9 @@ Widget_Render(
 	}
 	else {
 		if (Widget_HasChanged(widget)) {
+			widget->data_prev = widget->data;
+			widget->text.data_prev = widget->text.data;
+
 			Vertex_ClearAttributes(&widget->vertex_rect);
 			Widget_InvalidateBackground(widget);
 
@@ -7870,9 +7970,6 @@ Widget_Render(
 
 			/// revert for scissor
 			*rect_text = widget->layout_data.settings.rect;
-
-			widget->data_prev = widget->data;
-			widget->text.data_prev = widget->text.data;
 		}
 
 		OpenGL_Scissor(shader_set->window, widget->layout_data.settings.rect);
@@ -8034,16 +8131,12 @@ Widget_UpdateFocus(
 		if (focus_set_next) {
 			t_widget->data.has_focus = true;
 			focus_set_next = false;
-
-			Widget_Redraw(t_widget);
 		}
 		else {
 			if (IF_USE(keyboard).up[VK_TAB]) {
 				if (t_widget->data.has_focus) {
 					t_widget->data.has_focus = false;
 					focus_set_next = true;
-
-					Widget_Redraw(t_widget);
 				}
 			}
 		}
@@ -8061,8 +8154,6 @@ Widget_UpdateFocus(
 
 			if (t_widget->data.is_focusable) {
 				t_widget->data.has_focus = true;
-
-				Widget_Redraw(t_widget);
 				t_widget_focus_check = t_widget;
 
 				break;
@@ -8199,8 +8290,6 @@ Widget_UpdateInput(
 		return;
     }
 
-    bool redraw_required = false;
-
 	if (!widget->data.is_focusable)
 		return;
 
@@ -8253,14 +8342,12 @@ Widget_UpdateInput(
 
 			/// checkbox toggle
 			if (got_focus AND widget->data.is_checkable) {
-				widget->is_checked = !widget->is_checked;
-				redraw_required = true;
+				widget->data.is_checked = !widget->data.is_checked;
 			}
 
 			/// focus change
 			if (widget->data.has_focus != got_focus) {
 				widget->data.has_focus = got_focus;
-				redraw_required = true;
 			}
 		}
 
@@ -8301,8 +8388,7 @@ Widget_UpdateInput(
 		}
 
 		if (keyboard->up[VK_SPACE] AND widget->data.is_checkable) {
-			widget->is_checked = !widget->is_checked;
-			redraw_required = true;
+			widget->data.is_checked = !widget->data.is_checked;
 		}
     }
 
@@ -8339,10 +8425,6 @@ Widget_UpdateInput(
 
 		Rect_Clamp(&widget->rect_content, *rect_widget);
     }
-
-	if (redraw_required) {
-		Widget_Redraw(widget);
-	}
 }
 
 instant void
@@ -8405,7 +8487,7 @@ Layout_Add(
 	Assert(layout);
 	Assert(widget);
 
-	Layout_Block *current_block;
+	Layout_Block *current_block = 0;
 	Layout_GetLastBlock(layout, &current_block);
 
 	Array_Add(&current_block->ap_layout_data, &widget->layout_data);
@@ -8623,7 +8705,6 @@ Widget_CreateCheckbox(
 	t_widget.type         = WIDGET_CHECKBOX;
 	t_widget.rect_content = rect_box;
 	t_widget.window       = window;
-	t_widget.is_checked   = checked;
 
 	t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_height = true;
@@ -8632,6 +8713,7 @@ Widget_CreateCheckbox(
 	t_widget.data.is_checkable = true;
 	t_widget.data.is_focusable = true;
 	t_widget.data.border_size  = 2;
+	t_widget.data.is_checked   = checked;
 
 	t_widget.text.data.color = t_widget.data.color_font;
 

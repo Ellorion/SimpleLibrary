@@ -20,6 +20,9 @@
 
 # Others
 *.txt
+*.dat
+*.ttf
+*.ini
 
 # Object directory
 obj/
