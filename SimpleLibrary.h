@@ -1,5 +1,7 @@
 #pragma once
 
+#define DEBUG_UPDATE_ALWAYS 0
+
 /// Compiler: g++ (6.3.0)
 ///
 /// Linker flags:
@@ -35,7 +37,6 @@
 //Window_HandleEvents(Window *window) {
 //	MSG msg;
 //	bool running = true;
-//	bool ui_zoom_enabled = false;
 //
 //	while(running) {
 //		msg = {};
@@ -43,13 +44,13 @@
 //		/// Events
 //		/// ===================================================================
 //		Window_ReadMessage(msg, running, window);
-//		Window_AdjustScale(window, ui_zoom_enabled);
+//		OpenGL_AdjustScaleViewport(window, false);
 //
 //		/// Render
 //		/// ===================================================================
 //		OpenGL_ClearScreen();
 //
-//		Window_Update(window);
+//		Window_UpdateAndResetInput(window);
 //	}
 //}
 /// ===========================================================================
@@ -121,14 +122,14 @@
 //			LOG_DEBUG(fps << " fps");
 //		}
 //
-//		Window_Update(window);
+//		Window_UpdateAndResetInput(window);
 //	}
 //
 //	Texture_Destroy(&texture);
 //	Vertex_Destroy(&vertex);
 //	ShaderSet_Destroy(&shader_set);
 //}
-//
+
 //int main() {
 //	Window window;
 //
@@ -178,7 +179,7 @@
 //			LOG_DEBUG("Mouse pos: x = " << t_point.x << " - y: " << t_point.y);
 //		}
 //
-//		Window_Update(window);
+//		Window_UpdateAndResetInput(window);
 //	}
 //}
 //
@@ -237,7 +238,7 @@
 //			}
 //		}
 //
-//		Window_Update(window);
+//		Window_UpdateAndResetInput(window);
 //	}
 //}
 //
@@ -287,7 +288,7 @@
 //		LOG_DEBUG("X-Axis Section: " << Joypad_GetSection(joypad.state.thumb_left_x, 3000, 10));
 //		LOG_DEBUG("Y-Axis Section: " << Joypad_GetSection(joypad.state.thumb_left_y, 3000, 10));
 //
-//		Window_Update(window);
+//		Window_UpdateAndResetInput(window);
 //	}
 //}
 //
@@ -341,7 +342,7 @@
 //	String_Replace(&s_data, "\r\n", "\n");
 //
 //	Text text = Text_Create(&shader_set, &font, &s_data, {10, 10, window->width - 20, window->height}, TEXT_ALIGN_X_LEFT);
-//	ShaderSet_Use(&shader_set, SHADER_PROG_TEXT);
+//	text.data.color = {1, 0, 0, 1};
 //
 //	while(running) {
 //		msg = {};
@@ -358,9 +359,10 @@
 //		/// ===================================================================
 //		OpenGL_ClearScreen();
 //
+//		Text_Update(&text);
 //		Text_Render(&text);
 //
-//		Window_Update(window);
+//		Window_UpdateAndResetInput(window);
 //
 //		u32 fps = Time_GetFPS(&timer_fps);
 //
@@ -384,7 +386,7 @@
 //	Window_Show(&window);
 //
 //	OpenGL_Init(&window);
-//	OpenGL_SetVSync(&window, true);
+//	OpenGL_SetVSync(&window, false);
 //
 //	Window_HandleEvents(&window);
 //
@@ -431,9 +433,9 @@
 //		String_Append(&s_box_data, "Hello");
 //
 //		text_box.shader_set = &shader_set;
-//		text_box.rect       = rect_box;
+//		text_box.data.rect  = rect_box;
 //		text_box.font       = &font;
-//		text_box.color      = Color_MakeGrey(0.0f);
+//		text_box.data.color = Color_MakeGrey(0.0f);
 //
 //		String_Append(&text_box.s_data, s_box_data.value, s_box_data.length);
 //
@@ -461,7 +463,7 @@
 //		ShaderSet_Use(&shader_set, SHADER_PROG_TEXT);
 //		Text_Render(&text_box);
 //
-//		Window_Update(window);
+//		Window_UpdateAndResetInput(window);
 //	}
 //
 //	Text_Destroy(&text_box);
@@ -477,7 +479,7 @@
 //	Window_Show(&window);
 //
 //	OpenGL_Init(&window);
-//	OpenGL_SetVSync(&window, true);
+//	OpenGL_SetVSync(&window, false);
 //
 //	Window_HandleEvents(&window);
 //
@@ -512,9 +514,9 @@
 //	Widget widget_exit     = Widget_CreateButton(window, &font_20, { 320,  50, 100,  30}, "Exit");
 //
 //	Array<Widget *> ap_widgets;
-//	Widget_AddRenderTabStop(&ap_widgets, &widget_label);
-//	Widget_AddRenderTabStop(&ap_widgets, &widget_click_me);
-//	Widget_AddRenderTabStop(&ap_widgets, &widget_exit);
+//	Array_Add(&ap_widgets, &widget_label);
+//	Array_Add(&ap_widgets, &widget_click_me);
+//	Array_Add(&ap_widgets, &widget_exit);
 //
 //	while(running) {
 //		msg = {};
@@ -527,10 +529,10 @@
 //		/// hold shift-key to get reverse order
 //		Widget_UpdateFocus(&ap_widgets, keyboard->pressing[VK_SHIFT]);
 //
-//		if (keyboard->up[VK_ESCAPE] OR Widget_OnClick(&widget_exit))
+//		if (keyboard->up[VK_ESCAPE] OR widget_exit.events.on_trigger)
 //			running = false;
 //
-//		if (Widget_OnClick(&widget_click_me)) {
+//		if (widget_click_me.events.on_trigger) {
 //			std::cout << "clicked" << std::endl;
 //		}
 //
@@ -540,7 +542,7 @@
 //
 //		Widget_Render(&shader_set, &ap_widgets);
 //
-//		Window_Update(window);
+//		Window_UpdateAndResetInput(window);
 //	}
 //
 //	Widget_Destroy(&ap_widgets);
@@ -598,10 +600,13 @@
 //	Widget widget_click_me = Widget_CreateButton( window, &font_20, {320,  20, 100,  30}, "click me");
 //	Widget widget_exit     = Widget_CreateButton( window, &font_20, {320,  50, 100,  30}, "Exit");
 //
+//	widget_click_me.trigger_autosize = false;
+//	widget_exit.trigger_autosize     = false;
+//
 //	Array<Widget *> ap_widgets;
-//	Widget_AddRenderTabStop(&ap_widgets, &widget_listbox);
-//	Widget_AddRenderTabStop(&ap_widgets, &widget_click_me);
-//	Widget_AddRenderTabStop(&ap_widgets, &widget_exit);
+//	Array_Add(&ap_widgets, &widget_listbox);
+//	Array_Add(&ap_widgets, &widget_click_me);
+//	Array_Add(&ap_widgets, &widget_exit);
 //
 //	Widget_AddRow(&widget_listbox, "1");
 //	Widget_AddRow(&widget_listbox, "2");
@@ -628,21 +633,21 @@
 //		OpenGL_AdjustScaleViewport(window);
 //
 //		/// hold shift-key to get reverse tab order
-//		Widget_UpdateInput(&ap_widgets);
-//		Widget_UpdateFocus(&ap_widgets, keyboard->pressing[VK_SHIFT]);
+//		Widget_Update(&ap_widgets, keyboard);
 //
-//		if (keyboard->up[VK_ESCAPE] OR Widget_OnClick(&widget_exit))
+//		if (keyboard->up[VK_ESCAPE] OR widget_exit.events.on_trigger)
 //			running = false;
 //
-//		if (Widget_OnClick(&widget_click_me)) {
+//		if (widget_click_me.events.on_trigger) {
 //			std::cout << "clicked" << std::endl;
 //		}
 //
-//		if (Widget_OnClick(&widget_listbox)) {
-//			String s_row_data;
-//			Widget_GetSelectedRow(&widget_listbox, &s_row_data);
+//		if (widget_listbox.events.on_trigger) {
+//			String s_row_data = Widget_GetSelectedRow(&widget_listbox);
 //
 //			LOG_DEBUG(s_row_data.value);
+//
+//			String_Destroy(&s_row_data);
 //		}
 //
 //		/// Render
@@ -651,7 +656,7 @@
 //
 //		Widget_Render(&shader_set, &ap_widgets);
 //
-//		Window_Update(window);
+//		Window_UpdateAndResetInput(window);
 //
 //		u32 fps = Time_GetFPS(&timer_fps);
 //
@@ -708,14 +713,22 @@
 //	Widget w_button_menu_1   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "menu_1");
 //	Widget w_button_menu_2   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "menu_2");
 //	Widget w_button_menu_3   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "menu_3");
+//
 //	Widget w_button_top_1    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "top_1");
 //	Widget w_button_top_2    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "top_2");
-//	Widget w_button_top_3    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "top_3");
-//	Widget w_button_center_1 = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "center_1");
+//	Widget w_combobox        = Widget_CreateComboBox(window, &font_20, {}, 200);
+//
+//	Widget *w_combo_list = &ARRAY_IT(w_combobox.a_subwidgets, 2);
+//
+//	Widget_AddRow(&w_combobox, "Hello");
+//
+//	w_combo_list->data.color_background = Color_MakeGrey(0.5f);
+//
+//	Widget w_button_center_1 = Widget_CreateCheckBox(window, &font_20, {0, 0, 100, 30}, "center_1", false);
 //	Widget w_spreader        = Widget_CreateSpreader(window);
 //	Widget w_numpic          = Widget_CreateNumberPicker(window, &font_20, {0, 0, 100, 30}, {0, 5, 3, 1});
 //
-//	w_button_top_2.layout_data.auto_width = false;
+//	w_button_top_2.layout_data.settings.auto_width = false;
 //
 //	Layout layout;
 //	Layout_Create(&layout, {0, 0, window->width, window->height}, true);
@@ -725,7 +738,7 @@
 //	Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, -1);
 //	Layout_Add(&layout, &w_button_top_1);
 //	Layout_Add(&layout, &w_button_top_2);
-//	Layout_Add(&layout, &w_button_top_3);
+//	Layout_Add(&layout, &w_combobox);
 //	Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT,  -1);
 //	Layout_Add(&layout, &w_button_menu_1);
 //	Layout_Add(&layout, &w_button_menu_2);
@@ -733,17 +746,16 @@
 //	Layout_Add(&layout, &w_button_menu_3);
 //	Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT);
 //	Layout_Add(&layout, &w_button_center_1);
-//	Layout_Arrange(&layout);
 //
 //	Array<Widget *> ap_widgets;
-//	Widget_AddRenderTabStop(&ap_widgets, &w_button_top_1);
-//	Widget_AddRenderTabStop(&ap_widgets, &w_button_top_2);
-//	Widget_AddRenderTabStop(&ap_widgets, &w_button_top_3);
-//	Widget_AddRenderTabStop(&ap_widgets, &w_button_menu_1);
-//	Widget_AddRenderTabStop(&ap_widgets, &w_button_menu_2);
-//	Widget_AddRenderTabStop(&ap_widgets, &w_button_menu_3);
-//	Widget_AddRenderTabStop(&ap_widgets, &w_button_center_1);
-//	Widget_AddRenderTabStop(&ap_widgets, &w_numpic);
+//	Array_Add(&ap_widgets, &w_button_top_1);
+//	Array_Add(&ap_widgets, &w_button_top_2);
+//	Array_Add(&ap_widgets, &w_combobox);
+//	Array_Add(&ap_widgets, &w_button_menu_1);
+//	Array_Add(&ap_widgets, &w_button_menu_2);
+//	Array_Add(&ap_widgets, &w_button_menu_3);
+//	Array_Add(&ap_widgets, &w_button_center_1);
+//	Array_Add(&ap_widgets, &w_numpic);
 //
 //	while(running) {
 //		msg = {};
@@ -753,9 +765,11 @@
 //		Window_ReadMessage(msg, running, window);
 //		OpenGL_AdjustScaleViewport(window);
 //
+//		Layout_Resize(&layout, {0, 0, window->width, window->height});
+//		Layout_Arrange(&layout);
+//
 //		/// hold shift-key to get reverse tab order
-//		Widget_UpdateInput(&ap_widgets);
-//		Widget_UpdateFocus(&ap_widgets, keyboard->pressing[VK_SHIFT]);
+//		Widget_Update(&ap_widgets, keyboard);
 //
 //		if (keyboard->up[VK_ESCAPE])
 //			running = false;
@@ -766,7 +780,9 @@
 //
 //		Widget_Render(&shader_set, &ap_widgets);
 //
-//		Window_Update(window);
+//		LOG_DEBUG(Widget::widget_focus_current->type)
+//
+//		Window_UpdateAndResetInput(window);
 //	}
 //
 //	Widget_Destroy(&ap_widgets);
@@ -828,6 +844,10 @@ __inline__ static void debug_break(void)
 
 #define instant static inline
 
+/// ::: Globals
+/// ===========================================================================
+static u64 global_frame_count = 0;
+
 /// ::: Iterators
 /// ===========================================================================
 #define FOR(_max, _it)				\
@@ -877,7 +897,7 @@ _AssertMessage(
 
 /// ::: Debug
 /// ===========================================================================
-#define LOG_DEBUG(text) std::cout << text << std::endl;
+#define LOG_DEBUG(text) std::cout << "Frame [" << global_frame_count << "]: " << text << std::endl;
 
 /// ::: Utilities
 /// ===========================================================================
@@ -1761,8 +1781,14 @@ String_IsEqual(
 		return true;
 
 	/// in case one has more than nothing
-	if (!s_data OR !c_data)
+	if (!s_data OR !c_data) {
+		if (s_data AND s_data->length == 0) {
+			/// still equally nothing
+			return true;
+		}
+
 		return false;
+	}
 
 	/// in case one nothing
 	if (!s_data->value OR !s_data->length)
@@ -2378,7 +2404,7 @@ struct Array {
 ///       to a pointer (clone) or don't free the
 ///       passed / connected data
 template <typename T>
-instant void
+instant T *
 Array_Add(
 	Array<T> *array,
 	T element
@@ -2398,6 +2424,8 @@ Array_Add(
 	array->size += sizeof(T) * length;
 
 	++array->count;
+
+	return &array->memory[target];
 }
 
 template <typename T>
@@ -3633,7 +3661,7 @@ Window_Create(
 	HINSTANCE hInstance = GetModuleHandle(0);
 
 	WNDCLASS wc 	 = {};
-	wc.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS;
+	wc.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 	wc.lpfnWndProc   = (WNDPROC)WindowProc;
 	wc.cbClsExtra    = 0;
 	wc.cbWndExtra    = 0;
@@ -4404,7 +4432,8 @@ R"(
 	#version 330 core
 
 	layout(points) in;
-	layout(triangle_strip, max_vertices = 4) out;
+	layout(triangle_strip) out;
+	layout(max_vertices = 6) out;
 
 	in Vertex_Data {
 		mat4 proj_matrix;
@@ -4426,23 +4455,31 @@ R"(
 		vec4 v_pos_3 = matrix_mod * vec4(pt.z, pt.y, 0, 1) * scale_matrix;
 		vec4 v_pos_4 = matrix_mod * vec4(pt.z, pt.w, 0, 1) * scale_matrix;
 
-		/// v1
+		// ---------------------------------
 		gl_Position = v_pos_1;
 		rect_color = i_Vertex[0].rect_color;
 		EmitVertex();
 
-		/// v3
 		gl_Position = v_pos_2;
 		rect_color = i_Vertex[0].rect_color;
 		EmitVertex();
 
-		/// v2
 		gl_Position = v_pos_3;
 		rect_color = i_Vertex[0].rect_color;
 		EmitVertex();
 
-		/// v4
+		// ---------------------------------
 		gl_Position = v_pos_4;
+		rect_color = i_Vertex[0].rect_color;
+		EmitVertex();
+
+		gl_Position = v_pos_1;
+		rect_color = i_Vertex[0].rect_color;
+		EmitVertex();
+
+		// ---------------------------------
+
+		gl_Position = v_pos_2;
 		rect_color = i_Vertex[0].rect_color;
 		EmitVertex();
 
@@ -4455,10 +4492,11 @@ R"(
 
 	layout(origin_upper_left) in vec4 gl_FragCoord;
 
-	in vec4 rect_color;
+	in  vec4 rect_color;
+	out vec4 out_frag_color;
 
 	void main() {
-		gl_FragColor = rect_color;
+		out_frag_color = rect_color;
 	}
 )"};
 
@@ -4578,9 +4616,11 @@ R"(
 	in vec2 tex_coords;
 	in vec3 text_color;
 
+	out vec4 out_frag_color;
+
 	void main() {
 		vec4 color_greyscale = texture2D(fragment_texture, tex_coords);
-		gl_FragColor = vec4(text_color.xyz, color_greyscale.a);
+		out_frag_color = vec4(text_color.xyz, color_greyscale.a);
 	}
 )"};
 
@@ -4709,8 +4749,10 @@ R"(
 		vec2 tex_coords;
 	} i_Vertex;
 
+	out vec4 out_frag_color;
+
 	void main() {
-		gl_FragColor = texture2D(fragment_texture, i_Vertex.tex_coords);
+		out_frag_color = texture2D(fragment_texture, i_Vertex.tex_coords);
 	}
 )"};
 
@@ -4841,8 +4883,10 @@ R"(
 
 	in vec2 tex_coords;
 
+	out vec4 out_frag_color;
+
 	void main() {
-		gl_FragColor = texture2D(fragment_texture, tex_coords);
+		out_frag_color = texture2D(fragment_texture, tex_coords);
 	}
 )"};
 
@@ -5555,7 +5599,7 @@ struct Mouse {
 	bool down[MOUSE_BUTTON_COUNT];
 	bool pressing[MOUSE_BUTTON_COUNT];
 	s32  wheel = 0;
-	bool double_click[MOUSE_BUTTON_COUNT];
+//	bool double_click[MOUSE_BUTTON_COUNT];
 
 	bool is_up        = false;
 	bool is_down      = false;
@@ -5605,7 +5649,7 @@ Mouse_Reset(
 	mouse->wheel = 0;
 
 	FOR(MOUSE_BUTTON_COUNT, it) {
-		mouse->double_click[it] = false;
+//		mouse->double_click[it] = false;
 		mouse->down[it] = false;
 		mouse->up[it]   = false;
 	}
@@ -5720,6 +5764,8 @@ Mouse_Update(
 			mouse->pressing[0] = false;
 			mouse->up[0] = true;
 			mouse->is_up = true;
+
+//			LOG_DEBUG("mouse up: " << mouse->up[0])
 		} break;
 
 		case WM_MBUTTONUP:   {
@@ -5734,23 +5780,23 @@ Mouse_Update(
 			mouse->is_up = true;
 		} break;
 
-		case WM_LBUTTONDBLCLK: {
-			mouse->double_click[0] = true;
-			mouse->is_down = true;
-			mouse->is_up = true;
-		} break;
-
-		case WM_MBUTTONDBLCLK: {
-			mouse->double_click[1] = true;
-			mouse->is_down = true;
-			mouse->is_up = true;
-		} break;
-
-		case WM_RBUTTONDBLCLK: {
-			mouse->double_click[2] = true;
-			mouse->is_down = true;
-			mouse->is_up = true;
-		} break;
+//		case WM_LBUTTONDBLCLK: {
+//			mouse->double_click[0] = true;
+//			mouse->is_down = true;
+//			mouse->is_up = true;
+//		} break;
+//
+//		case WM_MBUTTONDBLCLK: {
+//			mouse->double_click[1] = true;
+//			mouse->is_down = true;
+//			mouse->is_up = true;
+//		} break;
+//
+//		case WM_RBUTTONDBLCLK: {
+//			mouse->double_click[2] = true;
+//			mouse->is_down = true;
+//			mouse->is_up = true;
+//		} break;
 
 		case WM_MOUSEWHEEL: {
 			mouse->wheel = MOUSE_WHEEL_GET_DELTA(msg->wParam) * 16;
@@ -5829,6 +5875,26 @@ Keyboard_Reset(
 
     if (!full_reset)
 		Memory_Copy(&keyboard->pressing, &pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
+}
+
+instant void
+Keyboard_ResetKey(
+	Keyboard *keyboard,
+	u32 key_virtual
+) {
+	if (!keyboard)
+		return;
+
+	keyboard->down[key_virtual] = false;
+	keyboard->up[key_virtual] 	= false;
+
+	keyboard->is_down 			= false;
+	keyboard->is_up 			= false;
+
+	keyboard->is_key_sym 		= false;
+	keyboard->key_sym 			= 0;
+	keyboard->key_scan			= 0;
+	keyboard->last_key_virtual	= 0;
 }
 
 instant void
@@ -6478,7 +6544,7 @@ struct Text_Data {
 	Rect rect 			= {}; /// draw area
 	Rect rect_padding 	= {};
 	Rect rect_margin    = {};
-	Color32 color 		= {1.0f, 0, 0, 1.0f};
+	Color32 color 		= {0.0f, 0.0f, 0.0f, 1.0f};
 
 	TEXT_ALIGN_X_TYPE align_x = TEXT_ALIGN_X_LEFT;
 	TEXT_ALIGN_Y_TYPE align_y = TEXT_ALIGN_Y_TOP;
@@ -6540,13 +6606,21 @@ Text_Destroy(
 
 instant bool
 Text_HasChanged(
-	Text *text
+	Text *text,
+	bool update_changes
 ) {
 	Assert(text);
 
 	bool has_changed = text->s_data.changed;
 
 	has_changed |= !Memory_Compare(&text->data, &text->data_prev, sizeof(text->data));
+
+	#if !DEBUG_UPDATE_ALWAYS
+	if (has_changed AND update_changes) {
+		text->data_prev = text->data;
+		text->s_data.changed = false;
+	}
+	#endif
 
 	return has_changed;
 }
@@ -6578,7 +6652,6 @@ Text_BuildLinesStatic(
 	Array<Text_Line> *a_text_line
 ) {
 	Assert(text);
-	Assert(text->font);
 	Assert(as_words);
 	Assert(a_text_line);
 
@@ -6594,9 +6667,13 @@ Text_BuildLinesStatic(
 	}
 	Array_ClearContainer(a_text_line);
 
+	s32 height_max  = 0;
+
+	if (as_words->count == 0)
+		return height_max;
+
 	Assert(a_text_line->count == 0);
 
-	s32 height_max  = 0;
 	s32 height_line = Font_GetLineHeight(font);
 	bool line_start = true;
 
@@ -6810,8 +6887,6 @@ Text_AddLines(
 	Array<Text_Line> *a_text_lines,
 	bool include_offsets = true
 ) {
-	Assert(text->shader_set);
-	Assert(text->font);
 	Assert(a_text_lines);
 
 	Rect rect = text->data.rect;
@@ -6925,7 +7000,7 @@ Text_Update(
 	Assert(text);
 
 	/// redraw text
-	if (Text_HasChanged(text)) {
+	if (Text_HasChanged(text, false)) {
 		String_SplitWordsStatic(&text->s_data, &text->as_words);
 		s32 text_height = Text_BuildLinesStatic(text, &text->as_words, &text->a_text_lines);
 
@@ -6955,8 +7030,8 @@ Text_Update(
 
 		Rect_Clamp(&text->data.rect_content, text->data.rect);
 
-		text->s_data.changed = false;
 		text->data_prev = text->data;
+		text->s_data.changed = false;
 
 		return true;
 	}
@@ -6982,15 +7057,11 @@ Vertex_IsEmpty(
 
 instant void
 Text_Render(
-	Text *text,
-	bool auto_update = true
+	Text *text
 ) {
 	Assert(text);
 
 	bool is_fixed_size = (text->data.rect.w OR text->data.rect.h);
-
-	if (auto_update)
-		Text_Update(text);
 
 	if (is_fixed_size)
 		OpenGL_Scissor(text->shader_set->window, text->data.rect);
@@ -7500,8 +7571,8 @@ struct Widget;
 
 typedef void (*Widget_OwnerDraw)
 	(Widget *widget);
-typedef void (*Widget_UpdateCustomInputs)
-	(Widget *widget, u64 it_current, Array<Widget> *subwidgets, Widget *widget_parent);
+typedef void (*Widget_UpdateCustomInputsSub)
+	(Widget *widget_parent, u64 sub_index);
 
 enum WIDGET_TYPE {
 	WIDGET_LABEL,
@@ -7511,12 +7582,18 @@ enum WIDGET_TYPE {
 	WIDGET_PICTUREBOX,
 	WIDGET_SPREADER,
 	WIDGET_NUMBERPICKER,
-	WIDGET_TEXTBOX
+	WIDGET_TEXTBOX,
+	WIDGET_COMBOBOX
 };
 
 enum WIDGET_SCROLL_TYPE {
 	WIDGET_SCROLL_ITEM,
 	WIDGET_SCROLL_BLOCK
+};
+
+enum WIDGET_SELECT_TYPE {
+	WIDGET_SELECT_ON_RETURN,
+	WIDGET_SELECT_ON_INDEX_CHANGE
 };
 
 struct Widget_Slide {
@@ -7531,7 +7608,6 @@ struct Widget_Data {
 	Color32 color_outline          = {0.8f, 0.8f, 0.8f, 1.0f}; //{0.0f, 0.0f, 1.0f, 1.0f};
 	Color32 color_outline_selected = {1.0f, 0.0f, 0.0f, 1.0f};
 	Color32 color_outline_inactive = {0.5f, 0.5f, 1.0f, 1.0f};
-	Color32 color_font             = {0.0f, 0.0f, 0.0f, 1.0f};
 	Color32 color_progress         = {0.2f, 0.2f, 0.6f, 1.0f};
 
 	u64  active_row_id = 0;
@@ -7543,6 +7619,10 @@ struct Widget_Data {
 	bool is_scrollable = false;
 	bool is_checkable  = false;
 
+	/// overlay
+	bool is_floating   = false; /// is overlay
+	bool is_popout     = false; /// visible overlay
+
 	bool has_focus  = false;
 	bool has_scrollable_list = false;
 	bool is_checked = false;
@@ -7553,24 +7633,62 @@ struct Widget_Data {
 };
 
 struct Widget {
-	WIDGET_TYPE type;
-	Layout_Data layout_data;
-	Rect rect_content;
-	Text text;
-	Vertex vertex_rect;
 	Window *window;
 
-	bool trigger_autosize = false;
-
-	Array<Widget> a_subwidgets;
-
+	/// Defining Properties
+	WIDGET_TYPE type;
 	Widget_Data data;
 	Widget_Data data_prev;
 	Widget_Slide slide;
 
+	/// On Demand
+	static Widget *widget_focus_current;
+	Widget *widget_focus_on_popout = 0;
+	WIDGET_SELECT_TYPE type_select = WIDGET_SELECT_ON_RETURN;
+
+	/// Triggers (per Frame)
+	bool trigger_autosize = false;
+	bool trigger_popout   = false;
+
+	/// Events (per Frame)
+	struct Widget_Events {
+		bool on_list_change_index = false;
+		bool on_list_change_final = false;
+
+		bool on_text_change = false;
+
+		bool on_trigger = false;
+		bool on_trigger_secondary = false;
+	} events;
+
+	/// Custom Events
 	Widget_OwnerDraw OwnerDraw = 0;
-	Widget_UpdateCustomInputs UpdateCustomInputs = 0;
+	Widget_UpdateCustomInputsSub UpdateCustomInputs = 0;
+
+	/// Rendering
+	Text   text;
+	Vertex vertex_rect;
+
+	/// Layout / Size
+	Layout_Data layout_data;
+	Rect rect_content;
+
+	/// Content
+	Array<Widget> a_subwidgets;
 };
+
+Widget *Widget::widget_focus_current = 0;
+
+instant bool
+Widget_IsListType(
+	Widget *widget
+) {
+	Assert(widget);
+
+	if (widget->type == WIDGET_LISTBOX)  return true;
+
+	return false;
+}
 
 instant void
 Widget_AddRow(
@@ -7580,6 +7698,15 @@ Widget_AddRow(
 ) {
 	if (!c_row_data)
 		return;
+
+	/// list contained in subwidgets
+	switch (widget->type) {
+		case WIDGET_COMBOBOX: {
+			widget = &ARRAY_IT(widget->a_subwidgets, 2);
+		} break;
+
+		default: {} break;
+	}
 
 	String *ts_data;
 	Array_AddEmpty(&widget->data.as_row_data, &ts_data);
@@ -7603,65 +7730,207 @@ Widget_AddRows(
 
 instant bool
 Mouse_IsHovering(
-	Widget *widget
+	Widget *widget,
+	Mouse *mouse = 0
 ) {
 	Assert(widget);
 
 	Point t_point;
-	Mouse_GetPosition(&t_point.x, &t_point.y, widget->window);
+	bool is_hovering_popout = false;
+
+	if (mouse) {
+		Mouse_GetPosition(mouse, widget->window);
+		t_point = mouse->point;
+	}
+	else {
+		Mouse_GetPosition(&t_point.x, &t_point.y, widget->window);
+	}
+
+	/// overlay check
+	if (    widget != widget->widget_focus_current
+		AND widget->widget_focus_current
+		AND widget->widget_focus_current->data.is_floating
+	) {
+		if (widget->widget_focus_current->data.is_popout) {
+			if (widget->type == WIDGET_CHECKBOX) {
+				int a = 1;
+			}
+
+			is_hovering_popout = Mouse_IsHovering(widget->widget_focus_current, mouse);
+		}
+	}
+
+	if (is_hovering_popout) {
+		return false;
+	}
 
     return Rect_IsIntersecting(&t_point, &widget->layout_data.settings.rect);
 }
 
 instant bool
-Mouse_IsHovering(
-	Mouse *mouse,
-	Widget *widget
+Widget_HasChanged(
+	Widget *widget,
+	bool update_changes
 ) {
-	Assert(mouse);
 	Assert(widget);
 
-	Mouse_GetPosition(mouse, widget->window);
+	bool result = false;
 
-    return Rect_IsIntersecting(&mouse->point, &widget->layout_data.settings.rect);
+	///@Note: updating text changed will happen
+	///       in a Text_Update
+	result = Text_HasChanged(&widget->text, false);
+
+	if (!result) {
+		result = !Memory_Compare(
+							&widget->layout_data.settings,
+							&widget->layout_data.settings_prev,
+							 sizeof(widget->layout_data.settings)
+					  );
+	}
+
+	if (!result) {
+		result = !Memory_Compare(
+							&widget->data,
+							&widget->data_prev,
+							 sizeof(widget->data)
+					  );
+	}
+
+	if (!result) {
+		FOR_ARRAY(widget->data.as_row_data, it) {
+			String *t_data = &ARRAY_IT(widget->data.as_row_data, it);
+
+			if (t_data->changed) {
+				result = true;
+
+				if (!update_changes)
+					break;
+
+				t_data->changed = false;
+			}
+		}
+	}
+
+	#if !DEBUG_UPDATE_ALWAYS
+	if (update_changes) {
+		widget->layout_data.settings_prev = widget->layout_data.settings;
+		widget->data_prev = widget->data;
+	}
+	#endif
+
+/// @NOTE: do NOT check subwidgets, since they will be added to the render list anyway
+///        and might mess up the update checking
+
+	return result;
+}
+
+instant void
+Widget_AddBorderSizes(
+	Widget *widget,
+	s32 *min_width,
+	s32 *min_height
+) {
+	Assert(widget);
+
+	Rect *rect_padding = &widget->text.data.rect_padding;
+
+	if (min_width) {
+		*min_width += rect_padding->x + rect_padding->w;
+
+		/// border size is used for the checbox,
+		/// not the border of the widget itself
+		if (widget->type != WIDGET_CHECKBOX)
+			*min_width += widget->data.border_size << 1;
+
+		*min_width +=   widget->text.data.rect_margin.x
+					  + widget->text.data.rect_margin.w;
+	}
+
+	if (min_height) {
+		*min_height += rect_padding->y + rect_padding->h;
+
+		/// border size is used for the checbox,
+		/// not the border of the widget itself
+		if (widget->type != WIDGET_CHECKBOX)
+			*min_height += widget->data.border_size << 1;
+
+		*min_height +=  widget->text.data.rect_margin.y
+					  + widget->text.data.rect_margin.h;
+	}
+}
+
+instant void
+Widget_SetFocus(
+	Widget *widget
+) {
+	Assert(widget);
+
+	if (!widget->data.is_focusable)
+		return;
+
+    if (widget->widget_focus_current) {
+    	widget->widget_focus_current->data.has_focus = false;
+    }
+
+    widget->data.has_focus = true;
+    widget->widget_focus_current = widget;
 }
 
 instant bool
-Widget_HasChanged(
+Widget_Update(
 	Widget *widget
 ) {
 	Assert(widget);
 
 	bool result = false;
 
-	result = !Memory_Compare(
-						&widget->layout_data.settings,
-						&widget->layout_data.settings_prev,
-						 sizeof(widget->layout_data.settings)
-				  );
-
-	if (result)  return result;
-
-	result = !Memory_Compare(
-						&widget->data,
-						&widget->data_prev,
-						 sizeof(widget->data)
-				  );
-
-	if (result)  return result;
-
-	FOR_ARRAY(widget->data.as_row_data, it) {
-		String *t_data = &ARRAY_IT(widget->data.as_row_data, it);
-
-		if (t_data->changed) {
-			result = true;
-			break;
-		}
+	FOR_ARRAY(widget->a_subwidgets, it) {
+		Widget *t_widget = &ARRAY_IT(widget->a_subwidgets, it);
+		Widget_Update(t_widget);
 	}
 
-	if (result)  return result;
+	widget->events.on_text_change = Text_Update(&widget->text);
 
-	result = Text_HasChanged(&widget->text);
+	if (widget->trigger_autosize){
+		Layout_Data_Settings *layout_data = &widget->layout_data.settings;
+		Text_Data *settings = &widget->text.data;
+
+		if (layout_data->auto_width AND settings->rect_content.w) {
+			s32 width_auto = settings->rect_content.w;
+			Widget_AddBorderSizes(widget, &width_auto, 0);
+
+			if (layout_data->rect.w != width_auto) {
+				layout_data->rect.w  = width_auto;
+				result = true;
+			}
+		}
+
+		if (layout_data->auto_height AND settings->rect_content.h) {
+			s32 height_auto = settings->rect_content.h;
+			Widget_AddBorderSizes(widget, 0, &height_auto);
+
+			if (layout_data->rect.h != height_auto) {
+				layout_data->rect.h  = height_auto;
+				result = true;
+			}
+		}
+
+		widget->trigger_autosize = false;
+	}
+
+	if (widget->trigger_popout) {
+		widget->data.is_popout = !widget->data.is_popout;
+		widget->trigger_popout = false;
+
+		if (widget->data.is_popout) {
+			Widget_SetFocus(widget);
+		}
+		else {
+			if (widget->widget_focus_on_popout) {
+				Widget_SetFocus(widget->widget_focus_on_popout);
+			}
+		}
+	}
 
 	return result;
 }
@@ -7692,7 +7961,7 @@ Widget_Redraw(
 
 			Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
 
-			if (Widget_HasChanged(widget)) {
+			if (Widget_HasChanged(widget, false)) {
 				Vertex_ClearAttributes(&widget->text.cursor.vertex_cursor);
 				Vertex_ClearAttributes(&widget->text.cursor.vertex_select);
 				Text_Cursor_SetSelection(&widget->text, {}, {});
@@ -7701,6 +7970,46 @@ Widget_Redraw(
 			widget->text.cursor.show_cursor = widget->data.has_focus;
 			Time_Reset(&widget->text.cursor.timer_blinking);
 			widget->text.cursor.is_blink_on = true;
+		} break;
+
+		case WIDGET_COMBOBOX: {
+			Rect *rect_layout = &widget->layout_data.settings.rect;
+
+			rect_layout->h = 0;
+
+			bool is_popped_out = false;
+
+            FOR_ARRAY(widget->a_subwidgets, it) {
+				Widget *t_widget = &ARRAY_IT(widget->a_subwidgets, it);
+				///@Remove?
+//				Widget_Update(t_widget);
+
+                if (!t_widget->data.is_floating) {
+					rect_layout->h = MAX(rect_layout->h, t_widget->layout_data.settings.rect.h);
+                }
+            }
+
+			Layout layout;
+			Layout_Create(&layout, &widget->layout_data, false);
+			layout.padding = 0;
+
+			Layout_Block *t_layout_block = 0;
+			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0, &t_layout_block);
+			t_layout_block->padding = 0;
+
+			/// label
+			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 0));
+			/// button
+			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 1));
+
+
+			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0, &t_layout_block);
+			t_layout_block->padding = 0;
+
+			/// list
+			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 2));
+
+			Layout_Arrange(&layout);
 		} break;
 
 		case WIDGET_LABEL: {
@@ -7807,49 +8116,14 @@ Widget_InvalidateBackground(
 	Assert(widget);
 
 	Widget_Redraw(widget);
-
-	widget->layout_data.settings_prev = widget->layout_data.settings;
 }
 
-instant void
-Widget_AddBorderSizes(
-	Widget *widget,
-	s32 *min_width,
-	s32 *min_height
-) {
-	Assert(widget);
-
-	Rect *rect_padding = &widget->text.data.rect_padding;
-
-	if (min_width) {
-		*min_width += rect_padding->x + rect_padding->w;
-
-		/// border size is used for the checbox,
-		/// not the border of the widget itself
-		if (widget->type != WIDGET_CHECKBOX)
-			*min_width += widget->data.border_size << 1;
-
-		*min_width +=   widget->text.data.rect_margin.x
-					  + widget->text.data.rect_margin.w;
-	}
-
-	if (min_height) {
-		*min_height += rect_padding->y + rect_padding->h;
-
-		/// border size is used for the checbox,
-		/// not the border of the widget itself
-		if (widget->type != WIDGET_CHECKBOX)
-			*min_height += widget->data.border_size << 1;
-
-		*min_height +=  widget->text.data.rect_margin.y
-					  + widget->text.data.rect_margin.h;
-	}
-}
-
-instant void
+/// return an non-rendered overlay widget (if exists)
+instant Widget *
 Widget_Render(
 	ShaderSet *shader_set,
-	Widget *widget
+	Widget *widget,
+	bool render_overlay = false
 ) {
 	Assert(shader_set);
 	Assert(widget);
@@ -7857,37 +8131,12 @@ Widget_Render(
 	widget->text.shader_set = shader_set;
 
 	/// draw non-list data
-	if (!widget->data.as_row_data.count) {
-		Text_Update(&widget->text);
-
-		if (widget->trigger_autosize){
-			Layout_Data_Settings *layout_data = &widget->layout_data.settings;
-			Text_Data *settings = &widget->text.data;
-
-			if (layout_data->auto_width AND settings->rect_content.w) {
-				s32 width_auto = settings->rect_content.w;
-				Widget_AddBorderSizes(widget, &width_auto, 0);
-
-				if (layout_data->rect.w != width_auto) {
-					layout_data->rect.w  = width_auto;
-				}
-			}
-
-			if (layout_data->auto_height AND settings->rect_content.h) {
-				s32 height_auto = settings->rect_content.h;
-				Widget_AddBorderSizes(widget, 0, &height_auto);
-
-				if (layout_data->rect.h != height_auto) {
-					layout_data->rect.h  = height_auto;
-				}
-			}
-
-			widget->trigger_autosize = false;
+	if (!Widget_IsListType(widget)) {
+		if (widget->data.is_floating AND !render_overlay) {
+			return widget;
 		}
 
-		if (Widget_HasChanged(widget)) {
-			widget->data_prev = widget->data;
-
+		if (Widget_HasChanged(widget, true)) {
 			Widget_InvalidateBackground(widget);
 		}
 
@@ -7915,24 +8164,21 @@ Widget_Render(
 			Vertex_ClearAttributes(&vertex_texture);
 		}
 
-		Text_Render(&widget->text, false);
-
-		FOR_ARRAY(widget->a_subwidgets, it_sub) {
-			Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
-			Widget_Render(shader_set, t_subwidget);
-		}
-
-		return;
+		Text_Render(&widget->text);
 	}
 	else {
-		if (Widget_HasChanged(widget)) {
-			widget->data_prev = widget->data;
-			widget->text.data_prev = widget->text.data;
+		if (widget->data.is_floating AND (!widget->data.is_popout OR !render_overlay)) {
+			return widget;
+		}
 
+		///@Refactor: update for list data, might make more sense
+		///           to move it into a seperate update function
+		if (Widget_HasChanged(widget, true)) {
 			Vertex_ClearAttributes(&widget->vertex_rect);
 			Widget_InvalidateBackground(widget);
 
 			Text *t_text = &widget->text;
+
 			Text_Clear(t_text);
 
 			/// x y w
@@ -7979,6 +8225,8 @@ Widget_Render(
 
 			/// revert for scissor
 			*rect_text = widget->layout_data.settings.rect;
+
+			t_text->data_prev = t_text->data;
 		}
 
 		OpenGL_Scissor(shader_set->window, widget->layout_data.settings.rect);
@@ -7989,10 +8237,23 @@ Widget_Render(
 			Rect_Render(shader_set, &widget->vertex_rect);
 		}
 
-		Text_Render(&widget->text, false);
+		Text_Render(&widget->text);
 
 		OpenGL_Scissor_Disable();
 	}
+
+	Widget *wg_overlay = 0;
+
+	FOR_ARRAY(widget->a_subwidgets, it_sub) {
+		Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
+
+		wg_overlay = Widget_Render(shader_set, t_subwidget);
+	}
+
+	/// Reset per Frame Event Data
+	widget->events = {};
+
+	return wg_overlay;
 }
 
 instant void
@@ -8002,10 +8263,24 @@ Widget_Render(
 ) {
 	Assert(ap_widgets);
 
+	Widget *wg_overlay = 0;
+
     FOR_ARRAY(*ap_widgets, it_widget) {
 		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
 
-		Widget_Render(shader_set, t_widget);
+		Widget *twg_overlay_buffer = Widget_Render(shader_set, t_widget, false);
+
+		if (twg_overlay_buffer) {
+			///@Note: there should be only one visible overlay
+			if (!wg_overlay)
+				wg_overlay = twg_overlay_buffer;
+			else
+				Assert(false);
+		}
+    }
+
+    if (wg_overlay) {
+    	Widget_Render(shader_set, wg_overlay, true);
     }
 }
 
@@ -8033,117 +8308,78 @@ Widget_Destroy(
     }
 }
 
-/// mouse_button
-///   0: left
-///   1: middle
-///   2: right
-///
-/// keyboard trigger
-///	  VK_RETURN
-///   VK_SPACE
 instant bool
-Widget_OnClick(
-	Widget *widget,
-	u16 mouse_button = 0,
-	bool handle_key_input = true
+Widget_IsFocusable(
+	Widget *widget
 ) {
 	Assert(widget);
-	Assert(widget->window);
 
-	bool result = false;
+	bool is_focusable = widget->data.is_focusable;
 
-	Keyboard *keyboard = widget->window->keyboard;
-	Mouse    *mouse    = widget->window->mouse;
+	if (is_focusable)  return is_focusable;
 
-	///@Idea: might be better in a seperate space,
-	///       and let this function only handle mouse input
-	if (handle_key_input
-		AND(   (IF_USE(keyboard).up[VK_RETURN])
-		    OR (IF_USE(keyboard).up[VK_SPACE]))
-	) {
-		if (widget->data.has_focus)
-			result = true;
+	FOR_ARRAY(widget->a_subwidgets, it) {
+		Widget *t_widget = &ARRAY_IT(widget->a_subwidgets, it);
+		is_focusable = Widget_IsFocusable(t_widget);
+
+		if (is_focusable)
+			break;
 	}
 
-	///@Performance: IsHovering does not have to retrieve
-	///              the mouse position again, when the
-	///              updated mouse information is already
-	///              stored in the window structure
-	///	             (in case the data was retrieved in
-	///              the message loop)
-	///
-	if (IF_USE(mouse).up[mouse_button]) {
-		if (Mouse_IsHovering(widget)) {
-			result = true;
-		}
-	}
-
-	return result;
-}
-
-instant bool
-Widget_OnDoubleClick(
-	Widget *widget,
-	u16 mouse_button = 0,
-	bool handle_key_input = true
-) {
-	Assert(widget);
-	Assert(widget->window);
-
-	bool result = false;
-
-	Keyboard *keyboard = widget->window->keyboard;
-	Mouse    *mouse    = widget->window->mouse;
-
-	if (handle_key_input AND IF_USE(keyboard).up[VK_RETURN]) {
-		if (widget->data.has_focus)
-			result = true;
-	}
-
-	if (IF_USE(mouse).double_click[mouse_button]) {
-		if (Mouse_IsHovering(mouse, widget)) {
-			result = true;
-		}
-	}
-
-	return result;
+	return is_focusable;
 }
 
 instant void
 Widget_UpdateFocus(
 	Array<Widget *> *ap_widgets,
-	bool check_backward,
-	Widget **widget_focus = 0
+	bool check_backward
 ) {
 	Assert(ap_widgets);
 
 	bool focus_set_next = false;
 
-	Widget *t_widget_focus_check = 0;
-
 	if (!ap_widgets->count)
 		return;
 
+	static Array<Widget *> ap_widgets_all;
+	Array_ClearContainer(&ap_widgets_all);
+
+	FOR_ARRAY(*ap_widgets, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+		Array_Add(&ap_widgets_all, t_widget);
+
+		FOR_ARRAY(t_widget->a_subwidgets, it_sub) {
+			Widget *t_subwidget = &ARRAY_IT(t_widget->a_subwidgets, it_sub);
+			Array_Add(&ap_widgets_all, t_subwidget);
+		}
+	}
+
 	s64 start = 0;
-	s64 end   = ap_widgets->count;
+	s64 end   = ap_widgets_all.count;
 	s64 step  = 1;
 
 	if (check_backward) {
-		start =  end;
+		start =  end - 1;
 		end   = -1;
 		step  = -1;
 	}
 
 	for (s64 it_widget = start; it_widget != end; it_widget += step) {
-		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+		Widget *t_widget = ARRAY_IT(ap_widgets_all, it_widget);
 
-		if (!t_widget->data.is_focusable)
+		if (!Widget_IsFocusable(t_widget))
 			continue;
 
 		Keyboard *keyboard = t_widget->window->keyboard;
 		Mouse    *mouse    = t_widget->window->mouse;
 
-		if (focus_set_next) {
+		bool is_visible = (   !t_widget->data.is_floating
+		                   OR  t_widget->data.is_popout);
+
+		if (    focus_set_next
+			AND is_visible
+			AND t_widget->data.is_focusable
+		) {
 			t_widget->data.has_focus = true;
 			focus_set_next = false;
 		}
@@ -8156,49 +8392,35 @@ Widget_UpdateFocus(
 			}
 		}
 
-		if (t_widget->data.has_focus)
-			t_widget_focus_check = t_widget;
+		if (t_widget->data.has_focus) {
+			if (!is_visible) {
+				t_widget->data.has_focus = false;
+                focus_set_next = true;
+			}
+			else {
+				t_widget->widget_focus_current = t_widget;
+			}
+		}
 	}
 
 	/// search for next focus from the beginning,
 	/// if there was no focusable left past the last focused
 	/// widget
-	if (focus_set_next OR !t_widget_focus_check) {
+	if (focus_set_next OR !Widget::widget_focus_current) {
 		for (s64 it_widget = start; it_widget != end; it_widget += step) {
-			Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+			Widget *t_widget = ARRAY_IT(ap_widgets_all, it_widget);
 
-			if (t_widget->data.is_focusable) {
+			bool is_visible = (   !t_widget->data.is_floating
+							   OR  t_widget->data.is_popout);
+
+			if (t_widget->data.is_focusable AND is_visible) {
 				t_widget->data.has_focus = true;
-				t_widget_focus_check = t_widget;
+				t_widget->widget_focus_current = t_widget;
 
 				break;
 			}
 		}
 	}
-
-	if (widget_focus) {
-		*widget_focus = t_widget_focus_check;
-	}
-}
-
-instant void
-Widget_SetFocus(
-	Array<Widget *> *ap_widgets,
-	Widget *widget
-) {
-	Assert(ap_widgets);
-	Assert(widget);
-
-    FOR_ARRAY(*ap_widgets, it) {
-		Widget *t_widget = ARRAY_IT(*ap_widgets, it);
-
-		if (t_widget->data.has_focus) {
-			t_widget->data.has_focus = false;
-			break;
-		}
-    }
-
-    widget->data.has_focus = true;
 }
 
 instant void
@@ -8246,7 +8468,7 @@ Widget_CalcActiveRowID(
     Assert(widget);
     Assert(mouse);
 
-    if (!Mouse_IsHovering(mouse, widget))
+    if (!Mouse_IsHovering(widget, mouse))
 		return widget->data.active_row_id;
 
     u64 active_row_id = 0;
@@ -8297,7 +8519,7 @@ Widget_UpdateInput(
 			Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
 
 			if (t_subwidget->UpdateCustomInputs)
-				t_subwidget->UpdateCustomInputs(t_subwidget, it_sub, &widget->a_subwidgets, widget);
+				t_subwidget->UpdateCustomInputs(widget, it_sub);
 			else
 				Widget_UpdateInput(t_subwidget);
 		}
@@ -8306,6 +8528,9 @@ Widget_UpdateInput(
     }
 
 	if (!widget->data.is_focusable)
+		return;
+
+	if (widget->data.is_floating AND !widget->data.is_popout)
 		return;
 
 	bool got_focus = widget->data.has_focus;
@@ -8317,7 +8542,7 @@ Widget_UpdateInput(
 	bool is_scrollable      = widget->data.is_scrollable;
 
     if (mouse) {
-		bool is_hovering = Mouse_IsHovering(mouse, widget);
+		bool is_hovering = Mouse_IsHovering(widget, mouse);
 
 		/// text selection
 		if (has_text_cursor AND is_hovering) {
@@ -8348,12 +8573,26 @@ Widget_UpdateInput(
 			}
 		}
 
+		/// left mouse button
 		if (mouse->up[0]) {
 			got_focus = is_hovering;
 
+			if (is_hovering) {
+				widget->events.on_trigger = true;
+			}
+
 			/// listbox entry selection
-			if (is_scrollable_list)
-				widget->data.active_row_id = Widget_CalcActiveRowID(widget, mouse);
+			if (is_scrollable_list) {
+				u64 new_active_row_id = Widget_CalcActiveRowID(widget, mouse);
+
+				if (new_active_row_id != widget->data.active_row_id) {
+					widget->data.active_row_id = new_active_row_id;
+					widget->events.on_list_change_index = true;
+				}
+				else {
+					widget->events.on_list_change_final = true;
+				}
+			}
 
 			/// checkbox toggle
 			if (got_focus AND widget->data.is_checkable) {
@@ -8362,7 +8601,20 @@ Widget_UpdateInput(
 
 			/// focus change
 			if (widget->data.has_focus != got_focus) {
+				if (widget->type == WIDGET_CHECKBOX) {
+					int a = 1;
+				}
+
 				widget->data.has_focus = got_focus;
+			}
+		}
+
+		/// right mouse button
+		if (mouse->up[2]) {
+			got_focus = is_hovering;
+
+			if (is_hovering) {
+				widget->events.on_trigger_secondary = true;
 			}
 		}
 
@@ -8380,33 +8632,48 @@ Widget_UpdateInput(
     }
 
     if (keyboard AND widget->data.has_focus) {
+		bool is_key_return = keyboard->up[VK_RETURN];
+		bool is_key_space  = keyboard->up[VK_SPACE];
+
+        if (is_key_return OR is_key_space) {
+        	widget->events.on_trigger = true;
+        }
+
+		if (widget->data.is_checkable
+			AND (   is_key_return
+				 OR is_key_space)
+		) {
+			widget->data.is_checked = !widget->data.is_checked;
+		}
+
 		if (is_scrollable_list) {
 			if (widget->data.active_row_id) {
 				if (keyboard->down[VK_UP]) {
 					--widget->data.active_row_id;
+					widget->events.on_list_change_index = true;
 				}
 
 				if (keyboard->down[VK_HOME]) {
-					widget->data.active_row_id = 0;
+					if (widget->data.active_row_id != 0) {
+						widget->data.active_row_id = 0;
+						widget->events.on_list_change_index = true;
+					}
 				}
 			}
 
-			if (widget->data.active_row_id < widget->data.as_row_data.count - 1) {
+			if (    widget->data.as_row_data.count
+				AND widget->data.active_row_id < widget->data.as_row_data.count - 1
+			) {
 				if (keyboard->down[VK_DOWN]) {
 					++widget->data.active_row_id;
+					widget->events.on_list_change_index = true;
 				}
 
 				if (keyboard->down[VK_END]) {
 					widget->data.active_row_id = widget->data.as_row_data.count - 1;
+					widget->events.on_list_change_index = true;
 				}
 			}
-		}
-
-		if (widget->data.is_checkable
-			AND (   keyboard->up[VK_SPACE]
-				 OR keyboard->up[VK_RETURN])
-		) {
-			widget->data.is_checked = !widget->data.is_checked;
 		}
     }
 
@@ -8446,19 +8713,7 @@ Widget_UpdateInput(
 }
 
 instant void
-Widget_UpdateInput(
-	Array<Widget *> *ap_widgets
-) {
-	Assert(ap_widgets);
-
-	FOR_ARRAY(*ap_widgets, it_widget) {
-		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
-		Widget_UpdateInput(t_widget);
-	}
-}
-
-instant void
-Widget_GetSelectedRow(
+Widget_GetSelectedRowStatic(
 	Widget *widget,
 	String *s_row_data
 ) {
@@ -8477,6 +8732,25 @@ Widget_GetSelectedRow(
 	String_Append(s_row_data, ts_row_data->value, ts_row_data->length);
 }
 
+instant String
+Widget_GetSelectedRow(
+	Widget *widget
+) {
+	Assert(widget);
+	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
+
+	String s_result;
+
+	if (!widget->data.as_row_data.count) {
+		return s_result;
+	}
+
+	String *ts_row_data = &ARRAY_IT(widget->data.as_row_data, widget->data.active_row_id);
+
+	String_Append(&s_result, ts_row_data->value, ts_row_data->length);
+
+	return s_result;
+}
 
 instant u64
 Widget_GetSelectedRowID(
@@ -8486,6 +8760,27 @@ Widget_GetSelectedRowID(
 	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
 
 	return widget->data.active_row_id;
+}
+
+instant void
+Widget_Update(
+	Array<Widget *> *ap_widgets,
+	Keyboard *keyboard
+) {
+	Assert(ap_widgets);
+	Assert(keyboard);
+
+	FOR_ARRAY(*ap_widgets, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+		Widget_Update(t_widget);
+	}
+
+	FOR_ARRAY(*ap_widgets, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+		Widget_UpdateInput(t_widget);
+	}
+
+	Widget_UpdateFocus(ap_widgets, keyboard->pressing[VK_SHIFT]);
 }
 
 instant void
@@ -8509,22 +8804,6 @@ Layout_Add(
 	Layout_GetLastBlock(layout, &current_block);
 
 	Array_Add(&current_block->ap_layout_data, &widget->layout_data);
-}
-
-instant void
-Widget_AddRenderTabStop(
-	Array<Widget *> *ap_widgets,
-	Widget *widget
-) {
-	Assert(ap_widgets);
-	Assert(widget);
-
-	Array_Add(ap_widgets, widget);
-
-	FOR_ARRAY(widget->a_subwidgets, it_sub) {
-		Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
-		Array_Add(ap_widgets, t_subwidget);
-	}
 }
 
 instant void
@@ -8623,7 +8902,6 @@ Widget_CreateLabel(
 
 	t_widget.text.data.align_x    = text_align_x;
 	t_widget.text.data.rect       = rect_box;
-	t_widget.text.data.color      = t_widget.data.color_font;
 
 	t_widget.text.font = font;
 
@@ -8662,11 +8940,10 @@ Widget_CreateButton(
 	t_widget.layout_data.settings.auto_height = true;
 	t_widget.layout_data.settings.auto_width  = true;
 
-	t_widget.text.data.align_x    = TEXT_ALIGN_X_MIDDLE;
-	t_widget.text.data.align_y    = TEXT_ALIGN_Y_CENTER;
-	t_widget.text.data.color      = t_widget.data.color_font;
+	t_widget.text.data.align_x = TEXT_ALIGN_X_MIDDLE;
+	t_widget.text.data.align_y = TEXT_ALIGN_Y_CENTER;
 
-	t_widget.text.font       = font;
+	t_widget.text.font = font;
 
 	String_Append(&t_widget.text.s_data, c_data, c_length);
 
@@ -8700,7 +8977,6 @@ Widget_CreateListbox(
 	t_widget.data.has_scrollable_list = true;
 
 	t_widget.text.data.rect  = rect_box;
-	t_widget.text.data.color = t_widget.data.color_font;
 
 	t_widget.text.font  = font;
 
@@ -8708,7 +8984,7 @@ Widget_CreateListbox(
 }
 
 instant Widget
-Widget_CreateCheckbox(
+Widget_CreateCheckBox(
 	Window *window,
 	Font *font,
 	Rect rect_box,
@@ -8733,8 +9009,6 @@ Widget_CreateCheckbox(
 	t_widget.data.is_focusable = true;
 	t_widget.data.border_size  = 2;
 	t_widget.data.is_checked   = checked;
-
-	t_widget.text.data.color = t_widget.data.color_font;
 
 	t_widget.text.font = font;
 
@@ -8791,34 +9065,32 @@ Widget_CreateSpreader(
 
 instant void
 Widget_UpdateInputNumberPicker(
-	Widget *widget,
-	u64 it_current,
-	Array<Widget> *a_subwidgets,
-	Widget *widget_parent
+	Widget *widget_parent,
+	u64 sub_index
 ) {
-	Assert(widget);
-	Assert(a_subwidgets);
 	Assert(widget_parent);
+
+	Widget *widget = &ARRAY_IT(widget_parent->a_subwidgets, sub_index);
 
 	Widget_UpdateInput(widget);
 
-	Widget *tw_label = &ARRAY_IT(*a_subwidgets, 0);
+	Widget *tw_label = &ARRAY_IT(widget_parent->a_subwidgets, 0);
 
 	/// based on subwidget array index
-	switch (it_current) {
+	switch (sub_index) {
 		case 1:
 		case 2: {
-			if (Widget_OnClick(widget, 0)) {
+			if (widget->events.on_trigger) {
 				Widget_Slide *t_slide = &widget_parent->slide;
 
 				t_slide->value = ToInt(&tw_label->text.s_data);
 
 				if (0) {}
-				else if (it_current == 1) {
+				else if (sub_index == 1) {
 					if (t_slide->value - t_slide->step >= t_slide->start)
 						t_slide->value -= t_slide->step;
 				}
-				else if (it_current == 2) {
+				else if (sub_index == 2) {
 					if (t_slide->value + t_slide->step <= t_slide->end)
 						t_slide->value += t_slide->step;
 				}
@@ -8854,6 +9126,10 @@ Widget_RedrawNumberPickerButton(
 
 	Rect_Resize(&rect_box, -2);
 	Vertex_AddRect32(t_vertex, rect_box, {1, 1, 1, 1});
+
+	widget->text.data.rect = widget->layout_data.settings.rect;
+	widget->text.data.rect.x += 1;
+	widget->text.data.rect.h -= 3;
 }
 
 instant Widget
@@ -8875,27 +9151,30 @@ Widget_CreateNumberPicker(
 
 	t_widget.data.is_focusable = false;
 
-	Widget w_label       = Widget_CreateLabel( window, font, {0, 0, 50, 24});
-	Widget w_button_up   = Widget_CreateButton(window, font, {0, 0, 24, 24}, "<");
-	Widget w_button_down = Widget_CreateButton(window, font, {0, 0, 24, 24}, ">");
-	Widget w_spreader    = Widget_CreateSpreader(window);
+	Widget wg_label       = Widget_CreateLabel( window, font, {0, 0, 50, 24});
+	Widget wg_button_up   = Widget_CreateButton(window, font, {0, 0, 24, 24}, "<");
+	Widget wg_button_down = Widget_CreateButton(window, font, {0, 0, 24, 24}, ">");
+	Widget wg_spreader    = Widget_CreateSpreader(window);
 
-	w_button_up.OwnerDraw   = Widget_RedrawNumberPickerButton;
-	w_button_down.OwnerDraw = Widget_RedrawNumberPickerButton;
-	w_button_up.UpdateCustomInputs   = Widget_UpdateInputNumberPicker;
-	w_button_down.UpdateCustomInputs = Widget_UpdateInputNumberPicker;
+	wg_button_up.trigger_autosize   = false;
+	wg_button_down.trigger_autosize = false;
 
-	w_label.text.data.align_x = TEXT_ALIGN_X_RIGHT;
-	w_label.text.data.rect_padding = {2, 2, 2, 2};
+	wg_button_up.OwnerDraw   = Widget_RedrawNumberPickerButton;
+	wg_button_down.OwnerDraw = Widget_RedrawNumberPickerButton;
+	wg_button_up.UpdateCustomInputs   = Widget_UpdateInputNumberPicker;
+	wg_button_down.UpdateCustomInputs = Widget_UpdateInputNumberPicker;
+
+	wg_label.text.data.align_x = TEXT_ALIGN_X_RIGHT;
+	wg_label.text.data.rect_padding = {2, 2, 2, 2};
 
 	char *c_value = ToCString(slide.value);
-	String_Append(&w_label.text.s_data, c_value);
+	String_Append(&wg_label.text.s_data, c_value);
 	Memory_Free(c_value);
 
-	Array_Add(&t_widget.a_subwidgets, w_label);
-	Array_Add(&t_widget.a_subwidgets, w_button_up);
-	Array_Add(&t_widget.a_subwidgets, w_button_down);
-	Array_Add(&t_widget.a_subwidgets, w_spreader);
+	Array_Add(&t_widget.a_subwidgets, wg_label);
+	Array_Add(&t_widget.a_subwidgets, wg_button_up);
+	Array_Add(&t_widget.a_subwidgets, wg_button_down);
+	Array_Add(&t_widget.a_subwidgets, wg_spreader);
 
 	return t_widget;
 }
@@ -8934,9 +9213,146 @@ Widget_CreateTextBox(
 
 	t_widget.text.font  = font;
 
-	t_widget.text.data.rect  = rect_box;
-	t_widget.text.data.color = t_widget.data.color_font;
+	t_widget.text.data.rect = rect_box;
 	t_widget.text.data.is_editable = true;
+
+	return t_widget;
+}
+
+instant void
+Widget_UpdateInputComboBox(
+	Widget *widget_parent,
+	u64 sub_index
+) {
+	Assert(widget_parent);
+
+	Widget *widget = &ARRAY_IT(widget_parent->a_subwidgets, sub_index);
+	Widget_UpdateInput(widget);
+
+	Widget *twg_label  = &ARRAY_IT(widget_parent->a_subwidgets, 0);
+	Widget *twg_button = &ARRAY_IT(widget_parent->a_subwidgets, 1);
+	Widget *twg_list   = &ARRAY_IT(widget_parent->a_subwidgets, 2);
+
+	Assert(twg_list->window);
+
+	Keyboard *keyboard = twg_list->window->keyboard;
+	Mouse    *mouse    = twg_list->window->mouse;
+
+	/// show list
+	if (sub_index == 0 OR sub_index == 1) {
+        if (widget->events.on_trigger) {
+			twg_list->trigger_popout = true;
+        }
+	}
+
+	/// set label to list entry
+	if (sub_index == 2) {
+		bool hide_popout = false;
+		bool update_label = false;
+
+		if (twg_list->data.has_focus) {
+			if (widget_parent->type_select == WIDGET_SELECT_ON_INDEX_CHANGE) {
+				update_label = true;
+			}
+
+			if (    widget_parent->type_select == WIDGET_SELECT_ON_RETURN
+				AND keyboard->up[VK_RETURN]
+			) {
+				update_label = true;
+			}
+
+			if (keyboard->up[VK_RETURN]) {
+				hide_popout = true;
+
+				Keyboard_ResetKey(keyboard, VK_RETURN);
+			}
+
+			if (keyboard->up[VK_ESCAPE]) {
+				hide_popout = true;
+
+				Keyboard_ResetKey(keyboard, VK_ESCAPE);
+			}
+
+			if (widget->events.on_trigger) {
+				if (!twg_list->events.on_list_change_index) {
+					hide_popout = true;
+				}
+			}
+
+			/// update label
+			if (update_label) {
+				static String s_row_data;
+				Widget_GetSelectedRowStatic(twg_list, &s_row_data);
+
+				if (!String_IsEqual(&twg_label->text.s_data, s_row_data.value, s_row_data.length)) {
+					String_Clear(&twg_label->text.s_data);
+					String_Append(&twg_label->text.s_data, s_row_data.value, s_row_data.length);
+					widget->events.on_text_change = true;
+				}
+			}
+		}
+		else {
+			hide_popout = true;
+		}
+
+		if (hide_popout) {
+			if (twg_list->data.is_popout) {
+				widget->events.on_list_change_final = true;
+
+				twg_list->trigger_popout = true;
+			}
+		}
+	}
+}
+
+instant Widget
+Widget_CreateComboBox(
+	Window *window,
+	Font *font,
+	Rect rect_box,
+	s32 combo_height
+) {
+	Widget t_widget;
+
+	if (!rect_box.w) {
+		rect_box.w = font->size;
+		Widget_AddBorderSizes(&t_widget, &rect_box.w, 0);
+	}
+
+	if (!rect_box.h) {
+		rect_box.h = Font_GetLineHeight(font);
+		Widget_AddBorderSizes(&t_widget, 0, &rect_box.h);
+	}
+
+	t_widget.type         = WIDGET_COMBOBOX;
+	t_widget.rect_content = rect_box;
+	t_widget.window       = window;
+
+	t_widget.data.is_focusable = false;
+
+	t_widget.layout_data.settings.rect = rect_box;
+	t_widget.layout_data.settings.auto_width = true;
+
+	Widget wg_label  = Widget_CreateLabel(window , font, {}, "");
+	Widget wg_button = Widget_CreateButton(window, font, {}, "X");
+	Widget wg_list   = Widget_CreateListbox(window, font, {0, 0, 0, combo_height});
+
+	wg_button.UpdateCustomInputs = Widget_UpdateInputComboBox;
+	wg_list.UpdateCustomInputs   = Widget_UpdateInputComboBox;
+
+	wg_list.data.is_floating = true;
+
+	wg_label.text.data.rect_padding  = {2, 2, 2, 2};
+
+	wg_button.text.data.rect_margin  = {};
+	wg_button.text.data.rect_padding = {3, 0, 3, 0};
+	wg_button.data.border_size = 2;
+
+	                     Array_Add(&t_widget.a_subwidgets, wg_label);
+	Widget *twg_button = Array_Add(&t_widget.a_subwidgets, wg_button);
+	Widget *twg_list   = Array_Add(&t_widget.a_subwidgets, wg_list);
+
+	twg_list->widget_focus_on_popout = twg_button;
 
 	return t_widget;
 }
