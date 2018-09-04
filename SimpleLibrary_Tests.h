@@ -55,11 +55,12 @@ Test_Strings(
 	AssertMessage(String_IsEqual(&s_buffer, "buffer"), "String data does not match (buffer)");
 
 	String s_buffer_copy;
-	String_Copy(&s_buffer_copy, s_buffer.value, s_buffer.length);
+	s_buffer_copy = String_Copy(s_buffer.value, s_buffer.length);
+
 	AssertMessage(String_IsEqual(&s_buffer_copy, "buffer"), "String copy failed (autosize");
 	String_Destroy(&s_buffer_copy);
 
-	String_Copy(&s_buffer_copy, s_buffer.value, 3);
+	s_buffer_copy = String_Copy(s_buffer.value, 3);
 	AssertMessage(String_IsEqual(&s_buffer_copy, "buf"), "String copy failed (substring)");
 	String_Destroy(&s_buffer_copy);
 
@@ -182,7 +183,7 @@ Test_Arrays(
 		Array_ClearContainer(&as_test);
 		AssertMessage(		as_test.size  == 0
 						AND as_test.count == 0
-						AND as_test.limit == 8
+						AND as_test.limit == sizeof(String)
 						AND as_test.memory > 0, "Clearing array failed.");
 
 		/// Memory ownership in local scope and not in array
@@ -234,10 +235,10 @@ Test_Arrays(
 		String s_data;
 		String_Append(&s_data, "demo");
 		Array_Add(&as_data, s_data);
-		AssertMessage(as_data.limit == 8, "Data size missmatch.");
+		AssertMessage(as_data.limit == sizeof(String), "Data size missmatch.");
 		/// Will result in 1 (existing) + 3 (new empty) slots
-		Array_Reserve(&as_data, 3, true);
-		AssertMessage(as_data.limit == 32 AND as_data.count == 1, "Array reservation failed.");
+		Array_ReserveAdd(&as_data, 3, true);
+		AssertMessage(as_data.limit == (sizeof(String) * 4) AND as_data.count == 1, "Array reservation failed.");
 
 		/// non-generic array_destroy will free the string
 		Array_Destroy(&as_data);

@@ -1,8 +1,9 @@
 #pragma once
 
 #define DEBUG_UPDATE_ALWAYS 0
+#define DEBUG 1
 
-/// Compiler: g++ (6.3.0)
+/// Compiler: g++ (6.3.0) (mingw)
 ///
 /// Linker flags:
 ///		-lcomdlg32
@@ -810,9 +811,15 @@
 //}
 /// ===========================================================================
 
+#ifdef __MINGW32__
+#   undef  _WIN32_WINNT
+#   define _WIN32_WINNT 0x0501
+#endif // __MINGW32__
+
+#include <windows.h>
+
 #include <iostream>
 #include <math.h>
-#include <windows.h>
 #include <shlobj.h>
 #include <GL/gl.h>
 #include "SimpleLibrary_OpenGLExt.h"
@@ -852,7 +859,7 @@ static u64 global_frame_count = 0;
 /// ===========================================================================
 #define FOR(_max, _it)				\
 	for(u64 _it = 0;				\
-	it < (_max); 					\
+	_it < (_max); 					\
 	++_it)
 
 #define FOR_START(_start, _max, _it)	\
@@ -897,7 +904,7 @@ _AssertMessage(
 
 /// ::: Debug
 /// ===========================================================================
-#define LOG_DEBUG(text) std::cout << "Frame [" << global_frame_count << "]: " << text << std::endl;
+#define LOG_DEBUG(text) std::cout << /*"Frame [" << global_frame_count << "]: " <<*/ text << std::endl;
 
 /// ::: Utilities
 /// ===========================================================================
@@ -915,6 +922,9 @@ _AssertMessage(
 
 #define IF_SET(pointer) \
 	if (pointer) (*pointer)
+
+#define XOR(_a, _b) \
+	(((_a) AND !(_b)) OR (!(_a) AND (_b)))
 
 struct Rect {
 	float x = 0.0f;
@@ -961,6 +971,17 @@ operator != (
 	Point p2
 ) {
 	if (p1.x != p2.x OR p1.y != p2.y)
+		return true;
+
+	return false;
+}
+
+bool
+operator == (
+	Point p1,
+	Point p2
+) {
+	if (p1.x == p2.x OR p1.y == p2.y)
 		return true;
 
 	return false;
@@ -1122,6 +1143,23 @@ Rect_IsIntersecting(
 }
 
 instant bool
+Rect_IsIntersectingBorderless(
+	Point *point,
+	Rect  *rect
+) {
+	Assert(point);
+	Assert(rect);
+
+	if (point->x < rect->x)  return false;
+	if (point->y < rect->y)  return false;
+
+	if (point->x >= rect->x + rect->w)  return false;
+	if (point->y >= rect->y + rect->h)  return false;
+
+	return true;
+}
+
+instant bool
 Rect_IsVisibleFully(
 	Rect *rect_inner,
 	Rect *rect_outer
@@ -1208,7 +1246,7 @@ Rect_Clamp(
 /// ::: Memory
 /// ===========================================================================
 #define Memory_Create(type, length) \
-		(type *)_Memory_Alloc_Empty(sizeof(type) * length)
+		((type *)_Memory_Alloc_Empty(sizeof(type) * length))
 
 #define Memory_Resize(buffer, type, length) \
 		(buffer \
@@ -1663,6 +1701,8 @@ String_Insert(
 	if (!c_length)
 		c_length = String_Length(c_data);
 
+	Assert(index_start < s_data->length + c_length);
+
     s_data->value = Memory_Resize(s_data->value, char, s_data->length + c_length);
 	Memory_Copy(s_data->value + index_start + c_length, s_data->value + index_start, s_data->length - index_start);
 
@@ -1734,6 +1774,18 @@ String_CreateCBufferCopy(
 	return c_buffer;
 }
 
+instant String
+String_CreateBuffer(
+	u32 buffer_size
+) {
+	String s_buffer;
+	String_Resize(&s_buffer, buffer_size);
+	s_buffer.length = buffer_size;
+	s_buffer.changed = true;
+
+	return s_buffer;
+}
+
 instant bool
 String_IsEqual(
 	const char *c_text1,
@@ -1776,70 +1828,53 @@ String_IsEqual(
 	const char *c_data,
 	u64 length = 0
 ) {
-	/// check if both have equally nothing
-	if (!s_data AND !c_data)
-		return true;
+	u64 c_len = String_Length(c_data);
 
-	/// in case one has more than nothing
-	if (!s_data OR !c_data) {
-		if (s_data AND s_data->length == 0) {
-			/// still equally nothing
+	if (!s_data OR (s_data AND !s_data->length)) {
+		if (!c_len)
 			return true;
-		}
-
-		return false;
 	}
 
-	/// in case one nothing
-	if (!s_data->value OR !s_data->length)
+	if (!length)
+		length = c_len;
+
+	if (!s_data AND length)
 		return false;
 
-	u64 len_c = String_Length(c_data);
+	if (length > s_data->length)
+		return false;
 
-	if (!length) {
-		/// different lengths
-		if (s_data->length != len_c)
-			return false;
-	}
+	u64 it = 0;
 
-	/// check min length needed to check
-	u64 len_min = 0;
-	u64 len_max = (len_c < s_data->length)
-						? len_c
-						: s_data->length;
-
-	if (length > 0 AND length > len_max)  len_max = length;
-
-	while(len_min < len_max) {
-		if (s_data->value[len_min] != c_data[len_min])
+	while(it < length) {
+		if (s_data->value[it] != c_data[it])
 			return false;
 
-		++len_min;
+		++it;
 	}
 
 	return true;
 }
 
-instant void
+instant String
 String_Copy(
-	String *s_dest,
 	const char *c_source,
 	u32 length = 0
 ) {
-	Assert(s_dest);
 	Assert(c_source);
-
-	/// overwrite protection check
-	Assert(!s_dest->value);
 
 	if (length == 0)
 		length = String_Length(c_source);
 
-	s_dest->value = Memory_Create(char, length);
-	Memory_Copy(s_dest->value, c_source, length);
-	s_dest->length = length;
+	String s_result = {};
 
-	s_dest->changed = true;
+	s_result.value = Memory_Create(char, length);
+	Memory_Copy(s_result.value, c_source, length);
+	s_result.length = length;
+
+	s_result.changed = true;
+
+	return s_result;
 }
 
 instant void
@@ -2242,12 +2277,15 @@ String_Insert(
 	s64 length = 0;
 
 	if (c_data == '\b') {
-		length = 0;
-		if (s_data->value[index_start + length - 1] == '\n')  --length;
-		if (s_data->value[index_start + length - 1] == '\r')  --length;
-		if (!length) --length;
+		/// make sure there is something to remove
+		if (index_start) {
+			length = 0;
+			if (s_data->value[index_start + length - 1] == '\n')  --length;
+			if (s_data->value[index_start + length - 1] == '\r')  --length;
+			if (!length) --length;
 
-		String_Remove(s_data, index_start + length, index_start);
+			String_Remove(s_data, index_start + length, index_start);
+		}
 	}
 	else if (c_data == '\r' OR c_data == '\n') {
 		length = 1;
@@ -2476,7 +2514,7 @@ Array_DestroyContainer(
 /// Will add memory slots on top of existing ones and add to that count
 template <typename T>
 instant void
-Array_Reserve(
+Array_ReserveAdd(
 	Array<T> *array,
 	u64 count_delta,
 	bool clear_zero = false
@@ -2741,6 +2779,30 @@ String_SplitWordsStatic(
 
 	Array<String> as_lines = Array_Split(s_data, "\n", DELIMITER_ADD_BACK);
 
+	if (as_lines.count <= 1) {
+		Array<String> as_lines_mac = Array_Split(s_data, "\r", DELIMITER_ADD_BACK);
+
+		if (as_lines_mac.count == 0) {
+			Array_Destroy(&as_lines_mac);
+		}
+		else if (as_lines_mac.count == 2) {
+			String *ts_last_line = &ARRAY_IT(as_lines_mac, 1);
+
+			/// s_data.value could end with '\r\n' with only one line
+			if (ts_last_line->length AND ts_last_line->value[0] == '\n') {
+				Array_Destroy(&as_lines_mac);
+			}
+			else {
+				Array_Destroy(&as_lines);
+				as_lines = as_lines_mac;
+			}
+		}
+		else {
+			Array_Destroy(&as_lines);
+			as_lines = as_lines_mac;
+		}
+	}
+
 	FOR_ARRAY(as_lines, it_lines) {
 		Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ");
 
@@ -2872,6 +2934,19 @@ String_GetDelimiterSection(
 	String_TrimRight(&s_result);
 
 	return s_result;
+}
+
+template <typename T>
+instant Array<T>
+Array_CreateBuffer(
+	u64 count
+) {
+	Array<T> a_buffer;
+	Array_ReserveAdd(&a_buffer, count, true);
+	a_buffer.count = count;
+	a_buffer.size = a_buffer.limit;
+
+	return a_buffer;
 }
 
 /// ::: CPU
@@ -3488,7 +3563,7 @@ File_GetExtension(
 		return s_result;
 	}
 
-	String_Copy(&s_result, s_data->value + pos_ext, s_data->length - pos_ext);
+	s_result = String_Copy(s_data->value + pos_ext, s_data->length - pos_ext);
 
 	return s_result;
 }
@@ -3503,7 +3578,7 @@ File_GetExtension(
 
 #define Window_IsCreated(window) (window->hWnd != 0)
 
-#define Window_ReadMessage(_msg, _running, _ptr_window)             				\
+#define Window_ReadMessage(_msg, _running, _ptr_window) 				            \
 	while (PeekMessage(&_msg, _ptr_window->hWnd, 0, 0, PM_REMOVE)) {				\
 		if (Mouse_Update(_ptr_window->mouse, _ptr_window, &_msg))	continue;		\
 		if (Keyboard_Update(_ptr_window->keyboard, &_msg))          continue;		\
@@ -3785,6 +3860,7 @@ Window_Show(
 
 instant void Mouse_Reset(Mouse *mouse);
 instant void Keyboard_ResetLastKey(Keyboard *keyboard);
+instant void Keyboard_Reset(Keyboard *keyboard, bool full_reset);
 
 instant void
 Window_UpdateAndResetInput(
@@ -3795,7 +3871,9 @@ Window_UpdateAndResetInput(
 	SwapBuffers(window->hDC);
 
 	Mouse_Reset(window->mouse);
-	Keyboard_ResetLastKey(window->keyboard);
+//	Keyboard_ResetLastKey(window->keyboard);
+
+	Keyboard_Reset(window->keyboard, false);
 }
 
 instant void
@@ -5764,8 +5842,6 @@ Mouse_Update(
 			mouse->pressing[0] = false;
 			mouse->up[0] = true;
 			mouse->is_up = true;
-
-//			LOG_DEBUG("mouse up: " << mouse->up[0])
 		} break;
 
 		case WM_MBUTTONUP:   {
@@ -5779,24 +5855,6 @@ Mouse_Update(
 			mouse->up[2] = true;
 			mouse->is_up = true;
 		} break;
-
-//		case WM_LBUTTONDBLCLK: {
-//			mouse->double_click[0] = true;
-//			mouse->is_down = true;
-//			mouse->is_up = true;
-//		} break;
-//
-//		case WM_MBUTTONDBLCLK: {
-//			mouse->double_click[1] = true;
-//			mouse->is_down = true;
-//			mouse->is_up = true;
-//		} break;
-//
-//		case WM_RBUTTONDBLCLK: {
-//			mouse->double_click[2] = true;
-//			mouse->is_down = true;
-//			mouse->is_up = true;
-//		} break;
 
 		case WM_MOUSEWHEEL: {
 			mouse->wheel = MOUSE_WHEEL_GET_DELTA(msg->wParam) * 16;
@@ -6519,14 +6577,25 @@ enum TEXT_ALIGN_Y_TYPE {
 	TEXT_ALIGN_Y_BOTTOM
 };
 
+enum CURSOR_MOVE_TYPE {
+	CURSOR_MOVE_X,
+	CURSOR_MOVE_Y,
+	CURSOR_MOVE_LINE_BORDER,
+};
+
 struct Text_Line {
 	u64 width_pixel;
 	String s_data;
 };
 
 struct Text_Cursor {
-	Point point_select_start = {};
-	Point point_select_end   = {};
+	CURSOR_MOVE_TYPE move_type = CURSOR_MOVE_X;
+	s64 move_index_x = 0;
+	s64 move_index_y = 0;
+
+	u64 index_select_start = 0; // also current cursor position
+	u64 index_select_end   = 0;
+	bool is_selecting = false;
 
 	Color32 color_cursor = {1.0f, 0.0f, 0.0f, 1.0f};
 	Color32 color_select = {0.5f, 0.5f, 1.0f, 1.0f};
@@ -6551,8 +6620,11 @@ struct Text_Data {
 
 	Rect rect_content = {}; /// offset x/y, max width / height
 
-	bool is_editable   = false;
-	bool use_word_wrap = true;
+	bool is_editable      = false;
+	bool use_word_wrap    = true;
+
+	///@TODO: implement me
+	bool ignore_linebreak = false;
 };
 
 struct Text {
@@ -6649,7 +6721,8 @@ instant s32
 Text_BuildLinesStatic(
 	Text *text,
 	Array<String> *as_words,
-	Array<Text_Line> *a_text_line
+	Array<Text_Line> *a_text_line,
+	bool append_cursor_end
 ) {
 	Assert(text);
 	Assert(as_words);
@@ -6669,27 +6742,34 @@ Text_BuildLinesStatic(
 
 	s32 height_max  = 0;
 
-	if (as_words->count == 0)
+	Text_Line *t_text_line;
+	Rect rect_line_current = {rect.x, rect.y, 0, 0};
+	u64 advance_space = Codepoint_GetAdvance(font, ' ');
+
+	if (as_words->count == 0) {
+		if (append_cursor_end) {
+			Array_AddEmpty(a_text_line, &t_text_line);
+
+			t_text_line->width_pixel += advance_space;
+			String_Append(&t_text_line->s_data, " ", 1);
+		}
 		return height_max;
+	}
 
 	Assert(a_text_line->count == 0);
 
 	s32 height_line = Font_GetLineHeight(font);
 	bool line_start = true;
 
-	u64 advance_space = Codepoint_GetAdvance(font, ' ');
-
 	if (as_words->count)
 		height_max += height_line;
-
-	Rect rect_line_current = {rect.x, rect.y, 0, 0};
-
-	Text_Line *t_text_line;
 
 	if (as_words->count)
 		Array_AddEmpty(a_text_line, &t_text_line);
 
     FOR_ARRAY(*as_words, it_words) {
+    	bool is_last_word = (it_words + 1 == as_words->count);
+
 		String *ts_word = &ARRAY_IT(*as_words, it_words);
 
 		u64 advance_word = Codepoint_GetStringAdvance(font, ts_word);
@@ -6701,7 +6781,11 @@ Text_BuildLinesStatic(
 		}
 
 		/// word wrap
-		if (text->data.use_word_wrap AND !line_start AND rect.w > 0 AND (rect_line_current.x - rect.x) + advance_word > rect.w) {
+		if (    text->data.use_word_wrap
+			AND !line_start
+			AND rect.w > 0
+			AND (rect_line_current.x - rect.x) + advance_word > rect.w
+		) {
 			Array_AddEmpty(a_text_line, &t_text_line);
 			line_start = true;
 
@@ -6711,7 +6795,9 @@ Text_BuildLinesStatic(
 			height_max += height_line;
 		}
 
-		if (String_EndWith(ts_word, "\n")) {
+		if (   String_EndWith(ts_word, "\n")
+			OR String_EndWith(ts_word, "\r")
+		) {
 			t_text_line->width_pixel += advance_word;
 			String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
 
@@ -6723,6 +6809,11 @@ Text_BuildLinesStatic(
 
 			height_max += height_line;
 
+			if (is_last_word AND append_cursor_end) {
+				t_text_line->width_pixel += advance_space;
+				String_Append(&t_text_line->s_data, " ", 1);
+			}
+
 			continue;
 		}
 
@@ -6730,32 +6821,172 @@ Text_BuildLinesStatic(
 		t_text_line->width_pixel += advance_word;
 		String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
 
+		if (is_last_word AND append_cursor_end) {
+			t_text_line->width_pixel += advance_space;
+			String_Append(&t_text_line->s_data, " ", 1);
+		}
+
 		line_start = false;
     }
 
 	return height_max;
 }
 
-instant void
-Text_Cursor_SetSelection(
+instant u64
+Text_Cursor_FindIndex(
 	Text *text,
-	Point point_start,
-	Point point_end
+	Point point
 ) {
-	bool is_adding_selection = false;
-	bool found_start  = false;
-	bool found_end    = false;
-	bool found_cursor = false;
+	Assert(text);
 
-	const s32 width_cursor = 2;
-
-	if (!text->data.is_editable)
-		return;
+	u64 cursor_index = 0;
+	bool found_index = false;
 
 	Text_Cursor *cursor = &text->cursor;
 
 	Rect rect = text->data.rect;
 	Rect_AddPadding(&rect, text->data.rect_padding);
+
+	point.x += text->data.rect_content.x;
+	point.y += text->data.rect_content.y;
+
+	u64 width_max = rect.w;
+
+	/// for text x-alignment
+	if (!width_max) {
+		FOR_ARRAY(text->a_text_lines, it_line) {
+			Text_Line *t_text_line = &ARRAY_IT(text->a_text_lines, it_line);
+
+			width_max = MAX(width_max, t_text_line->width_pixel);
+		}
+	}
+
+	Rect rect_position_it = {
+		rect.x + text->data.rect_content.x,
+		rect.y + text->data.rect_content.y,
+		0,
+		Font_GetLineHeight(text->font)
+	};
+
+	/// check the area above the text
+	/// to select the first char
+	if (point.y < rect_position_it.y) {
+		return cursor_index;
+	}
+
+	FOR(text->a_text_lines.count, it_line) {
+		Text_Line *text_line = &ARRAY_IT(text->a_text_lines, it_line);
+
+		u64 x_align_offset = 0;
+
+		if (width_max > text_line->width_pixel) {
+			if (     text->data.align_x == TEXT_ALIGN_X_MIDDLE)
+				x_align_offset = (width_max - text_line->width_pixel) >> 1;
+			else if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
+				x_align_offset = (width_max - text_line->width_pixel);
+		}
+
+		rect_position_it.x += x_align_offset;
+
+		FOR(text_line->s_data.length, it_data) {
+			bool is_last_char = (it_data + 1 == text_line->s_data.length);
+
+			Codepoint codepoint;
+
+			s8 ch = text_line->s_data.value[it_data];
+
+			Codepoint_GetData(text->font, ch, &codepoint);
+
+			bool is_newline_char = (ch == '\r' OR ch == '\n');
+
+			/// makes end-of-line chars selectable
+			/// by including the remaining width of a line in the last char
+			/// when using line-breaks or word-wrap
+			/// - newline char can happen before the last char,
+			///   if '\r\n' is used
+			if (is_newline_char OR is_last_char)
+				rect_position_it.w = width_max - (rect_position_it.w - rect_position_it.x);
+			else
+				rect_position_it.w = codepoint.advance;
+
+			if (it_data == 0) {
+				/// check the "free" space in front of the first char too,
+				/// to make it target the first char
+				/// -> same as with the last char
+				Rect rect_position_start = rect_position_it;
+				float pos_w = rect_position_start.x + rect_position_start.w;
+				rect_position_start.x = rect.x;
+				rect_position_start.w = pos_w - rect_position_start.x;
+
+				if (Rect_IsIntersectingBorderless(&point, &rect_position_start)) {
+					found_index = true;
+					return cursor_index;
+				}
+			}
+			else if (Rect_IsIntersectingBorderless(&point, &rect_position_it)) {
+				found_index = true;
+				return cursor_index;
+			}
+
+			if (!found_index) {
+				++cursor_index;
+				rect_position_it.x += rect_position_it.w;
+			}
+
+			if (is_newline_char) {
+				rect_position_it.w = codepoint.advance;
+			}
+		}
+
+		rect_position_it.x  = rect.x;
+		rect_position_it.y += rect_position_it.h;
+	}
+
+	if (!found_index AND cursor_index) {
+		--cursor_index;
+	}
+
+	return cursor_index;
+}
+
+instant void
+Text_Cursor_Flush(
+	Text *text
+) {
+	Assert(text);
+
+	Text_Cursor *cursor = &text->cursor;
+
+	cursor->move_index_x = 0;
+	cursor->move_index_y = 0;
+
+	if (!text->cursor.is_selecting)
+		text->cursor.index_select_start = text->cursor.index_select_end;
+}
+
+///@TODO: text scrolling when cursor is out of bound
+instant void
+Text_Cursor_Update(
+    Text *text
+) {
+	Assert(text);
+
+	/// cursor selection -> end = current
+	bool found_start    = false;
+	bool found_end      = false;
+	bool found_end_once = false;
+
+	const s32 width_cursor = 2;
+
+	u64 cursor_index = 0;
+
+	Text_Cursor *cursor = &text->cursor;
+
+	Rect rect = text->data.rect;
+	Rect_AddPadding(&rect, text->data.rect_padding);
+
+	Codepoint codepoint_space;
+	Codepoint_GetData(text->font, ' ', &codepoint_space);
 
 	u64 width_max = rect.w;
 
@@ -6767,117 +6998,221 @@ Text_Cursor_SetSelection(
 		}
 	}
 
-	Rect rect_position_start = {
+	if (!cursor->vertex_select.array_id)
+		cursor->vertex_select = Vertex_Create();
+
+	Vertex_ClearAttributes(&cursor->vertex_select);
+
+	Rect rect_position_it = {
 		rect.x + text->data.rect_content.x,
 		rect.y + text->data.rect_content.y,
 		0,
 		Font_GetLineHeight(text->font)
 	};
 
-	Rect rect_position_it    = rect_position_start;
-	Rect rect_position_end   = rect_position_it;
+	/// lower boundary index check
+	if (cursor->move_index_x < 0) {
+		if (cursor->index_select_end + cursor->move_index_x > cursor->index_select_end) {
+			cursor->move_index_x = 0;
 
-	point_start.x += text->data.rect_content.x;
-	point_start.y += text->data.rect_content.y;
-	point_end.x   += text->data.rect_content.x;
-	point_end.y   += text->data.rect_content.y;
+			if (!cursor->is_selecting)
+				cursor->index_select_start = 0;
 
-	if (!cursor->vertex_select.array_id)
-		cursor->vertex_select = Vertex_Create();
+			cursor->index_select_end = 0;
+		}
+	}
 
-	Vertex_ClearAttributes(&cursor->vertex_select);
+	if (cursor->move_type == CURSOR_MOVE_X) {
+		if (!cursor->is_selecting)
+			cursor->index_select_start += cursor->move_index_x;
 
-	Codepoint codepoint_space;
-	Codepoint_GetData(text->font, ' ', &codepoint_space);
+		cursor->index_select_end += cursor->move_index_x;
+	}
 
-	FOR_ARRAY(text->a_text_lines, it_line) {
-		Text_Line *t_text_line = &ARRAY_IT(text->a_text_lines, it_line);
+	FOR(text->a_text_lines.count, it_line) {
+		Text_Line *text_line = &ARRAY_IT(text->a_text_lines, it_line);
 
-		u64 it_data = 0;
+		/// horizontal alignment
+		/// -------------------------------------------------------------------
 		u64 x_align_offset = 0;
 
-		if (width_max > t_text_line->width_pixel) {
+		if (width_max > text_line->width_pixel) {
 			if (     text->data.align_x == TEXT_ALIGN_X_MIDDLE)
-				x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
+				x_align_offset = (width_max - text_line->width_pixel) >> 1;
 			else if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
-				x_align_offset = (width_max - t_text_line->width_pixel);
+				x_align_offset = (width_max - text_line->width_pixel);
 		}
 
 		rect_position_it.x += x_align_offset;
+		/// -------------------------------------------------------------------
 
-		bool is_line_end    = false;
-		bool added_line_end = false;
+		bool is_newline_char_once = false;
 
-		while(it_data < t_text_line->s_data.length) {
+		FOR(text_line->s_data.length, it_data) {
 			Codepoint codepoint;
 
-			s8 ch = t_text_line->s_data.value[it_data];
+			s8 character = text_line->s_data.value[it_data];
 
-			Codepoint_GetData(text->font, ch, &codepoint);
+			Codepoint_GetData(text->font, character, &codepoint);
 			rect_position_it.w = codepoint.advance;
 
-			/// makes line-breaks selectable
-			if ((ch == '\r' OR ch == '\n')) {
-				rect_position_it.w = width_max - (rect_position_it.w - rect_position_it.x);
-				is_line_end = true;
-			}
+			bool is_newline_char = (character == '\r' OR character == '\n');
 
-			if (!found_start AND Rect_IsIntersecting(&point_start, &rect_position_it)) {
+			if (cursor->index_select_start == cursor_index AND !found_start)
 				found_start = true;
-			}
 
-			if (!found_end AND Rect_IsIntersecting(&point_end, &rect_position_it)) {
-				found_end = true;
-			}
+			if (cursor->index_select_end == cursor_index AND !found_end) {
+				switch (cursor->move_type) {
+					case CURSOR_MOVE_X: {
+						found_end = true;
+					} break;
 
-			if ((found_start AND !found_end) OR (!found_start AND found_end)) {
-				if (is_line_end) {
-					/// do not show multible ' ' in case of '\r\n'
-					rect_position_it.w = (added_line_end ? 0 : codepoint_space.advance);
-					added_line_end = true;
+					case CURSOR_MOVE_Y: {
+						if (cursor->move_index_y == 0) {
+							found_end = true;
+						}
+						else if (cursor->move_index_y > 0) {
+							Point pt_line = {
+								rect_position_it.x,
+								rect_position_it.y + Font_GetLineHeight(text->font)
+							};
+
+							if (!cursor->is_selecting)
+								found_start = false;
+
+							cursor->index_select_end = Text_Cursor_FindIndex(text, pt_line);
+
+							Text_Cursor_Flush(text);
+						}
+						else {
+							float y_line_prev_pos = rect_position_it.y - Font_GetLineHeight(text->font);
+
+							/// do not try to go before the first line
+							if (y_line_prev_pos >= rect.y) {
+								Point pt_line = {
+									rect_position_it.x,
+									rect_position_it.y - Font_GetLineHeight(text->font)
+								};
+
+								cursor->index_select_end = Text_Cursor_FindIndex(text, pt_line);
+
+								Text_Cursor_Flush(text);
+
+								return Text_Cursor_Update(text);
+							}
+							else {
+								Text_Cursor_Flush(text);
+								found_end = true;
+							}
+						}
+					} break;
+
+					case CURSOR_MOVE_LINE_BORDER: {
+						if (cursor->move_index_x == 0) {
+							found_end = true;
+						}
+						else if (cursor->move_index_x > 0) {
+							cursor->index_select_end -= it_data;
+							cursor->index_select_end += text_line->s_data.length;
+							cursor->index_select_end -= 1;
+
+							if (String_EndWith(&text_line->s_data, "\r\n"))
+								cursor->index_select_end -= 1;
+
+							if (cursor->index_select_end != cursor_index) {
+								if (!cursor->is_selecting)
+									found_start = false;
+							}
+							else {
+                                found_end = true;
+							}
+
+							Text_Cursor_Flush(text);
+						}
+						else {
+							cursor->index_select_end -= it_data;
+
+							Text_Cursor_Flush(text);
+							return Text_Cursor_Update(text);
+						}
+					} break;
 				}
-
-				Vertex_AddRect32(&cursor->vertex_select, rect_position_it, cursor->color_select);
 			}
 
-			if (found_end AND !found_cursor) {
-				if (!cursor->vertex_cursor.array_id)
-					cursor->vertex_cursor = Vertex_Create();
+			if (XOR(found_start, found_end)) {
+				/// do not show multible ' ' in case of '\r\n'
+				/// or selection would look strechted
+				if (is_newline_char)
+					rect_position_it.w = (is_newline_char_once
+											? 0
+											: codepoint_space.advance
+										 );
 
-				Vertex_ClearAttributes(&cursor->vertex_cursor);
-
-				Rect rect_cursor = rect_position_it;
-				rect_cursor.w = width_cursor;
-
-				Vertex_AddRect32(&cursor->vertex_cursor, rect_cursor, cursor->color_cursor);
-
-				found_cursor = true;
+				Vertex_AddRect32(
+					&cursor->vertex_select,
+					rect_position_it,
+					cursor->color_select
+				);
 			}
 
-			++it_data;
+			if (found_end AND !found_end_once) {
+				if (!is_newline_char_once) {
+					/// update index, if you seek to '\r' and skip to '\n'
+					cursor->index_select_end = cursor_index;
 
+					if (!cursor->vertex_cursor.array_id)
+						cursor->vertex_cursor = Vertex_Create();
+
+					Vertex_ClearAttributes(&cursor->vertex_cursor);
+
+					Rect rect_cursor = rect_position_it;
+					rect_cursor.w = width_cursor;
+
+					Vertex_AddRect32(
+						&cursor->vertex_cursor,
+						rect_cursor,
+						cursor->color_cursor
+					);
+
+					found_end_once = true;
+				}
+				else {
+					/// to move to the start of the
+					/// line-break when using '\r\n'
+					if (cursor->move_index_x < 0) {
+						Text_Cursor_Flush(text);
+
+						cursor->move_type    = CURSOR_MOVE_X;
+						cursor->move_index_x = -1;
+
+						return Text_Cursor_Update(text);
+					}
+
+					/// skipping '\n' here when '\r\n'
+					/// is present in the current line
+				}
+			}
+
+			++cursor_index;
 			rect_position_it.x += rect_position_it.w;
 
-			rect_position_end = rect_position_it;
+			is_newline_char_once = is_newline_char;
 		}
 
 		rect_position_it.x  = rect.x;
 		rect_position_it.y += rect_position_it.h;
 	}
 
-	/// render starting or truncated cursor position
-	if (!found_cursor) {
-		if (!cursor->vertex_cursor.array_id)
-			cursor->vertex_cursor = Vertex_Create();
+	/// make sure there is always a line
+	/// with at least a ' ' in it
+	Assert(cursor_index);
 
-		Vertex_ClearAttributes(&cursor->vertex_cursor);
-
-		Rect rect_cursor = (!found_end ? rect_position_start : rect_position_end );
-
-		rect_cursor.w = width_cursor;
-
-		Vertex_AddRect32(&cursor->vertex_cursor, rect_cursor, cursor->color_cursor);
+	/// upper boundary index check
+	if (!found_end_once) {
+		cursor->index_select_end = cursor_index - 1;
 	}
+
+	Text_Cursor_Flush(text);
 }
 
 instant void
@@ -7002,7 +7337,7 @@ Text_Update(
 	/// redraw text
 	if (Text_HasChanged(text, false)) {
 		String_SplitWordsStatic(&text->s_data, &text->as_words);
-		s32 text_height = Text_BuildLinesStatic(text, &text->as_words, &text->a_text_lines);
+		s32 text_height = Text_BuildLinesStatic(text, &text->as_words, &text->a_text_lines, true);
 
 		if (text->data.rect.h) {
 			s32 pad_height = text->data.rect_padding.y + text->data.rect_padding.h;
@@ -7024,14 +7359,107 @@ Text_Update(
 		Text_Clear(text);
 		Text_AddLines(text, true);
 
-		Text_Cursor_SetSelection(text,
-								 text->cursor.point_select_start,
-								 text->cursor.point_select_end);
+		Text_Cursor_Update(text);
 
 		Rect_Clamp(&text->data.rect_content, text->data.rect);
 
 		text->data_prev = text->data;
 		text->s_data.changed = false;
+
+		return true;
+	}
+
+	return false;
+}
+
+///@TODO: clipboard support(?)
+instant bool
+Text_UpdateInput(
+    Text *text,
+    Keyboard *keyboard
+) {
+	Assert(text);
+	Assert(keyboard);
+
+	if (!text->data.is_editable)
+		return false;
+
+	s8 offset_index_x = 0;
+	s8 offset_index_y = 0;
+
+	CURSOR_MOVE_TYPE *move_type = &text->cursor.move_type;
+
+	if (keyboard->down[VK_LEFT])  { offset_index_x = -1;
+									*move_type = CURSOR_MOVE_X; }
+	if (keyboard->down[VK_RIGHT]) { offset_index_x =  1;
+									*move_type = CURSOR_MOVE_X; }
+
+	if (keyboard->down[VK_UP])    { offset_index_y = -1;
+									*move_type = CURSOR_MOVE_Y; }
+	if (keyboard->down[VK_DOWN])  { offset_index_y =  1;
+									*move_type = CURSOR_MOVE_Y; }
+
+	if (keyboard->down[VK_HOME])  { offset_index_x = -1;
+									*move_type = CURSOR_MOVE_LINE_BORDER; }
+	if (keyboard->down[VK_END])   { offset_index_x =  1;
+									*move_type = CURSOR_MOVE_LINE_BORDER; }
+
+	text->cursor.is_selecting = (keyboard->pressing[VK_SHIFT] AND !keyboard->is_key_sym);
+
+	if (keyboard->is_key_sym AND keyboard->is_down) {
+		char key = LOWORD(keyboard->key_sym);
+
+		*move_type = CURSOR_MOVE_X;
+
+		bool was_selection_removed = false;
+
+		if (text->cursor.index_select_start != text->cursor.index_select_end) {
+			String_Remove(
+				&text->s_data,
+				text->cursor.index_select_start,
+				text->cursor.index_select_end
+			);
+
+			/// cursor and selection bounds will start at the
+			/// beginning of the selection
+			if (text->cursor.index_select_end > text->cursor.index_select_start)
+				text->cursor.index_select_end   = text->cursor.index_select_start;
+			else
+				text->cursor.index_select_start = text->cursor.index_select_end;
+
+			was_selection_removed = true;
+		}
+
+		/// tab-char is not supported for now
+		if (    key != '\t'
+			AND (   !was_selection_removed
+				 OR (    was_selection_removed
+					 AND key != '\b'))
+		) {
+			if (key == '\b') {
+				int a = 1;
+			}
+
+			text->cursor.move_index_x = String_Insert(
+											&text->s_data,
+											text->cursor.index_select_end,
+											key
+										);
+		}
+
+		Text_Update(text);
+
+		return true;
+	}
+
+	if (offset_index_x != 0 OR offset_index_y != 0) {
+		if (!text->cursor.is_selecting)
+			text->cursor.index_select_start = text->cursor.index_select_end;
+
+		text->cursor.move_index_x += offset_index_x;
+		text->cursor.move_index_y += offset_index_y;
+
+		Text_Cursor_Update(text);
 
 		return true;
 	}
@@ -7073,7 +7501,10 @@ Text_Render(
 	}
 
 	/// redraw cursor
-	if (text->cursor.show_cursor AND text->data.is_editable AND text->cursor.vertex_cursor.a_attributes.count) {
+	if (    text->cursor.show_cursor
+		AND text->data.is_editable
+		AND text->cursor.vertex_cursor.a_attributes.count
+	) {
 		if (Time_HasElapsed(&text->cursor.timer_blinking, text->cursor.blink_inverval_ms)) {
 			text->cursor.is_blink_on = !text->cursor.is_blink_on;
 		}
@@ -7111,7 +7542,7 @@ Text_GetSize(
 
 	if (height) {
 		String_SplitWordsStatic(&text->s_data, &as_words);
-		*height = Text_BuildLinesStatic(text, &as_words, &a_text_lines);
+		*height = Text_BuildLinesStatic(text, &as_words, &a_text_lines, false);
 	}
 
 	IF_SET(width)  = text->data.rect.w;
@@ -7679,6 +8110,17 @@ struct Widget {
 
 Widget *Widget::widget_focus_current = 0;
 
+instant void
+Widget_Cursor_RestartBlinking(
+	Widget *widget
+) {
+	Assert(widget);
+
+	widget->text.cursor.show_cursor = widget->data.has_focus;
+	Time_Reset(&widget->text.cursor.timer_blinking);
+	widget->text.cursor.is_blink_on = true;
+}
+
 instant bool
 Widget_IsListType(
 	Widget *widget
@@ -7710,7 +8152,7 @@ Widget_AddRow(
 
 	String *ts_data;
 	Array_AddEmpty(&widget->data.as_row_data, &ts_data);
-	String_Copy(ts_data, c_row_data, c_length);
+	*ts_data = String_Copy(c_row_data, c_length);
 }
 
 instant void
@@ -7752,10 +8194,6 @@ Mouse_IsHovering(
 		AND widget->widget_focus_current->data.is_floating
 	) {
 		if (widget->widget_focus_current->data.is_popout) {
-			if (widget->type == WIDGET_CHECKBOX) {
-				int a = 1;
-			}
-
 			is_hovering_popout = Mouse_IsHovering(widget->widget_focus_current, mouse);
 		}
 	}
@@ -7961,15 +8399,11 @@ Widget_Redraw(
 
 			Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
 
-			if (Widget_HasChanged(widget, false)) {
-				Vertex_ClearAttributes(&widget->text.cursor.vertex_cursor);
-				Vertex_ClearAttributes(&widget->text.cursor.vertex_select);
-				Text_Cursor_SetSelection(&widget->text, {}, {});
+			if (Text_HasChanged(&widget->text, false)) {
+				Text_Cursor_Update(&widget->text);
 			}
 
-			widget->text.cursor.show_cursor = widget->data.has_focus;
-			Time_Reset(&widget->text.cursor.timer_blinking);
-			widget->text.cursor.is_blink_on = true;
+			Widget_Cursor_RestartBlinking(widget);
 		} break;
 
 		case WIDGET_COMBOBOX: {
@@ -8196,7 +8630,7 @@ Widget_Render(
 				String *ts_data = &ARRAY_IT(widget->data.as_row_data, it_row);
 
 				String_SplitWordsStatic(ts_data, &t_text->as_words);
-				rect_text->h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines);
+				rect_text->h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines, false);
 
 				if (Rect_IsIntersecting(rect_text, &widget->layout_data.settings.rect)) {
 					Color32 t_color_rect = widget->data.color_outline;
@@ -8546,30 +8980,28 @@ Widget_UpdateInput(
 
 		/// text selection
 		if (has_text_cursor AND is_hovering) {
-			Text *t_text = &widget->text;
+			Text *text = &widget->text;
 
-			if (mouse->pressing[0]) {
+			text->cursor.is_selecting = mouse->pressing[0];
+
+			if (text->cursor.is_selecting) {
+				widget->data.has_focus = true;
+
 				if (mouse->is_down) {
-					t_text->cursor.point_select_start = mouse->point;
-					t_text->cursor.point_select_end   = mouse->point;
+					u64 index = Text_Cursor_FindIndex(text, mouse->point);
 
-					t_text->cursor.point_select_start.x -= t_text->data.rect_content.x;
-					t_text->cursor.point_select_start.y -= t_text->data.rect_content.y;
-					t_text->cursor.point_select_end.x   -= t_text->data.rect_content.x;
-					t_text->cursor.point_select_end.y   -= t_text->data.rect_content.y;
-
-					Vertex_ClearAttributes(&t_text->cursor.vertex_select);
+					text->cursor.index_select_start = index;
+					text->cursor.index_select_end   = index;
 				}
 				else {
-					t_text->cursor.point_select_end = mouse->point;
+					u64 index = Text_Cursor_FindIndex(text, mouse->point);
 
-					t_text->cursor.point_select_end.x   -= t_text->data.rect_content.x;
-					t_text->cursor.point_select_end.y   -= t_text->data.rect_content.y;
+					text->cursor.index_select_end   = index;
 
-					Text_Cursor_SetSelection(t_text,
-											 t_text->cursor.point_select_start,
-											 t_text->cursor.point_select_end);
+					Widget_Cursor_RestartBlinking(widget);
 				}
+
+				Text_Cursor_Update(text);
 			}
 		}
 
@@ -8600,13 +9032,9 @@ Widget_UpdateInput(
 			}
 
 			/// focus change
-			if (widget->data.has_focus != got_focus) {
-				if (widget->type == WIDGET_CHECKBOX) {
-					int a = 1;
-				}
-
+//			if (widget->data.has_focus != got_focus) {
 				widget->data.has_focus = got_focus;
-			}
+//			}
 		}
 
 		/// right mouse button
@@ -8674,6 +9102,10 @@ Widget_UpdateInput(
 					widget->events.on_list_change_index = true;
 				}
 			}
+		}
+
+		if (Text_UpdateInput(&widget->text, keyboard)) {
+			Widget_Cursor_RestartBlinking(widget);
 		}
     }
 
@@ -9275,6 +9707,7 @@ Widget_UpdateInputComboBox(
 
 			if (widget->events.on_trigger) {
 				if (!twg_list->events.on_list_change_index) {
+					update_label = true;
 					hide_popout = true;
 				}
 			}
@@ -9333,8 +9766,8 @@ Widget_CreateComboBox(
 	t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_width = true;
 
-	Widget wg_label  = Widget_CreateLabel(window , font, {}, "");
-	Widget wg_button = Widget_CreateButton(window, font, {}, "X");
+	Widget wg_text   = Widget_CreateTextBox(window, font, {});
+	Widget wg_button = Widget_CreateButton( window, font, {}, "X");
 	Widget wg_list   = Widget_CreateListbox(window, font, {0, 0, 0, combo_height});
 
 	wg_button.UpdateCustomInputs = Widget_UpdateInputComboBox;
@@ -9342,13 +9775,13 @@ Widget_CreateComboBox(
 
 	wg_list.data.is_floating = true;
 
-	wg_label.text.data.rect_padding  = {2, 2, 2, 2};
+	wg_text.text.data.rect_padding  = {2, 1, 2, 1};// {2, 2, 2, 2};
 
 	wg_button.text.data.rect_margin  = {};
 	wg_button.text.data.rect_padding = {3, 0, 3, 0};
 	wg_button.data.border_size = 2;
 
-	                     Array_Add(&t_widget.a_subwidgets, wg_label);
+	                     Array_Add(&t_widget.a_subwidgets, wg_text);
 	Widget *twg_button = Array_Add(&t_widget.a_subwidgets, wg_button);
 	Widget *twg_list   = Array_Add(&t_widget.a_subwidgets, wg_list);
 
