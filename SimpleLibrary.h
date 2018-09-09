@@ -24,10 +24,19 @@
 ///     c_ -> C-String (when String with the same name might also be used)
 ///    as_ -> Array<String> ...
 ///     t_ -> temporary local variable (which might overlap in name with
-///           a parameter)
+///           a parameter / or when shadowing)
+///
+///     Postfix Pointer Parameter:
+///     ------------------------------------------------------
+///     Function parameters with pointers who end in name with
+///       _out -> everything / something (in a struct)
+///               will be cleared / overwritten
+///       _io  -> will read an input and generate an output
+///               based on it
+///     otherwise, the pointer will only be used for reading
 ///
 ///     Function names that ends with "Static" have a byRef return parameter
-///     which needs manual freeing, in case it is not a static object / variable
+///     which needs manual freeing, in case it is not a static object / variable (tbd)
 ///
 /// Return types: if a function returns a struct, it's memory needs to
 ///               be free'd to prevent memory leaks
@@ -1017,15 +1026,15 @@ operator == (
 template <typename T>
 instant void
 Swap(
-	T *first,
-	T *second
+	T *first_io,
+	T *second_io
 ) {
-	Assert(first);
-	Assert(second);
+	Assert(first_io);
+	Assert(second_io);
 
-	T temp = *first;
-	*first = *second;
-	*second = temp;
+	T temp = *first_io;
+	*first_io = *second_io;
+	*second_io = temp;
 }
 
 instant void
@@ -1034,10 +1043,10 @@ Rect_GetAspect(
 	s32 height_src,
 	s32 *width_dst,
 	s32 *height_dst,
-	float *off_x,
-	float *off_y,
-	float *ratio_x = 0,
-	float *ratio_y = 0,
+	float *off_x_io,
+	float *off_y_io,
+	float *ratio_x_out = 0,
+	float *ratio_y_out = 0,
 	bool scale_to_dest = false
 ) {
 	Assert(width_dst);
@@ -1051,9 +1060,9 @@ Rect_GetAspect(
 		float ratio = (aspect_dst / aspect_src);
 		float offset = *width_dst / ratio;
 
-		if (off_x)  *off_x += floor((*width_dst - offset) / 2);
-		if (ratio_x)  *ratio_x = ratio;
-		if (ratio_y)  *ratio_y = 1;
+		if (off_x_io)  *off_x_io += floor((*width_dst - offset) / 2);
+		if (ratio_x_out)  *ratio_x_out = ratio;
+		if (ratio_y_out)  *ratio_y_out = 1;
 
 		*width_dst = floor(offset);
     }
@@ -1061,16 +1070,16 @@ Rect_GetAspect(
 		float ratio = (aspect_src / aspect_dst);
 		float offset = *height_dst / ratio;
 
-		if (off_y)  *off_y += floor((*height_dst - offset) / 2);
-		if (ratio_x)  *ratio_x = 1;
-		if (ratio_y)  *ratio_y = ratio;
+		if (off_y_io)  *off_y_io += floor((*height_dst - offset) / 2);
+		if (ratio_x_out)  *ratio_x_out = 1;
+		if (ratio_y_out)  *ratio_y_out = ratio;
 
 		*height_dst = floor(offset);
     }
 
     if (scale_to_dest) {
-		if (ratio_x)  *ratio_x = (float)*width_dst  / width_src;
-		if (ratio_y)  *ratio_y = (float)*height_dst / height_src;
+		if (ratio_x_out)  *ratio_x_out = (float)*width_dst  / width_src;
+		if (ratio_y_out)  *ratio_y_out = (float)*height_dst / height_src;
     }
 }
 
@@ -1079,8 +1088,8 @@ Rect_GetAspect(
 	Rect *rect_convert_to_dest,
 	s32 width_src,
 	s32 height_src,
-	float *ratio_x = 0,
-	float *ratio_y = 0,
+	float *ratio_x_out = 0,
+	float *ratio_y_out = 0,
 	bool scale_to_dest = false
 ) {
 	Assert(rect_convert_to_dest);
@@ -1091,8 +1100,8 @@ Rect_GetAspect(
 					&rect_convert_to_dest->h,
 					&rect_convert_to_dest->x,
 					&rect_convert_to_dest->y,
-					ratio_x,
-					ratio_y,
+					ratio_x_out,
+					ratio_y_out,
 					scale_to_dest);
 }
 
@@ -1179,28 +1188,28 @@ Rect_IsVisibleFully(
 
 instant void
 Rect_Resize(
-	Rect *rect,
+	Rect *rect_io,
 	s32 pixel_offset
 ) {
-	Assert(rect);
+	Assert(rect_io);
 
-	rect->x -= pixel_offset;
-	rect->y -= pixel_offset;
-	rect->w += (pixel_offset << 1);
-	rect->h += (pixel_offset << 1);
+	rect_io->x -= pixel_offset;
+	rect_io->y -= pixel_offset;
+	rect_io->w += (pixel_offset << 1);
+	rect_io->h += (pixel_offset << 1);
 }
 
 instant void
 Rect_AddPadding(
-	Rect *rect,
+	Rect *rect_io,
 	Rect rect_padding
 ) {
-	Assert(rect);
+	Assert(rect_io);
 
-	rect->x += rect_padding.x;
-	rect->y += rect_padding.y;
-	rect->w -= (rect_padding.x + rect_padding.w);
-	rect->h -= (rect_padding.y + rect_padding.h);
+	rect_io->x += rect_padding.x;
+	rect_io->y += rect_padding.y;
+	rect_io->w -= (rect_padding.x + rect_padding.w);
+	rect_io->h -= (rect_padding.y + rect_padding.h);
 }
 
 instant Color32
@@ -1213,34 +1222,34 @@ Color_MakeGrey(
 
 instant void
 Clamp(
-	s64 *value,
+	s64 *value_io,
 	s64 min,
 	s64 max
 ) {
-	Assert(value);
+	Assert(value_io);
 
-	if (*value < min)  *value = min;
-	if (*value > max)  *value = max;
+	if (*value_io < min)  *value_io = min;
+	if (*value_io > max)  *value_io = max;
 }
 
 instant void
-Rect_Clamp(
-	Rect *rect,
+Rect_ClampY(
+	Rect *rect_io,
 	Rect  rect_limit
 ) {
-	Assert(rect);
+	Assert(rect_io);
 
 	/// do not show negative space below the last visible
-	if (rect->y + rect->h < rect_limit.h)
-		rect->y = rect_limit.h - rect->h;
+	if (rect_io->y + rect_io->h < rect_limit.h)
+		rect_io->y = rect_limit.h - rect_io->h;
 
 	/// do not show negative space above the first visible
-	if (rect->y > 0)
-		rect->y = 0;
+	if (rect_io->y > 0)
+		rect_io->y = 0;
 
 	/// avoid scrolling, when all content is visible
-	if (rect->h <= rect_limit.h)
-		rect->y = 0;
+	if (rect_io->h <= rect_limit.h)
+		rect_io->y = 0;
 }
 
 /// ::: Memory
@@ -1261,15 +1270,15 @@ struct Memory_Header {
 
 instant void
 Memory_GetHeader(
-	Memory_Header *header,
+	Memory_Header *header_out,
 	void *mem
 ) {
-	Assert(header);
+	Assert(header_out);
 	Assert(mem);
 
 	mem = (char *)mem - sizeof(Memory_Header);
 
-	*header = (*(Memory_Header *)mem);
+	*header_out = (*(Memory_Header *)mem);
 }
 
 instant void *
@@ -1338,11 +1347,20 @@ _Memory_Resize(
 	return mem;
 }
 
-instant void
-Memory_Free(
-	void *data
+/// will set the free'd pointer to 0
+/// - extra security
+#define Memory_Free(_data) \
+	_data = _Memory_Free(_data);
+
+template <typename T>
+instant T
+_Memory_Free(
+	T data
 ) {
-	if (data == 0)  return;
+	Assert(std::is_pointer<T>::value);
+
+	if (data == 0)
+		return 0;
 
 	Memory_Header mem_header;
 	Memory_GetHeader(&mem_header, data);
@@ -1356,21 +1374,23 @@ Memory_Free(
 	else {
 		LOG_DEBUG("Trying to free heap pointer(?).")
 	}
+
+	return 0;
 }
 
 instant void
 Memory_Copy(
-	const void *dest,
+	const void *dest_out,
 	const void *src,
 	u64 length
 ) {
-	if (!dest OR !src OR !length)  return;
-	if (dest == src)            return;
+	if (!dest_out OR !src OR !length)	return;
+	if (dest_out == src)				return;
 
-    char *c_dest = (char *)dest;
+    char *c_dest = (char *)dest_out;
     char *c_src  = (char *)src;
 
-    if (dest > src) {
+    if (dest_out > src) {
 		while(length-- > 0)
 			c_dest[length] = c_src[length];
     }
@@ -1383,13 +1403,13 @@ Memory_Copy(
 
 instant void
 Memory_Set(
-	void *dest,
+	void *dest_out,
 	int data,
 	u64 length
 ) {
-	if (dest == 0) return;
+	if (dest_out == 0) return;
 
-	u8 *cDest = (u8*)dest;
+	u8 *cDest = (u8*)dest_out;
 	u8  cData = data;
 
 	while (length-- > 0)
@@ -1463,7 +1483,6 @@ ToCString(
 struct String;
 instant char* String_CreateCBufferCopy(String *s_data);
 
-
 instant s32
 ToInt(
 	String *s_data
@@ -1486,18 +1505,18 @@ struct Timer {
 
 instant void
 Time_Reset(
-	Timer *timer
+	Timer *timer_out
 ) {
-	if (!timer)
+	if (!timer_out)
 		return;
 
-	timer->lo_timer = GetTickCount();
+	timer_out->lo_timer = GetTickCount();
 
 	LARGE_INTEGER largeCounter;
 	QueryPerformanceCounter(&largeCounter);
 
-	timer->hi_timer = largeCounter.QuadPart;
-	timer->counter = 0;
+	timer_out->hi_timer = largeCounter.QuadPart;
+	timer_out->counter = 0;
 }
 
 instant u32
@@ -1507,25 +1526,25 @@ Time_Get() {
 
 instant bool
 Time_HasElapsed(
-	Timer *timer,
+	Timer *timer_io,
 	u32 interval_in_ms,
 	bool run_once = false
 ) {
-	Assert(timer);
+	Assert(timer_io);
 
-	if (!timer->lo_timer) {
-		Time_Reset(timer);
+	if (!timer_io->lo_timer) {
+		Time_Reset(timer_io);
 		return false;
 	}
 
 	bool result = true;
 
-	if (Time_Get() - timer->lo_timer < interval_in_ms) {
+	if (Time_Get() - timer_io->lo_timer < interval_in_ms) {
 		result = false;
 	}
 	else {
 		if (!run_once) {
-			timer->lo_timer = Time_Get();
+			timer_io->lo_timer = Time_Get();
 		}
 	}
 
@@ -1535,17 +1554,17 @@ Time_HasElapsed(
 /// milliseconds
 instant double
 Time_Measure(
-	Timer *timer
+	Timer *timer_io
 ) {
-	if (!timer)
+	if (!timer_io)
 		return 0.f;
 
 	LARGE_INTEGER largeCounter;
 	QueryPerformanceCounter(&largeCounter);
 
-	/// init timer
-	if (timer->hi_timer == 0) {
-		timer->hi_timer = largeCounter.QuadPart;
+	/// init timer_io
+	if (timer_io->hi_timer == 0) {
+		timer_io->hi_timer = largeCounter.QuadPart;
 		return 0.f;
 	}
 
@@ -1554,11 +1573,11 @@ Time_Measure(
 	LARGE_INTEGER largeFreq;
 	QueryPerformanceFrequency(&largeFreq);
 
-	double diff = ((double)( (current_time - timer->hi_timer)
+	double diff = ((double)( (current_time - timer_io->hi_timer)
 							* 1000.0)
 							/ largeFreq.QuadPart);
 
-	timer->hi_timer = current_time;
+	timer_io->hi_timer = current_time;
 
 	return diff;
 }
@@ -1566,44 +1585,45 @@ Time_Measure(
 /// has to be used every frame or the calculation will be wrong
 instant u32
 Time_GetFPS(
-	Timer *timer,
+	Timer *timer_io,
 	bool get_worst = false
 ) {
-	if (!timer)
+	if (!timer_io)
 		return 0;
 
-	u32 diff = Time_Get() - timer->lo_timer;
+	u32 diff = Time_Get() - timer_io->lo_timer;
 
-	if (timer->lo_timer > 0 AND diff < 1000) {
-		++timer->counter;
+	if (timer_io->lo_timer > 0 AND diff < 1000) {
+		++timer_io->counter;
 	}
 	else {
-		timer->fps_worst = MIN(timer->fps_worst, timer->counter);
+		timer_io->fps_worst = MIN(	timer_io->fps_worst,
+									timer_io->counter);
 
-		if (timer->fps_worst == 0)
-			timer->fps_worst = timer->counter;
+		if (timer_io->fps_worst == 0)
+			timer_io->fps_worst = timer_io->counter;
 
-		timer->fps = timer->counter;
-		timer->counter = 1;
-		timer->lo_timer = Time_Get();
+		timer_io->fps = timer_io->counter;
+		timer_io->counter = 1;
+		timer_io->lo_timer = Time_Get();
 	}
 
-	return (get_worst ? timer->fps_worst : timer->fps);
+	return (get_worst ? timer_io->fps_worst : timer_io->fps);
 }
 
 /// Reach the end (from the start) in the timespan of the duration
 /// Returns: step increase
 instant float
 Time_Move(
-	Timer *timer,
+	Timer *timer_io,
 	u32 timespan_in_ms,
 	float distance
 ) {
-	Assert(timer);
+	Assert(timer_io);
 
 	if (!timespan_in_ms)  return 0.0f;
 
-	double step_size = Time_Measure(timer) / timespan_in_ms;
+	double step_size = Time_Measure(timer_io) / timespan_in_ms;
 	return distance * step_size;
 }
 
@@ -1647,87 +1667,91 @@ String_Length(
 
 instant void
 String_Destroy(
-	String *s_data
+	String *s_data_io
 ) {
-	Assert(s_data);
+	Assert(s_data_io);
 
-	Memory_Free(s_data->value);
-	*s_data = {};
+	Memory_Free(s_data_io->value);
+	*s_data_io = {};
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 }
 
 instant void
 String_Resize(
-	String *s_data,
+	String *s_data_io,
 	s64 length_delta
 ) {
-	Assert(s_data);
+	Assert(s_data_io);
 
-	s_data->value = Memory_Resize(s_data->value, char, s_data->length + length_delta);
+	s_data_io->value = Memory_Resize(s_data_io->value, char, s_data_io->length + length_delta);
 }
 
 instant bool
 String_Append(
-	String *s_data,
+	String *s_data_io,
 	const char *c_data,
 	u64 length_append = 0
 ) {
-    if (!s_data)
+    if (!s_data_io)
 		return false;
 
     if (length_append == 0)  length_append = String_Length(c_data);
     if (length_append == 0)  return false;
 
-	String_Resize(s_data, length_append);
-	Memory_Copy(s_data->value + s_data->length, (char *)c_data, length_append);
-	s_data->length += length_append;
+	String_Resize(s_data_io, length_append);
+	Memory_Copy(s_data_io->value + s_data_io->length, (char *)c_data, length_append);
+	s_data_io->length += length_append;
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 
 	return true;
 }
 
 instant u64
 String_Insert(
-	String *s_data,
+	String *s_data_io,
 	u64 index_start,
 	const char *c_data,
 	u64 c_length = 0
 ) {
-	if (!s_data)  return 0;
+	if (!s_data_io)  return 0;
 	if (!c_data)  return 0;
 
 	if (!c_length)
 		c_length = String_Length(c_data);
 
-	Assert(index_start < s_data->length + c_length);
+	Assert(index_start < s_data_io->length + c_length);
 
-    s_data->value = Memory_Resize(s_data->value, char, s_data->length + c_length);
-	Memory_Copy(s_data->value + index_start + c_length, s_data->value + index_start, s_data->length - index_start);
+    s_data_io->value = Memory_Resize(s_data_io->value, char, s_data_io->length + c_length);
+
+	Memory_Copy(s_data_io->value + index_start + c_length,
+				s_data_io->value + index_start,
+				s_data_io->length - index_start);
 
 	FOR_START(index_start, index_start + c_length, it) {
-		s_data->value[index_start + (it - index_start)] = *c_data++;
+		s_data_io->value[index_start + (it - index_start)] = *c_data++;
 	}
 
-	s_data->length += c_length;
+	s_data_io->length += c_length;
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 
 	return c_length;
 }
 
 instant void
 To_String(
-	String *s_data,
+	String *s_data_out,
 	const char *c_data,
 	u64 c_length = 0
 ) {
-	Assert(s_data);
+	Assert(s_data_out);
 	Assert(c_data);
 
-	*s_data = {};
-	String_Append(s_data, c_data, c_length);
+//	*s_data_out = {};
+	String_Destroy(s_data_out);
+	String_Append(s_data_out, c_data, c_length);
 }
 
 /// does NOT add memory for '\0'
@@ -1735,7 +1759,7 @@ To_String(
 /// in the buffer so you don't truncate the string
 instant void
 To_CString(
-	char *c_buffer,
+	char *c_buffer_out,
 	u64 c_length,
 	String *s_data
 ) {
@@ -1744,7 +1768,7 @@ To_CString(
 	if (!c_length)  return;
 
 	if (!s_data->length) {
-		c_buffer[0] = '\0';
+		c_buffer_out[0] = '\0';
 		return;
 	}
 
@@ -1755,11 +1779,11 @@ To_CString(
 
 	/// stop before '\0'
 	FOR(c_length - 1, it) {
-		c_buffer[it] = s_data->value[it];
+		c_buffer_out[it] = s_data->value[it];
 	}
 
 	/// set final '\0'
-	c_buffer[c_length - 1] = '\0';
+	c_buffer_out[c_length - 1] = '\0';
 }
 
 instant char *
@@ -1879,14 +1903,14 @@ String_Copy(
 
 instant void
 String_Copy(
-	char *dest,
+	char *dest_out,
 	const char *src,
 	u32 length = 0
 ) {
 	if (!src)
 		return;
 
-	char *result = dest;
+	char *result = dest_out;
 
 	if (!length)
 		length = String_Length(src);
@@ -1895,11 +1919,11 @@ String_Copy(
 	++length;
 
 	while (*src AND --length > 0)
-		*dest++ = *src++;
+		*dest_out++ = *src++;
 
-	*dest = '\0';
+	*dest_out = '\0';
 
-	dest = result;
+	dest_out = result;
 }
 
 instant char *
@@ -2038,12 +2062,12 @@ String_FindRev(
 
 instant void
 String_Cut(
-	String *s_data,
+	String *s_data_io,
 	u32 length
 ) {
-	if (s_data AND length < s_data->length) {
-		s_data->length  = length;
-		s_data->changed = true;
+	if (s_data_io AND length < s_data_io->length) {
+		s_data_io->length  = length;
+		s_data_io->changed = true;
 	}
 }
 
@@ -2088,111 +2112,111 @@ String_EndWith(
 
 instant void
 String_ToLower(
-	String *s_data
+	String *s_data_io
 ) {
-	if (!s_data)
+	if (!s_data_io)
 		return;
 
 	u64 index = 0;
-	u64 len_max = s_data->length + 1;
+	u64 len_max = s_data_io->length + 1;
 
 	while(index < len_max) {
-		if (s_data->value[index] >= 'A' AND s_data->value[index] <= 'Z') {
-			s_data->value[index] = s_data->value[index] + 32;
+		if (s_data_io->value[index] >= 'A' AND s_data_io->value[index] <= 'Z') {
+			s_data_io->value[index] = s_data_io->value[index] + 32;
 		}
 		++index;
 	}
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 }
 
 instant void
 String_ToUpper(
-	String *s_data
+	String *s_data_io
 ) {
-	if (!s_data)
+	if (!s_data_io)
 		return;
 
 	u64 index = 0;
-	u64 len_max = s_data->length + 1;
+	u64 len_max = s_data_io->length + 1;
 
 	while(index < len_max) {
-		if (s_data->value[index] >= 'a' AND s_data->value[index] <= 'z') {
-			s_data->value[index] = s_data->value[index] - 32;
+		if (s_data_io->value[index] >= 'a' AND s_data_io->value[index] <= 'z') {
+			s_data_io->value[index] = s_data_io->value[index] - 32;
 		}
 		++index;
 	}
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 }
 
 instant void
 String_Reverse(
-	String *s_data
+	String *s_data_io
 ) {
-	if (!s_data)
+	if (!s_data_io)
 		return;
 
-	u64 length = s_data->length;
+	u64 length = s_data_io->length;
 
 	for(u64 it = 0; it < (length >> 1); ++it) {
-		char temp = s_data->value[it];
+		char temp = s_data_io->value[it];
 		/// don't reverse the '\0'!
-		s_data->value[it] = s_data->value[length - it - 1];
-		s_data->value[length - it - 1] = temp;
+		s_data_io->value[it] = s_data_io->value[length - it - 1];
+		s_data_io->value[length - it - 1] = temp;
 	}
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 }
 
 instant void
 String_TrimLeft(
-	String *s_data
+	String *s_data_io
 ) {
-	Assert(s_data);
+	Assert(s_data_io);
 
 	u64 length = 0;
-	u64 len_max = s_data->length;
+	u64 len_max = s_data_io->length;
 
 	/// does not skip '\0'
     while(length <= len_max) {
-		if (s_data->value[length] <= 32 AND s_data->value[length] != 127) ++length;
-		else												   break;
+		if (s_data_io->value[length] <= 32 AND s_data_io->value[length] != 127) ++length;
+		else break;
     }
 
-    Memory_Copy(s_data->value, s_data->value + length, s_data->length - length);
-    s_data->length -= length;
+    Memory_Copy(s_data_io->value, s_data_io->value + length, s_data_io->length - length);
+    s_data_io->length -= length;
 
-    s_data->changed = true;
+    s_data_io->changed = true;
 }
 
 instant void
 String_TrimRight(
-	String *s_data
+	String *s_data_io
 ) {
-	Assert(s_data);
+	Assert(s_data_io);
 
-	u64 length = s_data->length;
+	u64 length = s_data_io->length;
 
     while(length > 0) {
-		if (s_data->value[length - 1] <= 32 AND s_data->value[length - 1] != 127)
+		if (s_data_io->value[length - 1] <= 32 AND s_data_io->value[length - 1] != 127)
 			--length;
 		else
 			break;
     }
 
-    s_data->length = length;
+    s_data_io->length = length;
 
-    s_data->changed = true;
+    s_data_io->changed = true;
 }
 
 instant u64
 String_Remove(
-	String *s_data,
+	String *s_data_io,
 	u64 index_start,
 	u64 index_end
 ) {
-	Assert(s_data);
+	Assert(s_data_io);
 
 	if (index_start == index_end)
 		return 0;
@@ -2200,38 +2224,38 @@ String_Remove(
 	if (index_start > index_end)
 		Swap(&index_start, &index_end);
 
-	if (index_end > s_data->length)
-		index_end = s_data->length;
+	if (index_end > s_data_io->length)
+		index_end = s_data_io->length;
 
-	u64 length = s_data->length - index_end;
+	u64 length = s_data_io->length - index_end;
 	u64 rm_count = (index_end - index_start);
 
-	Memory_Copy(s_data->value + index_start, s_data->value + index_end, length);
-	s_data->length -= rm_count;
+	Memory_Copy(s_data_io->value + index_start, s_data_io->value + index_end, length);
+	s_data_io->length -= rm_count;
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 
 	return rm_count;
 }
 
 instant void
 String_Clear(
-	String *s_data
+	String *s_data_out
 ) {
-	Assert(s_data);
+	Assert(s_data_out);
 
-	s_data->length = 0;
+	s_data_out->length = 0;
 
-	s_data->changed = true;
+	s_data_out->changed = true;
 }
 
 instant void
 String_Replace(
-	String     *s_data,
+	String     *s_data_io,
 	const char *find,
 	const char *replace
 ) {
-	Assert(s_data);
+	Assert(s_data_io);
 	Assert(find);
 	Assert(replace);
 
@@ -2240,39 +2264,39 @@ String_Replace(
 	s64 find_length     = String_Length(find);
 	s64 replace_length  = String_Length(replace);
 
-	while(String_Find(s_data, find, &pos_found, pos_start)) {
-		String_Remove(s_data, pos_found, pos_found + find_length);
-		String_Insert(s_data, pos_found, replace);
+	while(String_Find(s_data_io, find, &pos_found, pos_start)) {
+		String_Remove(s_data_io, pos_found, pos_found + find_length);
+		String_Insert(s_data_io, pos_found, replace);
 		pos_start += pos_found + replace_length;
 	}
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 }
 
 instant void
 String_Replace(
-	String     *s_data,
+	String     *s_data_io,
 	const char *find,
 	String     *s_replace
 ) {
-	Assert(s_data);
+	Assert(s_data_io);
 	Assert(find);
 	Assert(s_replace);
 
 	char *c_replace = String_CreateCBufferCopy(s_replace);
-	String_Replace(s_data, find, c_replace);
+	String_Replace(s_data_io, find, c_replace);
 	Memory_Free(c_replace);
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 }
 
 instant s64
 String_Insert(
-	String *s_data,
+	String *s_data_io,
 	u64 index_start,
 	const char c_data
 ) {
-	Assert(s_data);
+	Assert(s_data_io);
 
 	s64 length = 0;
 
@@ -2280,48 +2304,48 @@ String_Insert(
 		/// make sure there is something to remove
 		if (index_start) {
 			length = 0;
-			if (s_data->value[index_start + length - 1] == '\n')  --length;
-			if (s_data->value[index_start + length - 1] == '\r')  --length;
+			if (s_data_io->value[index_start + length - 1] == '\n')  --length;
+			if (s_data_io->value[index_start + length - 1] == '\r')  --length;
 			if (!length) --length;
 
-			String_Remove(s_data, index_start + length, index_start);
+			String_Remove(s_data_io, index_start + length, index_start);
 		}
 	}
 	else if (c_data == '\r' OR c_data == '\n') {
 		length = 1;
-		String_Insert(s_data, index_start, "\n", length);
+		String_Insert(s_data_io, index_start, "\n", length);
 	}
 	else {
 		length = 1;
-		String_Insert(s_data, index_start, &c_data, length);
+		String_Insert(s_data_io, index_start, &c_data, length);
 	}
 
-	s_data->changed = true;
+	s_data_io->changed = true;
 
 	return length;
 }
 
 instant void
 String_Cut(
-	String *s_data,
+	String *s_data_io,
 	const char *c_start,
 	const char *c_end
 ) {
-	Assert(s_data);
+	Assert(s_data_io);
 
 	s64 start = 0, end = 0;
 	u64 len_end = String_Length(c_end);
 
 	while (true) {
-		start = String_IndexOf(s_data, c_start);
+		start = String_IndexOf(s_data_io, c_start);
 
 		if (start < 0)
 			break;
 
-		end = String_IndexOf(s_data, c_end, start);
+		end = String_IndexOf(s_data_io, c_end, start);
 
 		if (end > start)
-			String_Remove(s_data, start, end + len_end);
+			String_Remove(s_data_io, start, end + len_end);
 		else
 			break;
 	}
@@ -2444,93 +2468,86 @@ struct Array {
 template <typename T>
 instant T *
 Array_Add(
-	Array<T> *array,
+	Array<T> *array_io,
 	T element
 ) {
-	Assert(array);
+	Assert(array_io);
 
 	constexpr u64 length = 1;
 
-	if (array->size + sizeof(T) * length > array->limit) {
-		array->limit += sizeof(T) * length;
-		array->memory = (T *)_Memory_Resize(array->memory, array->limit);;
+	if (array_io->size + sizeof(T) * length > array_io->limit) {
+		array_io->limit += sizeof(T) * length;
+		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->limit);;
 	}
 
-	u64 target = array->size / sizeof(T);
+	u64 target = array_io->size / sizeof(T);
 
-	array->memory[target] = element;
-	array->size += sizeof(T) * length;
+	array_io->memory[target] = element;
+	array_io->size += sizeof(T) * length;
 
-	++array->count;
+	++array_io->count;
 
-	return &array->memory[target];
+	return &array_io->memory[target];
 }
 
 template <typename T>
 instant u64
 Array_AddEmpty(
-	Array<T> *array,
-	T **element_empty
+	Array<T> *array_io,
+	T **element_empty_out
 ) {
-	Assert(array);
-	Assert(element_empty);
+	Assert(array_io);
+	Assert(element_empty_out);
 
 	T t_element_empty = {};
-	Array_Add(array, t_element_empty);
-	*element_empty = &ARRAY_IT(*array, array->count - 1);
+	Array_Add(array_io, t_element_empty);
+	*element_empty_out = &ARRAY_IT(*array_io, array_io->count - 1);
 
-	return array->count - 1;
+	return array_io->count - 1;
 }
 
-///@Info: does NOT have ownership and clears/destroys
-///       dynamic data inside structs and such.
-///       the same thing applies for inserting data
-///       into empty array slots (created with addempty)
-///       into dynamic pointers inside a struct element
-///    -> non-generic overlap functions might exist that
-///       do that
 template<typename T>
 instant void
 Array_ClearContainer(
-	Array<T> *array
+	Array<T> *array_out
 ) {
-	Assert(array);
+	Assert(array_out);
 
-	array->size = 0;
-	array->count = 0;
+	array_out->size = 0;
+	array_out->count = 0;
 }
 
 template<typename T>
 instant void
 Array_DestroyContainer(
-	Array<T> *array
+	Array<T> *array_out
 ) {
-	Assert(array);
+	Assert(array_out);
 
-	Memory_Free(array->memory);
-	*array = {};
+	Memory_Free(array_out->memory);
+	*array_out = {};
 }
 
 /// Will add memory slots on top of existing ones and add to that count
 template <typename T>
 instant void
 Array_ReserveAdd(
-	Array<T> *array,
+	Array<T> *array_io,
 	u64 count_delta,
 	bool clear_zero = false
 ) {
-	Assert(array);
+	Assert(array_io);
 
-	u64 old_limit = array->limit;
+	u64 old_limit = array_io->limit;
 
-	if (array->size + sizeof(T) * count_delta > array->limit) {
-		array->limit += sizeof(T) * count_delta;
-		array->memory = (T *)_Memory_Resize(array->memory, array->limit);
+	if (array_io->size + sizeof(T) * count_delta > array_io->limit) {
+		array_io->limit += sizeof(T) * count_delta;
+		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->limit);
 	}
 
 	if (clear_zero) {
 		/// only clear new reserved data
-		Memory_Set(array->memory + array->count, 0, array->limit - old_limit);
+		Memory_Set(array_io->memory + array_io->count, 0, array_io->limit - old_limit);
 	}
 }
 
@@ -2556,25 +2573,25 @@ Array_Find(
 template <typename T>
 instant bool
 Array_FindOrAddEmpty(
-	Array<T> *array,
+	Array<T> *array_io,
 	T find,
-	T **entry
+	T **entry_out
 ) {
-	Assert(array);
-	Assert(entry);
+	Assert(array_io);
+	Assert(entry_out);
 
 	u64 t_index_find;
-	bool found_element = Array_Find(array, find, &t_index_find);
+	bool found_element = Array_Find(array_io, find, &t_index_find);
 
 	if (found_element) {
-		*entry = &ARRAY_IT(*array, t_index_find);
+		*entry_out = &ARRAY_IT(*array_io, t_index_find);
 	}
 	else {
-        Array_AddEmpty(array, entry);
+        Array_AddEmpty(array_io, entry_out);
 
         /// store what you want to find, if it does not exists,
         /// so it does not have to be assigned manually all the time
-        **entry = find;
+        **entry_out = find;
 	}
 
 	return found_element;
@@ -2584,41 +2601,43 @@ Array_FindOrAddEmpty(
 template <typename T>
 instant T
 Array_Remove(
-	Array<T> *array,
+	Array<T> *array_io,
 	u64 index
 ) {
-	Assert(array);
-	Assert(index < array->count);
+	Assert(array_io);
+	Assert(index < array_io->count);
 
-	T result = ARRAY_IT(*array, index);
+	T result = ARRAY_IT(*array_io, index);
 
-	FOR_ARRAY_START(*array, index, it) {
-		if (it + 1 >= array->count)
+	FOR_ARRAY_START(*array_io, index, it) {
+		if (it + 1 >= array_io->count)
 			break;
 
-		ARRAY_IT(*array, it) = ARRAY_IT(*array, it + 1);
+		ARRAY_IT(*array_io, it) = ARRAY_IT(*array_io, it + 1);
 	}
 
-	array->count -= 1;
-	array->size  -= sizeof(T);
+	array_io->count -= 1;
+	array_io->size  -= sizeof(T);
 
 	return result;
 }
 
 instant void
 Array_Destroy(
-	Array<String> *array
+	Array<String> *array_out
 ) {
-	Assert(array);
+	Assert(array_out);
 
-	if (!array->by_reference) {
-		while(array->count) {
-			String s_data_it = Array_Remove(array, 0);
+	if (!array_out->by_reference) {
+		while(array_out->count) {
+			///@Idea: might be faster to remove from
+			///       the end to avoid reordering
+			String s_data_it = Array_Remove(array_out, 0);
 			String_Destroy(&s_data_it);
 		}
 	}
 
-    Array_DestroyContainer(array);
+    Array_DestroyContainer(array_out);
 }
 
 enum DELIMITER_TYPE {
@@ -2753,29 +2772,29 @@ Array_Split(
 
 instant void
 Array_Clear(
-	Array<String> *array
+	Array<String> *array_out
 ) {
-	Assert(array);
+	Assert(array_out);
 
-	if (!array->by_reference) {
-		FOR_ARRAY(*array, it) {
-			String *ts_data = &ARRAY_IT(*array, it);
+	if (!array_out->by_reference) {
+		FOR_ARRAY(*array_out, it) {
+			String *ts_data = &ARRAY_IT(*array_out, it);
 			String_Destroy(ts_data);
 		}
 	}
 
-    Array_ClearContainer(array);
+    Array_ClearContainer(array_out);
 }
 
 instant void
 String_SplitWordsStatic(
 	String *s_data,
-	Array<String> *as_words
+	Array<String> *as_words_out
 ) {
 	Assert(s_data);
-	Assert(as_words);
+	Assert(as_words_out);
 
-	Array_Clear(as_words);
+	Array_Clear(as_words_out);
 
 	Array<String> as_lines = Array_Split(s_data, "\n", DELIMITER_ADD_BACK);
 
@@ -2807,7 +2826,7 @@ String_SplitWordsStatic(
 		Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ");
 
 		FOR_ARRAY(tas_words, it_words) {
-			Array_Add(as_words, ARRAY_IT(tas_words, it_words));
+			Array_Add(as_words_out, ARRAY_IT(tas_words, it_words));
 		}
 
 		Array_DestroyContainer(&tas_words);
@@ -2819,20 +2838,20 @@ String_SplitWordsStatic(
 template <typename T>
 instant void
 Array_Sort_Quick_Ascending(
-	T *begin,
-	T *end
+	T *begin_io,
+	T *end_io
 ) {
-	Assert(begin);
-	Assert(end);
+	Assert(begin_io);
+	Assert(end_io);
 
-	if (begin == end)
+	if (begin_io == end_io)
 		return;
 
-    T *pivot = begin;
-    T *next  = begin;
+    T *pivot = begin_io;
+    T *next  = begin_io;
 	++next;
 
-	while(next <= end) {
+	while(next <= end_io) {
 		if (*next < *pivot) {
 			Swap(next, pivot);
 
@@ -2846,27 +2865,27 @@ Array_Sort_Quick_Ascending(
 		++next;
     }
 
-    if (begin < pivot)  Array_Sort_Quick_Ascending(begin    , pivot - 1);
-	if (end   > pivot)  Array_Sort_Quick_Ascending(pivot + 1, end      );
+    if (begin_io < pivot)  Array_Sort_Quick_Ascending(begin_io	, pivot - 1	);
+	if (end_io   > pivot)  Array_Sort_Quick_Ascending(pivot + 1	, end_io	);
 }
 
 template <typename T>
 instant void
 Array_Sort_Quick_Descending(
-	T *begin,
-	T *end
+	T *begin_io,
+	T *end_io
 ) {
-	Assert(begin);
-	Assert(end);
+	Assert(begin_io);
+	Assert(end_io);
 
-	if (begin == end)
+	if (begin_io == end_io)
 		return;
 
-    T *pivot = begin;
-    T *next  = begin;
+    T *pivot = begin_io;
+    T *next  = begin_io;
 	++next;
 
-	while(next <= end) {
+	while(next <= end_io) {
 		if (*next > *pivot) {
 			Swap(next, pivot);
 
@@ -2880,30 +2899,30 @@ Array_Sort_Quick_Descending(
 		++next;
     }
 
-    if (begin < pivot)  Array_Sort_Quick_Descending(begin    , pivot - 1);
-	if (end   > pivot)  Array_Sort_Quick_Descending(pivot + 1, end      );
+    if (begin_io < pivot)  Array_Sort_Quick_Descending(begin_io , pivot - 1	);
+	if (end_io   > pivot)  Array_Sort_Quick_Descending(pivot + 1, end_io	);
 }
 
 template <typename T>
 instant void
 Array_Sort_Ascending(
-	Array<T> *array
+	Array<T> *array_io
 ) {
-	Assert(array);
-	Assert(array->count);
+	Assert(array_io);
+	Assert(array_io->count);
 
-	Array_Sort_Quick_Ascending( &array->memory[0], &array->memory[array->count - 1]);
+	Array_Sort_Quick_Ascending( &array_io->memory[0], &array_io->memory[array_io->count - 1]);
 }
 
 template <typename T>
 instant void
 Array_Sort_Descending(
-	Array<T> *array
+	Array<T> *array_io
 ) {
-	Assert(array);
-	Assert(array->count);
+	Assert(array_io);
+	Assert(array_io->count);
 
-	Array_Sort_Quick_Descending(&array->memory[0], &array->memory[array->count - 1]);
+	Array_Sort_Quick_Descending(&array_io->memory[0], &array_io->memory[array_io->count - 1]);
 }
 
 instant String
@@ -2982,14 +3001,14 @@ struct CPU_Features {
 instant void
 CPU_GetID(
 	u32 id,
-	CPU_ID *cpu_id
+	CPU_ID *cpu_id_out
 ) {
-	Assert(cpu_id);
+	Assert(cpu_id_out);
 
 	asm volatile
 		("cpuid" :
-		 "=a" (cpu_id->EAX), "=b" (cpu_id->EBX),
-		 "=c" (cpu_id->ECX), "=d" (cpu_id->EDX)
+		 "=a" (cpu_id_out->EAX), "=b" (cpu_id_out->EBX),
+		 "=c" (cpu_id_out->ECX), "=d" (cpu_id_out->EDX)
 		: "a" (id), "c" (0));
 }
 
@@ -3055,25 +3074,27 @@ CPU_GetFeatures() {
 	return (cpu_features);
 }
 
+///@TODO: clear possible existing buffer before adding
 instant void
 CPU_GetFeatures(
-	Array<const char *> *a_features
+	Array<const char *> *a_features_out
 ) {
-	Assert(a_features);
+	Assert(a_features_out);
+	Assert(a_features_out->count == 0);
 
 	CPU_Features cpu_features = CPU_GetFeatures();
 
-	if (cpu_features.mmx)     Array_Add(a_features, "MMX");
-	if (cpu_features.mmx_ext) Array_Add(a_features, "MMX Ext");
+	if (cpu_features.mmx)     Array_Add(a_features_out, "MMX");
+	if (cpu_features.mmx_ext) Array_Add(a_features_out, "MMX Ext");
 
-	if (cpu_features.sse)     Array_Add(a_features, "SSE");
-	if (cpu_features.sse2)    Array_Add(a_features, "SSE2");
-	if (cpu_features.sse3)    Array_Add(a_features, "SSE3");
-	if (cpu_features.sse4_1)  Array_Add(a_features, "SSE4.1");
-	if (cpu_features.sse4_2)  Array_Add(a_features, "SSE4.2");
+	if (cpu_features.sse)     Array_Add(a_features_out, "SSE");
+	if (cpu_features.sse2)    Array_Add(a_features_out, "SSE2");
+	if (cpu_features.sse3)    Array_Add(a_features_out, "SSE3");
+	if (cpu_features.sse4_1)  Array_Add(a_features_out, "SSE4.1");
+	if (cpu_features.sse4_2)  Array_Add(a_features_out, "SSE4.2");
 
-	if (cpu_features._3dnow)     Array_Add(a_features, "3DNow");
-	if (cpu_features._3dnow_ext) Array_Add(a_features, "3DNow Ext");
+	if (cpu_features._3dnow)     Array_Add(a_features_out, "3DNow");
+	if (cpu_features._3dnow_ext) Array_Add(a_features_out, "3DNow Ext");
 }
 
 /// ::: Files
@@ -3249,12 +3270,12 @@ File_Open(
 
 instant bool
 File_Close(
-	File *file
+	File *file_io
 ) {
-	Assert(file);
+	Assert(file_io);
 
 	/// Returns 0 on success
-	return (fclose(file->fp) == 0);
+	return (fclose(file_io->fp) == 0);
 }
 
 instant u64
@@ -3289,15 +3310,15 @@ File_Execute(
 instant void
 File_Write(
 	File *file,
-	const char *data,
+	const char *data_out,
 	u64 length = 0
 ) {
 	Assert(file);
 
 	if (!length)
-		length = String_Length(data);
+		length = String_Length(data_out);
 
-    fwrite(data, sizeof(char), sizeof(char) * length, file->fp);
+    fwrite(data_out, sizeof(char), sizeof(char) * length, file->fp);
 }
 
 instant String
@@ -3351,17 +3372,17 @@ struct File_Watcher {
 
 instant void
 File_Watch(
-	File_Watcher *file_watcher,
+	File_Watcher *file_watcher_out,
 	const char *c_filename,
 	u64 c_length = 0
 ) {
-	Assert(file_watcher);
+	Assert(file_watcher_out);
 
-	*file_watcher = {};
+	*file_watcher_out = {};
 
 	char *tc_filename = String_CreateCBufferCopy(c_filename, c_length);
 
-	file_watcher->file = CreateFile(
+	file_watcher_out->file = CreateFile(
 			tc_filename,
 			0,
 			0,
@@ -3371,8 +3392,8 @@ File_Watch(
 			NULL
 		);
 
-	if (file_watcher->file)
-		file_watcher->exists = true;
+	if (file_watcher_out->file)
+		file_watcher_out->exists = true;
 
 	Memory_Free(tc_filename);
 }
@@ -3510,6 +3531,8 @@ File_ReadDirectory(
 	String_Destroy(&s_search_path);
 }
 
+///@HINT: test this with backup data, before using
+///       or it could leave a mess
 instant void
 File_Rename(
 	const char *c_path,
@@ -3598,9 +3621,9 @@ File_GetExtension(
 
 instant bool
 Dialog_OpenFile(
-	String *s_file
+	String *s_file_out
 ) {
-	Assert(s_file);
+	Assert(s_file_out);
 
 	bool result = false;
 
@@ -3617,7 +3640,7 @@ Dialog_OpenFile(
     ofn.Flags        = 0x02000000 | OFN_FILEMUSTEXIST;
 
     if (GetOpenFileNameA(&ofn)) {
-		To_String(s_file, filename);
+		To_String(s_file_out, filename);
 		result = true;
     }
 
@@ -3626,9 +3649,9 @@ Dialog_OpenFile(
 
 instant bool
 Dialog_OpenDirectory(
-	String *s_directory
+	String *s_directory_out
 ) {
-	Assert(s_directory);
+	Assert(s_directory_out);
 
 	bool result = false;
 
@@ -3647,7 +3670,7 @@ Dialog_OpenDirectory(
 		Memory_Free(pidl);
 
 		if (result)
-			To_String(s_directory, directory);
+			To_String(s_directory_out, directory);
 	}
 
     return result;
@@ -3700,27 +3723,29 @@ LONG WINAPI WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
 instant void
 Window_Destroy(
-	Window *window
+	Window *window_io
 ) {
-	if (window->isFullscreen) {
+	if (window_io->isFullscreen) {
 		ChangeDisplaySettings(0, 0);
 	}
 
-	if (Window_IsCreated(window)) {
-		if (window->hDC)
-			ReleaseDC(window->hWnd, window->hDC);
+	if (Window_IsCreated(window_io)) {
+		if (window_io->hDC)
+			ReleaseDC(window_io->hWnd, window_io->hDC);
 
-		DestroyWindow(window->hWnd);
+		DestroyWindow(window_io->hWnd);
 	}
 
 	if (!UnregisterClass(class_name, GetModuleHandle(0))) {
 		LOG_ERROR("UnregisterClass() failed.");
 	}
+
+	*window_io = {};
 }
 
 instant bool
 Window_Create(
-	Window *window,
+	Window *window_out,
 	const char *title,
 	s32 width,
 	s32 height,
@@ -3728,8 +3753,10 @@ Window_Create(
 	Keyboard *keyboard = 0,
 	Mouse *mouse = 0
 ) {
-	Assert(window);
-	*window = {};
+	Assert(window_out);
+	Assert(!Window_IsCreated(window_out));
+
+	*window_out = {};
 
 	/// register window class
 	/// -------------------------------------
@@ -3748,7 +3775,7 @@ Window_Create(
 	wc.lpszClassName = class_name;
 
 	if (!RegisterClass(&wc)) {
-		LOG_ERROR("RegisterClass() failed: Cannot register window class.");
+		LOG_ERROR("RegisterClass() failed: Cannot register window_out class.");
 		return false;
 	}
 
@@ -3770,7 +3797,7 @@ Window_Create(
 	u32 dwExStyle = WS_EX_APPWINDOW;
 	u32 dwStyle   = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 
-	if (window->isFullscreen) {
+	if (window_out->isFullscreen) {
 		dwStyle  |= WS_POPUP;
 	}
 	else {
@@ -3791,12 +3818,12 @@ Window_Create(
 								0, 0, hInstance, 0);
 
 	if (!hWnd) {
-		LOG_ERROR("CreateWindow() failed: Cannot create a window.");
-		Window_Destroy(window);
+		LOG_ERROR("CreateWindow() failed: Cannot create a window_out.");
+		Window_Destroy(window_out);
 		return false;
 	}
 
-	window->hWnd = hWnd;
+	window_out->hWnd = hWnd;
 
 	/// set pixel format
 	/// -------------------------------------
@@ -3813,33 +3840,33 @@ Window_Create(
 
 	if (!pf) {
 		LOG_ERROR("ChoosePixelFormat() failed: Cannot find a suitable pixel format.");
-		Window_Destroy(window);
+		Window_Destroy(window_out);
 		return false;
 	}
 
 	if (!SetPixelFormat(hDC, pf, &pfd)) {
 		LOG_ERROR("SetPixelFormat() failed: Cannot set format specified.");
-		Window_Destroy(window);
+		Window_Destroy(window_out);
 		return false;
 	}
 
 	if (!DescribePixelFormat(hDC, pf, sizeof(PIXELFORMATDESCRIPTOR), &pfd)) {
 		LOG_ERROR("DescribePixelFormat() failed: " << GetLastError());
-		Window_Destroy(window);
+		Window_Destroy(window_out);
 		return false;
 	}
 
-	window->hDC = hDC;
+	window_out->hDC = hDC;
 
-	window->title  = title;
-	window->width  = width;
-	window->height = height;
+	window_out->title  = title;
+	window_out->width  = width;
+	window_out->height = height;
 
 	if (mouse)
-		window->mouse = mouse;
+		window_out->mouse = mouse;
 
 	if (keyboard)
-		window->keyboard = keyboard;
+		window_out->keyboard = keyboard;
 
 	return true;
 }
@@ -3901,51 +3928,51 @@ Window_AlwaysOnTop(
 /// the missing borders
 instant void
 Window_ToggleFullscreen(
-	Window *window
+	Window *window_io
 ) {
-	Assert(window);
+	Assert(window_io);
 
-	if (!window->isFullscreen) {
-		DWORD dwStyle = (DWORD)GetWindowLong(window->hWnd, GWL_STYLE);
+	if (!window_io->isFullscreen) {
+		DWORD dwStyle = (DWORD)GetWindowLong(window_io->hWnd, GWL_STYLE);
 
 		dwStyle = dwStyle | WS_POPUP;
 		dwStyle = dwStyle & ~WS_OVERLAPPEDWINDOW;
 
-		SetWindowLong(window->hWnd, GWL_STYLE, dwStyle);
+		SetWindowLong(window_io->hWnd, GWL_STYLE, dwStyle);
 
-		ShowWindow(window->hWnd, SW_RESTORE);
-		ShowWindow(window->hWnd, SW_MAXIMIZE);
+		ShowWindow(window_io->hWnd, SW_RESTORE);
+		ShowWindow(window_io->hWnd, SW_MAXIMIZE);
 
-		window->isFullscreen = true;
+		window_io->isFullscreen = true;
 	}
 	else {
-		DWORD dwStyle = (DWORD)GetWindowLong(window->hWnd, GWL_STYLE);
+		DWORD dwStyle = (DWORD)GetWindowLong(window_io->hWnd, GWL_STYLE);
 
 		dwStyle = dwStyle & ~WS_POPUP;
 		dwStyle = dwStyle |  WS_OVERLAPPEDWINDOW;
 
-		SetWindowLong(window->hWnd, GWL_STYLE, dwStyle);
+		SetWindowLong(window_io->hWnd, GWL_STYLE, dwStyle);
 
-		ShowWindow(window->hWnd, SW_RESTORE);
+		ShowWindow(window_io->hWnd, SW_RESTORE);
 
-		window->isFullscreen = false;
+		window_io->isFullscreen = false;
 	}
 }
 
 instant void
 Window_SetSize(
-	Window *window,
+	Window *window_io,
 	s32 width,
 	s32 height
 ) {
-	Assert(window);
+	Assert(window_io);
 
-	if (window->isFullscreen)
-		Window_ToggleFullscreen(window);
+	if (window_io->isFullscreen)
+		Window_ToggleFullscreen(window_io);
 
 	RECT rect = {};
-	DWORD dwStyle   = (DWORD)GetWindowLong(window->hWnd, GWL_STYLE);
-	DWORD dwExStyle = (DWORD)GetWindowLong(window->hWnd, GWL_EXSTYLE);
+	DWORD dwStyle   = (DWORD)GetWindowLong(window_io->hWnd, GWL_STYLE);
+	DWORD dwExStyle = (DWORD)GetWindowLong(window_io->hWnd, GWL_EXSTYLE);
 
 	bool success = AdjustWindowRectEx(&rect, dwStyle, 0, dwExStyle);
 
@@ -3954,34 +3981,34 @@ Window_SetSize(
 		height += (rect.bottom - rect.top);
 
 		rect = {};
-		GetWindowRect(window->hWnd, &rect);
+		GetWindowRect(window_io->hWnd, &rect);
 
 		s32 x = rect.left + (rect.right  - rect.left - width)  / 2;
 		s32 y = rect.top  + (rect.bottom - rect.top  - height) / 2;
 
-		SetWindowPos(window->hWnd, HWND_TOP, x, y, width, height, 0);
+		SetWindowPos(window_io->hWnd, HWND_TOP, x, y, width, height, 0);
 	}
 }
 
 instant void
 Window_SetTitle(
-	Window *window,
+	Window *window_out,
 	const char *title
 ) {
-	Assert(window);
+	Assert(window_out);
 	Assert(title);
 
-	window->title = title;
+	window_out->title = title;
 
-	SetWindowText(window->hWnd, window->title);
+	SetWindowText(window_out->hWnd, window_out->title);
 }
 
 instant bool
 Window_UnAdjustRect(
 	HWND hWnd,
-	RECT *rect
+	RECT *rect_io
 ) {
-	Assert(rect);
+	Assert(rect_io);
 
 	RECT t_rect = {};
 
@@ -3991,10 +4018,10 @@ Window_UnAdjustRect(
 	bool success = AdjustWindowRectEx(&t_rect, dwStyle, 0, dwExStyle);
 
 	if (success) {
-		rect->left   -= t_rect.left;
-		rect->top    -= t_rect.top;
-		rect->right  -= t_rect.right;
-		rect->bottom -= t_rect.bottom;
+		rect_io->left   -= t_rect.left;
+		rect_io->top    -= t_rect.top;
+		rect_io->right  -= t_rect.right;
+		rect_io->bottom -= t_rect.bottom;
 	}
 	return success;
 }
@@ -4003,13 +4030,13 @@ Window_UnAdjustRect(
 /// ===========================================================================
 instant void
 OpenGL_Init(
-	Window *window
+	Window *window_io
 ) {
-	Assert(window);
+	Assert(window_io);
 
-	if (window->hDC) {
-		window->hRC = wglCreateContext(window->hDC);
-		wglMakeCurrent(window->hDC, window->hRC);
+	if (window_io->hDC) {
+		window_io->hRC = wglCreateContext(window_io->hDC);
+		wglMakeCurrent(window_io->hDC, window_io->hRC);
 
 		glShadeModel(GL_SMOOTH);
 		glClearColor(0.0f, 0.0f, 0.0f, 0.5f);
@@ -4031,27 +4058,27 @@ OpenGL_Init(
 /// call before Window_Destroy
 instant void
 OpenGL_Destroy(
-	Window *window
+	Window *window_io
 ) {
-	Assert(window);
+	Assert(window_io);
 
-	if (window->hRC) {
+	if (window_io->hRC) {
 		wglMakeCurrent(0, 0);
-		wglDeleteContext(window->hRC);
+		wglDeleteContext(window_io->hRC);
 	}
 }
 
 instant void
 OpenGL_SetVSync(
-	Window *window,
+	Window *window_out,
 	bool enable
 ) {
-	Assert(window);
+	Assert(window_out);
 
 	if(wglSwapIntervalEXT)
 		wglSwapIntervalEXT(enable);
 
-	window->useVSync = enable;
+	window_out->useVSync = enable;
 
 	LOG_DEBUG("VSync: " << (enable
 							? "enabled."
@@ -4078,13 +4105,13 @@ OpenGL_ClearScreen(
 /// to the current window size
 instant bool
 OpenGL_AdjustScaleViewport(
-	Window *window,
+	Window *window_io,
 	bool zooming = true
 ) {
-	Assert(window);
+	Assert(window_io);
 
 	RECT rect_window;
-	GetClientRect(window->hWnd, &rect_window);
+	GetClientRect(window_io->hWnd, &rect_window);
 	s32 new_width  = rect_window.right  - rect_window.left;
 	s32 new_height = rect_window.bottom - rect_window.top;
 
@@ -4092,48 +4119,48 @@ OpenGL_AdjustScaleViewport(
 	float y = 0.f;
 
 	if (!zooming) {
-		bool result =    window->width  != new_width
-		              OR window->height != new_height;
+		bool result =    window_io->width  != new_width
+		              OR window_io->height != new_height;
 
 		glViewport(x, y, new_width, new_height);
-		window->scale_x = 1.0f;
-		window->scale_y = 1.0f;
-		window->width = new_width;
-		window->height = new_height;
+		window_io->scale_x = 1.0f;
+		window_io->scale_y = 1.0f;
+		window_io->width = new_width;
+		window_io->height = new_height;
 
 		return result;
 	}
 
 	Rect_GetAspect(
-		window->width,
-		window->height,
+		window_io->width,
+		window_io->height,
 		&new_width,
 		&new_height,
 		&x,
 		&y
 	);
 
-    window->x_viewport = x;
-    window->y_viewport = y;
+    window_io->x_viewport = x;
+    window_io->y_viewport = y;
 
-	float prev_scale_x = window->scale_x;
-	float prev_scale_y = window->scale_y;
+	float prev_scale_x = window_io->scale_x;
+	float prev_scale_y = window_io->scale_y;
 
-	if (window->width > new_width)
-		window->scale_x = (float)new_width / window->width;
+	if (window_io->width > new_width)
+		window_io->scale_x = (float)new_width / window_io->width;
 	else
-		window->scale_x = (float)window->width / new_width;
+		window_io->scale_x = (float)window_io->width / new_width;
 
 
-	if (window->height > new_height)
-		window->scale_y = (float)new_height / window->height;
+	if (window_io->height > new_height)
+		window_io->scale_y = (float)new_height / window_io->height;
 	else
-		window->scale_y = (float)window->height / new_height;
+		window_io->scale_y = (float)window_io->height / new_height;
 
 	glViewport(x, y, new_width, new_height);
 
-    if (prev_scale_x != window->scale_x) return true;
-    if (prev_scale_y != window->scale_y) return true;
+    if (prev_scale_x != window_io->scale_x) return true;
+    if (prev_scale_y != window_io->scale_y) return true;
 
     return false;
 }
@@ -4265,11 +4292,13 @@ Image_LoadBMP32(
 
 instant void
 Image_Destroy(
-	Image *image
+	Image *image_out
 ) {
-	Assert(image);
+	Assert(image_out);
 
-	Memory_Free(image->data);
+	Memory_Free(image_out->data);
+
+	*image_out = {};
 }
 
 /// ::: Textures
@@ -4293,18 +4322,18 @@ operator == (
 
 instant void
 Array_Destroy(
-	Array<Tuple<Texture, Array<float>>> *array
+	Array<Tuple<Texture, Array<float>>> *array_out
 ) {
-	Assert(array);
+	Assert(array_out);
 
-	FOR_ARRAY(*array, it) {
-		Tuple<Texture, Array<float>> *t_tuple = &ARRAY_IT(*array, it);
+	FOR_ARRAY(*array_out, it) {
+		Tuple<Texture, Array<float>> *t_tuple = &ARRAY_IT(*array_out, it);
 		Array<float> *a_second = &t_tuple->second;
 
 		Array_DestroyContainer(a_second);
 	}
 
-	Array_DestroyContainer(array);
+	Array_DestroyContainer(array_out);
 }
 
 instant bool
@@ -4319,14 +4348,14 @@ Texture_IsEmpty(
 instant void
 Texture_GetSizeAndBind(
 	Texture *texture,
-	s32 *width,
-	s32 *height
+	s32 *width_out,
+	s32 *height_out
 ) {
     Assert(texture);
 
     glBindTexture(GL_TEXTURE_2D, texture->ID);
-    if (width)  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH , width);
-	if (height) glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, height);
+    if (width_out)  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH , width_out);
+	if (height_out) glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, height_out);
 }
 
 instant Texture
@@ -4366,21 +4395,21 @@ Texture_Load(
 
 instant void
 Texture_Destroy(
-	Texture *texture
+	Texture *texture_out
 ) {
-	Assert(texture);
+	Assert(texture_out);
 
-	glDeleteTextures(1, &texture->ID);
-	texture->ID = 0;
+	glDeleteTextures(1, &texture_out->ID);
+	texture_out->ID = 0;
 }
 
 instant void
 Texture_Reload(
-	Texture *texture,
+	Texture *texture_io,
 	const char *c_filename,
 	u64 c_length = 0
 ) {
-	Assert(texture);
+	Assert(texture_io);
 
 	if (File_HasExtension(c_filename, ".bmp", c_length)) {
 		u32 format_input;
@@ -4391,9 +4420,9 @@ Texture_Reload(
 		if (image.flip_h)  format_input = GL_ABGR_EXT;
 		else               format_input = GL_RGBA;
 
-		Texture_Destroy(texture);
-		*texture = Texture_Load(image.data, image.width, image.height, format_input, false);
-		texture->flip_h = image.flip_h;
+		Texture_Destroy(texture_io);
+		*texture_io = Texture_Load(image.data, image.width, image.height, format_input, false);
+		texture_io->flip_h = image.flip_h;
 
 		Image_Destroy(&image);
 
@@ -4406,8 +4435,8 @@ Texture_Reload(
 		s32 width, height, bits;
 		u8 *c_data = stbi_load(tc_filename, &width, &height, &bits, 4);
 
-		Texture_Destroy(texture);
-		*texture = Texture_Load(c_data, width, height, GL_RGBA, true);
+		Texture_Destroy(texture_io);
+		*texture_io = Texture_Load(c_data, width, height, GL_RGBA, true);
 
 		Memory_Free(tc_filename);
 
@@ -4987,11 +5016,11 @@ struct ShaderSet {
 
 instant void
 ShaderProgram_Add(
-	ShaderProgram *shader_prog,
+	ShaderProgram *shader_prog_out,
 	u32 type,
 	const char *code
 ) {
-	Assert(shader_prog);
+	Assert(shader_prog_out);
 
     u32 id_shader = glCreateShader(type);
 
@@ -5013,9 +5042,9 @@ ShaderProgram_Add(
 	}
 
 	switch (type) {
-		case GL_VERTEX_SHADER:   { shader_prog->vertex_id   = id_shader; } break;
-		case GL_GEOMETRY_SHADER: { shader_prog->geometry_id = id_shader; } break;
-		case GL_FRAGMENT_SHADER: { shader_prog->fragment_id = id_shader; } break;
+		case GL_VERTEX_SHADER:   { shader_prog_out->vertex_id   = id_shader; } break;
+		case GL_GEOMETRY_SHADER: { shader_prog_out->geometry_id = id_shader; } break;
+		case GL_FRAGMENT_SHADER: { shader_prog_out->fragment_id = id_shader; } break;
 		default: {
 			LOG_DEBUG("Unimplemented shader type");
 		}
@@ -5025,14 +5054,14 @@ ShaderProgram_Add(
 /// returns shader array index
 instant u32
 ShaderSet_Add(
-	ShaderSet *shader_set,
+	ShaderSet *shader_set_io,
 	const Shader *shader
 ) {
-	Assert(shader_set);
+	Assert(shader_set_io);
     Assert(shader);
 
 	ShaderProgram *shader_prog;
-	u64 array_id = Array_AddEmpty(&shader_set->a_shaders, &shader_prog);
+	u64 array_id = Array_AddEmpty(&shader_set_io->a_shaders, &shader_prog);
 
 	AssertMessage(	array_id == shader->type,
 					"Shader added out of SHADER_PROG_TYPE order.");
@@ -5088,30 +5117,32 @@ ShaderSet_Create(
 
 inline void
 ShaderProgram_Destroy(
-	ShaderProgram *shader_prog
+	ShaderProgram *shader_prog_out
 ) {
-	Assert(shader_prog);
+	Assert(shader_prog_out);
 
-    if (shader_prog->id) {
-		glDeleteProgram(shader_prog->id);
-		glDeleteShader(shader_prog->vertex_id);
-		glDeleteShader(shader_prog->geometry_id);
-		glDeleteShader(shader_prog->fragment_id);
+    if (shader_prog_out->id) {
+		glDeleteProgram(shader_prog_out->id);
+		glDeleteShader(shader_prog_out->vertex_id);
+		glDeleteShader(shader_prog_out->geometry_id);
+		glDeleteShader(shader_prog_out->fragment_id);
 
-		*shader_prog = {};
+		*shader_prog_out = {};
     }
 }
 
 inline void
 ShaderSet_Destroy(
-	ShaderSet *shader_set
+	ShaderSet *shader_set_out
 ) {
-    Assert(shader_set);
+    Assert(shader_set_out);
 
-    FOR_ARRAY(shader_set->a_shaders, it) {
-		ShaderProgram *t_shader_prog = &ARRAY_IT(shader_set->a_shaders, it);
+    FOR_ARRAY(shader_set_out->a_shaders, it) {
+		ShaderProgram *t_shader_prog = &ARRAY_IT(shader_set_out->a_shaders, it);
 		ShaderProgram_Destroy(t_shader_prog);
     }
+
+    *shader_set_out = {};
 }
 
 inline void
@@ -5223,20 +5254,20 @@ Shader_BindAndUseIndex0(
 
 inline void
 ShaderSet_Use(
-	ShaderSet *shader_set,
+	ShaderSet *shader_set_io,
 	SHADER_PROG_TYPE type
 ) {
-	Assert(shader_set);
-	Assert(shader_set->window);
+	Assert(shader_set_io);
+	Assert(shader_set_io->window);
 
-	s64 prev_active_id = shader_set->active_id;
+	s64 prev_active_id = shader_set_io->active_id;
 
 	switch (type) {
 		case SHADER_PROG_RECT:
 		case SHADER_PROG_TEXT:
 		case SHADER_PROG_TEXTURE_FULL:
 		case SHADER_PROG_TEXTURE_SIZE: {
-			shader_set->active_id = type;
+			shader_set_io->active_id = type;
 		} break;
 
 		default: {
@@ -5245,24 +5276,24 @@ ShaderSet_Use(
 		} break;
 	}
 
-	if (prev_active_id == shader_set->active_id)
+	if (prev_active_id == shader_set_io->active_id)
 		return;
 
-	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
-	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
+	Assert((u64)shader_set_io->active_id < shader_set_io->a_shaders.count);
+	ShaderProgram *shader_prog = &ARRAY_IT(shader_set_io->a_shaders, shader_set_io->active_id);
 
 	glUseProgram(shader_prog->id);
 
-	if (shader_set->window) {
+	if (shader_set_io->window) {
 		RectF viewport;
-		Window *t_window = shader_set->window;
+		Window *t_window = shader_set_io->window;
 
 		viewport.x = t_window->x_viewport;
 		viewport.y = t_window->y_viewport;
 		viewport.w = (float)t_window->width;
 		viewport.h = (float)t_window->height;
 
-		Shader_SetValue(shader_set, "viewport", (float *)&viewport, 4);
+		Shader_SetValue(shader_set_io, "viewport", (float *)&viewport, 4);
 		OpenGL_SetBlending(true);
 	}
 }
@@ -5326,57 +5357,61 @@ operator == (
 instant void
 Vertex_GetTextureSize(
 	Vertex *vertex,
-	s32 *width,
-	s32 *height
+	s32 *width_out,
+	s32 *height_out
 ) {
 	Assert(vertex);
+	Assert(vertex->texture.ID);
 
-    if (width)  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH , width);
-	if (height) glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, height);
+	///@TODO: check if there is a way to find out of a texture is already bound
+
+    if (width_out)  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH , width_out);
+	if (height_out) glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, height_out);
 }
 
 inline void
 Vertex_Destroy(
-	Vertex *vertex
+	Vertex *vertex_out
 ) {
-	Assert(vertex);
+	Assert(vertex_out);
 
-	FOR_ARRAY(vertex->a_attributes, it) {
-		Vertex_Buffer<float> *t_attribute = &ARRAY_IT(vertex->a_attributes, it);
+	FOR_ARRAY(vertex_out->a_attributes, it) {
+		Vertex_Buffer<float> *t_attribute = &ARRAY_IT(vertex_out->a_attributes, it);
 		glDeleteBuffers(1, &t_attribute->id);
 		Array_DestroyContainer(&t_attribute->a_buffer);
 	}
 
-	glDeleteVertexArrays(1, &vertex->array_id);
-	Array_DestroyContainer(&vertex->a_attributes);
+	glDeleteVertexArrays(1, &vertex_out->array_id);
+	Array_DestroyContainer(&vertex_out->a_attributes);
 
-	*vertex = {};
+	*vertex_out = {};
 }
 
 inline void
 Vertex_SetTexture(
 	ShaderSet *shader_set,
-	Vertex *vertex,
+	Vertex *vertex_out,
 	Texture *texture
 ) {
 	Assert(shader_set);
-	Assert(vertex);
+	Assert(vertex_out);
 	Assert(texture);
 
-	vertex->texture = *texture;
-	vertex->settings.flip_h = texture->flip_h;
+	vertex_out->texture = *texture;
+	vertex_out->settings.flip_h = texture->flip_h;
 
 	/// use this uniform in a shader, if the texture index has to change
-	Shader_BindAndUseIndex0(shader_set, "fragment_texture", &vertex->texture);
+	Shader_BindAndUseIndex0(shader_set, "fragment_texture", &vertex_out->texture);
 }
 
 instant void
-Vertex_CreateStatic(
-	Vertex *vertex
+Vertex_Create(
+	Vertex *vertex_out
 ) {
-	Assert(vertex);
+	Assert(vertex_out);
+	Assert(vertex_out->array_id == 0);
 
-	glGenVertexArrays(1, &vertex->array_id);
+	glGenVertexArrays(1, &vertex_out->array_id);
 }
 
 instant Vertex
@@ -5384,7 +5419,7 @@ Vertex_Create(
 ) {
 	Vertex vertex = {};
 
-	Vertex_CreateStatic(&vertex);
+	Vertex_Create(&vertex);
 
 	return vertex;
 }
@@ -5479,24 +5514,24 @@ Vertex_BindAttributes(
 
 instant void
 Vertex_ClearAttributes(
-	Vertex *vertex
+	Vertex *vertex_out
 ) {
-	Assert(vertex);
+	Assert(vertex_out);
 
-	FOR_ARRAY(vertex->a_attributes, it) {
-		auto *t_attribute = &ARRAY_IT(vertex->a_attributes, it);
+	FOR_ARRAY(vertex_out->a_attributes, it) {
+		auto *t_attribute = &ARRAY_IT(vertex_out->a_attributes, it);
 		Array_ClearContainer(&t_attribute->a_buffer);
 	}
 }
 
 instant void
 Vertex_ClearAttributes(
-	Array<Vertex> *a_vertex
+	Array<Vertex> *a_vertex_out
 ) {
-	Assert(a_vertex);
+	Assert(a_vertex_out);
 
-	FOR_ARRAY(*a_vertex, it_vertex) {
-		Vertex *t_vertex = &ARRAY_IT(*a_vertex, it_vertex);
+	FOR_ARRAY(*a_vertex_out, it_vertex) {
+		Vertex *t_vertex = &ARRAY_IT(*a_vertex_out, it_vertex);
 
 		FOR_ARRAY(t_vertex->a_attributes, it_attrib) {
 			auto *t_attribute = &ARRAY_IT(t_vertex->a_attributes, it_attrib);
@@ -5552,81 +5587,81 @@ Vertex_Render(
 
 instant void
 Vertex_FindOrAdd(
-	Array<Vertex> *a_vertex,
+	Array<Vertex> *a_vertex_io,
 	Texture *texture_find,
-	Vertex **entry
+	Vertex **entry_out
 ) {
-	Assert(a_vertex);
+	Assert(a_vertex_io);
 	Assert(texture_find);
-	Assert(entry);
+	Assert(entry_out);
 
 	Vertex *t_vertex_entry;
 	Vertex t_vertex_find;
 	t_vertex_find.texture = *texture_find;
 
-	if (!Array_FindOrAddEmpty(a_vertex, t_vertex_find, &t_vertex_entry))
+	if (!Array_FindOrAddEmpty(a_vertex_io, t_vertex_find, &t_vertex_entry))
 		*t_vertex_entry = t_vertex_find;
 
 	if (!t_vertex_entry->array_id)
-		Vertex_CreateStatic(t_vertex_entry);
+		Vertex_Create(t_vertex_entry);
 
-	*entry = t_vertex_entry;
+	*entry_out = t_vertex_entry;
 }
 
 instant void
 Vertex_FindOrAddAttribute(
-	Vertex *vertex,
+	Vertex *vertex_io,
 	u32 group_count,
 	const char *c_attribute_name,
-	Vertex_Buffer<float> **a_buffer
+	Vertex_Buffer<float> **a_buffer_out
 ) {
-	Assert(vertex);
+	Assert(vertex_io);
 	Assert(c_attribute_name);
-	Assert(a_buffer);
+	Assert(a_buffer_out);
 
 	Vertex_Buffer<float> *t_attribute_entry;
 	Vertex_Buffer<float> t_attribute_find;
 	t_attribute_find.name = c_attribute_name;
 	t_attribute_find.group_count = group_count;
 
-	if (!Array_FindOrAddEmpty(&vertex->a_attributes, t_attribute_find, &t_attribute_entry))
+	if (!Array_FindOrAddEmpty(&vertex_io->a_attributes, t_attribute_find, &t_attribute_entry))
 		*t_attribute_entry = t_attribute_find;
 
-	*a_buffer = t_attribute_entry;
+	*a_buffer_out = t_attribute_entry;
 }
 
 instant void
 Vertex_AddTexturePosition(
-	Vertex *vertex,
+	Vertex *vertex_io,
 	float x,
 	float y
 ) {
-	Assert(vertex);
+	Assert(vertex_io);
 
 	Vertex_Buffer<float> *t_attribute;
 
-	Vertex_FindOrAddAttribute(vertex, 2, "vertex_position", &t_attribute);
+	Vertex_FindOrAddAttribute(vertex_io, 2, "vertex_position", &t_attribute);
 	Array_Add(&t_attribute->a_buffer, x);
 	Array_Add(&t_attribute->a_buffer, y);
 }
 
 instant void
 Vertex_AddRect32(
-	Vertex *vertex,
+	Vertex *vertex_io,
 	Rect rect,
 	Color32 color
 ) {
-	Assert(vertex);
+	Assert(vertex_io);
 
 	Vertex_Buffer<float> *t_attribute;
 
-	Vertex_FindOrAddAttribute(vertex, 4, "vertex_position", &t_attribute);
+	Vertex_FindOrAddAttribute(vertex_io, 4, "vertex_position", &t_attribute);
 	Array_Add(&t_attribute->a_buffer, (float)rect.x);
 	Array_Add(&t_attribute->a_buffer, (float)rect.y);
 	Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
 	Array_Add(&t_attribute->a_buffer, (float)rect.y + rect.h);
 
-	Vertex_FindOrAddAttribute(vertex, 4, "rect_color", &t_attribute);
+	Vertex_FindOrAddAttribute(vertex_io, 4, "rect_color", &t_attribute);
 	Array_Add(&t_attribute->a_buffer, (float)color.r);
 	Array_Add(&t_attribute->a_buffer, (float)color.g);
 	Array_Add(&t_attribute->a_buffer, (float)color.b);
@@ -5635,14 +5670,14 @@ Vertex_AddRect32(
 
 instant void
 Vertex_AddRectTexture(
-	Vertex *vertex,
+	Vertex *vertex_io,
 	Rect rect
 ) {
-	Assert(vertex);
+	Assert(vertex_io);
 
 	Vertex_Buffer<float> *t_attribute;
 
-	Vertex_FindOrAddAttribute(vertex, 4, "vertex_position", &t_attribute);
+	Vertex_FindOrAddAttribute(vertex_io, 4, "vertex_position", &t_attribute);
 	Array_Add(&t_attribute->a_buffer, (float)rect.x);
 	Array_Add(&t_attribute->a_buffer, (float)rect.y);
 	Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
@@ -5677,7 +5712,6 @@ struct Mouse {
 	bool down[MOUSE_BUTTON_COUNT];
 	bool pressing[MOUSE_BUTTON_COUNT];
 	s32  wheel = 0;
-//	bool double_click[MOUSE_BUTTON_COUNT];
 
 	bool is_up        = false;
 	bool is_down      = false;
@@ -5719,30 +5753,30 @@ Mouse_AutoHide(
 
 instant void
 Mouse_Reset(
-	Mouse *mouse
+	Mouse *mouse_out
 ) {
-	if (!mouse)
+	if (!mouse_out)
 		return;
 
-	mouse->wheel = 0;
+	mouse_out->wheel = 0;
 
 	FOR(MOUSE_BUTTON_COUNT, it) {
-//		mouse->double_click[it] = false;
-		mouse->down[it] = false;
-		mouse->up[it]   = false;
+//		mouse_out->double_click[it] = false;
+		mouse_out->down[it] = false;
+		mouse_out->up[it]   = false;
 	}
 
-	mouse->is_up        = false;
-	mouse->is_down      = false;
-	mouse->is_moving    = false;
+	mouse_out->is_up        = false;
+	mouse_out->is_down      = false;
+	mouse_out->is_moving    = false;
 
-	mouse->point_relative = {};
+	mouse_out->point_relative = {};
 }
 
 instant void
 Mouse_GetPosition(
-	float *x,
-	float *y,
+	float *x_out,
+	float *y_out,
 	Window *window
 ) {
 	POINT point;
@@ -5765,25 +5799,25 @@ Mouse_GetPosition(
 	}
 
 
-	if (x) *x = point.x;
-	if (y) *y = point.y;
+	if (x_out) *x_out = point.x;
+	if (y_out) *y_out = point.y;
 }
 
 instant void
 Mouse_GetPosition(
-	Mouse *mouse,
+	Mouse *mouse_out,
 	Window *window
 ) {
 	Assert(window);
-	Assert(mouse);
+	Assert(mouse_out);
 
 	RECT rect_active;
 	GetWindowRect(window->hWnd, &rect_active);
 	Window_UnAdjustRect(window->hWnd, &rect_active);
 
-	Mouse t_mouse = *mouse;
+	Mouse t_mouse = *mouse_out;
 
-	Mouse_GetPosition(&mouse->point.x, &mouse->point.y, 0);
+	Mouse_GetPosition(&mouse_out->point.x, &mouse_out->point.y, 0);
 
 	RectF rect_viewport;
 
@@ -5792,72 +5826,72 @@ Mouse_GetPosition(
 	float scale_x = window->width  / rect_viewport.w;
 	float scale_y = window->height / rect_viewport.h;
 
-	mouse->point.x = (mouse->point.x - (rect_active.left + rect_viewport.x)) * scale_x;
-	mouse->point.y = (mouse->point.y - (rect_active.top  + rect_viewport.y)) * scale_y;
+	mouse_out->point.x = (mouse_out->point.x - (rect_active.left + rect_viewport.x)) * scale_x;
+	mouse_out->point.y = (mouse_out->point.y - (rect_active.top  + rect_viewport.y)) * scale_y;
 
-	mouse->point_relative.x = mouse->point.x - t_mouse.point.x;
-	mouse->point_relative.y = mouse->point.y - t_mouse.point.y;
+	mouse_out->point_relative.x = mouse_out->point.x - t_mouse.point.x;
+	mouse_out->point_relative.y = mouse_out->point.y - t_mouse.point.y;
 }
 
 instant bool
 Mouse_Update(
-	Mouse *mouse,
+	Mouse *mouse_io,
 	Window *window,
 	MSG *msg
 ) {
-	if (!mouse)
+	if (!mouse_io)
 		return false;
 
 	if (!msg)
 		return false;
 
-	Mouse_Reset(mouse);
+	Mouse_Reset(mouse_io);
 
 	if (window AND msg->message == WM_MOUSEMOVE) {
-		mouse->is_moving = true;
-		Mouse_GetPosition(mouse, window);
+		mouse_io->is_moving = true;
+		Mouse_GetPosition(mouse_io, window);
 		return true;
 	}
 
     switch(msg->message) {
 		case WM_LBUTTONDOWN: {
-			mouse->pressing[0] = true;
-			mouse->down[0] = true;
-			mouse->is_down = true;
+			mouse_io->pressing[0] = true;
+			mouse_io->down[0] = true;
+			mouse_io->is_down = true;
 		} break;
 
 		case WM_MBUTTONDOWN: {
-			mouse->pressing[1] = true;
-			mouse->down[1] = true;
-			mouse->is_down = true;
+			mouse_io->pressing[1] = true;
+			mouse_io->down[1] = true;
+			mouse_io->is_down = true;
 		} break;
 
 		case WM_RBUTTONDOWN: {
-			mouse->pressing[2] = true;
-			mouse->down[2] = true;
-			mouse->is_down = true;
+			mouse_io->pressing[2] = true;
+			mouse_io->down[2] = true;
+			mouse_io->is_down = true;
 		} break;
 
 		case WM_LBUTTONUP:   {
-			mouse->pressing[0] = false;
-			mouse->up[0] = true;
-			mouse->is_up = true;
+			mouse_io->pressing[0] = false;
+			mouse_io->up[0] = true;
+			mouse_io->is_up = true;
 		} break;
 
 		case WM_MBUTTONUP:   {
-			mouse->pressing[1] = false;
-			mouse->up[1] = true;
-			mouse->is_up = true;
+			mouse_io->pressing[1] = false;
+			mouse_io->up[1] = true;
+			mouse_io->is_up = true;
 		} break;
 
 		case WM_RBUTTONUP:   {
-			mouse->pressing[2] = false;
-			mouse->up[2] = true;
-			mouse->is_up = true;
+			mouse_io->pressing[2] = false;
+			mouse_io->up[2] = true;
+			mouse_io->is_up = true;
 		} break;
 
 		case WM_MOUSEWHEEL: {
-			mouse->wheel = MOUSE_WHEEL_GET_DELTA(msg->wParam) * 16;
+			mouse_io->wheel = MOUSE_WHEEL_GET_DELTA(msg->wParam) * 16;
 		} break;
 
 		default: { return false; } break;
@@ -5894,146 +5928,137 @@ struct Keyboard {
     u8   key_states[256]	= {};
 };
 
-/// reset last key pressed
-/// to prevent continuous input events
-instant void
-Keyboard_ResetLastKey(
-	Keyboard *keyboard
-) {
-	if (!keyboard)
-		return;
-
-	u32 vkey = keyboard->last_key_virtual;
-
-	keyboard->down[vkey] 		= false;
-	keyboard->up[vkey] 			= false;
-
-	keyboard->is_down 			= false;
-	keyboard->is_up 			= false;
-
-	keyboard->is_key_sym 		= false;
-	keyboard->key_sym 			= 0;
-	keyboard->key_scan			= 0;
-	keyboard->last_key_virtual	= 0;
-}
-
 instant void
 Keyboard_Reset(
-	Keyboard *keyboard,
+	Keyboard *keyboard_out,
 	bool full_reset = false
 ) {
-	Assert(keyboard);
+	Assert(keyboard_out);
 
 	bool pressing[KEYBOARD_KEYCOUNT] = {};
 
 	if (!full_reset)
-		Memory_Copy(&pressing, &keyboard->pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
+		Memory_Copy(&pressing, &keyboard_out->pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
 
-    *keyboard = {};
+    *keyboard_out = {};
 
     if (!full_reset)
-		Memory_Copy(&keyboard->pressing, &pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
+		Memory_Copy(&keyboard_out->pressing, &pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
 }
 
 instant void
 Keyboard_ResetKey(
-	Keyboard *keyboard,
+	Keyboard *keyboard_out,
 	u32 key_virtual
 ) {
-	if (!keyboard)
+	if (!keyboard_out)
 		return;
 
-	keyboard->down[key_virtual] = false;
-	keyboard->up[key_virtual] 	= false;
+	keyboard_out->down[key_virtual] = false;
+	keyboard_out->up[key_virtual] 	= false;
 
-	keyboard->is_down 			= false;
-	keyboard->is_up 			= false;
+	keyboard_out->is_down 			= false;
+	keyboard_out->is_up 			= false;
 
-	keyboard->is_key_sym 		= false;
-	keyboard->key_sym 			= 0;
-	keyboard->key_scan			= 0;
-	keyboard->last_key_virtual	= 0;
+	keyboard_out->is_key_sym 		= false;
+	keyboard_out->key_sym 			= 0;
+	keyboard_out->key_scan			= 0;
+	keyboard_out->last_key_virtual	= 0;
+}
+
+/// reset last key pressed
+/// to prevent continuous input events
+instant void
+Keyboard_ResetLastKey(
+	Keyboard *keyboard_out
+) {
+	if (!keyboard_out)
+		return;
+
+	u32 vkey = keyboard_out->last_key_virtual;
+
+	Keyboard_ResetKey(keyboard_out, keyboard_out->last_key_virtual);
 }
 
 instant void
 Keyboard_GetKeySym(
-	Keyboard *keyboard,
+	Keyboard *keyboard_io,
 	MSG *msg
 ) {
-	Assert(keyboard);
+	Assert(keyboard_io);
 	Assert(msg);
 
 	u16 ch = 0;
-	GetKeyboardState(keyboard->key_states);
+	GetKeyboardState(keyboard_io->key_states);
 
-	keyboard->is_key_sym	= false;
-	keyboard->key_sym		= 0;
+	keyboard_io->is_key_sym	= false;
+	keyboard_io->key_sym		= 0;
 
 	if (ToAscii(msg->wParam,
 				MapVirtualKey(msg->wParam, 0),
-				keyboard->key_states, &ch, 0) > 0)
+				keyboard_io->key_states, &ch, 0) > 0)
 	{
 		if (ch == VK_ESCAPE)  return;
 
-		keyboard->is_key_sym 	= true;
-		keyboard->key_sym 		= ch; // (char)LOBYTE(ch);
+		keyboard_io->is_key_sym 	= true;
+		keyboard_io->key_sym 		= ch; // (char)LOBYTE(ch);
 	}
 }
 
 instant void
 Keyboard_SetDown(
-	Keyboard *keyboard,
+	Keyboard *keyboard_io,
 	MSG *msg
 ) {
-	Assert(keyboard);
+	Assert(keyboard_io);
 	Assert(msg);
 
-	keyboard->key_scan = MapVirtualKey(msg->wParam, 0);
+	keyboard_io->key_scan = MapVirtualKey(msg->wParam, 0);
 
-	keyboard->down[msg->wParam] 		= true;
-	keyboard->up[msg->wParam] 			= false;
-	keyboard->pressing[msg->wParam] 	= true;
-	keyboard->repeating[msg->wParam] 	= GETBIT(msg->lParam, 30);
+	keyboard_io->down[msg->wParam] 		= true;
+	keyboard_io->up[msg->wParam] 		= false;
+	keyboard_io->pressing[msg->wParam] 	= true;
+	keyboard_io->repeating[msg->wParam] = GETBIT(msg->lParam, 30);
 
-	Keyboard_GetKeySym(keyboard, msg);
+	Keyboard_GetKeySym(keyboard_io, msg);
 
-	keyboard->last_key_virtual 	= msg->wParam;
-	keyboard->is_down 			= true;
-	keyboard->is_up				= false;
+	keyboard_io->last_key_virtual 	= msg->wParam;
+	keyboard_io->is_down 			= true;
+	keyboard_io->is_up				= false;
 }
 
 instant void
 Keyboard_SetUp(
-	Keyboard *keyboard,
+	Keyboard *keyboard_io,
 	MSG *msg
 ) {
-	Assert(keyboard);
+	Assert(keyboard_io);
 	Assert(msg);
 
-	keyboard->key_scan = MapVirtualKey(msg->wParam, 0);
-	keyboard->last_key_virtual 	= msg->wParam;
+	keyboard_io->key_scan = MapVirtualKey(msg->wParam, 0);
+	keyboard_io->last_key_virtual 	= msg->wParam;
 
-	if (keyboard->pressing[msg->wParam]) {
-		keyboard->down[msg->wParam] 		= false;
-		keyboard->up[msg->wParam] 			= true;
-		keyboard->pressing[msg->wParam] 	= false;
-		keyboard->repeating[msg->wParam] 	= false;
+	if (keyboard_io->pressing[msg->wParam]) {
+		keyboard_io->down[msg->wParam] 		= false;
+		keyboard_io->up[msg->wParam] 		= true;
+		keyboard_io->pressing[msg->wParam] 	= false;
+		keyboard_io->repeating[msg->wParam] = false;
 
-		Keyboard_GetKeySym(keyboard, msg);
+		Keyboard_GetKeySym(keyboard_io, msg);
 
-		keyboard->is_down 			= false;
-		keyboard->is_up				= true;
+		keyboard_io->is_down 			= false;
+		keyboard_io->is_up				= true;
 	}
 }
 
 instant bool
 Keyboard_Update(
-	Keyboard *keyboard,
+	Keyboard *keyboard_io,
 	MSG *msg
 ) {
 	bool result = false;
 
-	if (!keyboard)
+	if (!keyboard_io)
 		return result;
 
 	Assert(msg);
@@ -6041,13 +6066,13 @@ Keyboard_Update(
 	switch (msg->message) {
 		case WM_SYSKEYDOWN:
 		case WM_KEYDOWN: {
-			Keyboard_SetDown(keyboard, msg);
+			Keyboard_SetDown(keyboard_io, msg);
 			result = true;
 		} break;
 
 		case WM_SYSKEYUP:
 		case WM_KEYUP: {
-			Keyboard_SetUp(keyboard, msg);
+			Keyboard_SetUp(keyboard_io, msg);
 			result = true;
 		} break;
 	}
@@ -6058,12 +6083,12 @@ Keyboard_Update(
 instant void
 Keyboard_Insert(
 	Keyboard *keyboard,
-	String *s_data
+	String *s_data_io
 ) {
 	Assert(keyboard);
-	Assert(s_data);
+	Assert(s_data_io);
 
-	String_Insert(s_data, s_data->length, keyboard->key_sym);
+	String_Insert(s_data_io, s_data_io->length, keyboard->key_sym);
 }
 
 instant bool
@@ -6086,23 +6111,23 @@ Keyboard_IsPressingAnyKey(
 
 instant void
 Keyboard_WaitForIdle(
-	Keyboard *keyboard,
+	Keyboard *keyboard_out,
 	bool *pending_event,
 	u32 delay_in_ms = 400
 ) {
-	Assert(keyboard);
+	Assert(keyboard_out);
 	Assert(pending_event);
 
 	if (*pending_event) {
 		static Timer timer_input_delay;
 
 		if (Time_HasElapsed(&timer_input_delay, delay_in_ms, true)) {
-			if (!Keyboard_IsPressingAnyKey(keyboard)) {
+			if (!Keyboard_IsPressingAnyKey(keyboard_out)) {
 				*pending_event = false;
 			}
 		}
 
-		Keyboard_Reset(keyboard);
+		Keyboard_Reset(keyboard_out);
 	}
 }
 
@@ -6149,9 +6174,9 @@ struct Joypad {
 
 instant bool
 Joypad_Init_XInput(
-	Joypad *joypad
+	Joypad *joypad_out
 ) {
-	Assert(joypad);
+	Assert(joypad_out);
 
     char sys_dir[MAX_PATH];
 
@@ -6160,10 +6185,10 @@ Joypad_Init_XInput(
 
     strcat(sys_dir, "\\xinput1_3.dll");
 
-    joypad->dll = LoadLibrary(sys_dir);
-    if (!joypad->dll)  return false;
+    joypad_out->dll = LoadLibrary(sys_dir);
+    if (!joypad_out->dll)  return false;
 
-    joypad->GetState = (proc_XInputGetState)GetProcAddress(joypad->dll, "XInputGetState");
+    joypad_out->GetState = (proc_XInputGetState)GetProcAddress(joypad_out->dll, "XInputGetState");
 
 	return true;
 }
@@ -6375,18 +6400,18 @@ instant void Codepoint_Destroy(Codepoint *);
 
 instant void
 Font_Destroy(
-	Font *font
+	Font *font_out
 ) {
-	Assert(font);
+	Assert(font_out);
 
-	FOR_ARRAY(font->a_codepoint, it) {
-		Codepoint *t_codepoint = &ARRAY_IT(font->a_codepoint, it);
+	FOR_ARRAY(font_out->a_codepoint, it) {
+		Codepoint *t_codepoint = &ARRAY_IT(font_out->a_codepoint, it);
         Codepoint_Destroy(t_codepoint);
 	}
 
-	String_Destroy(&font->s_data);
+	String_Destroy(&font_out->s_data);
 
-	*font = {};
+	*font_out = {};
 }
 
 instant s32
@@ -6431,14 +6456,19 @@ Codepoint_ToTexture(
 	return result;
 }
 
+/// does NOT return codepoint data,
+/// because it will be stored inside the font-struct for fast access,
+/// otherwise it could be assumed it would need freeing, which would
+/// corrupt the array data inside the font-struct
+/// -> font => codepoint-array has ownership
 instant void
 Codepoint_GetData(
 	Font *font,
 	s32 codepoint,
-	Codepoint *entry
+	Codepoint *entry_out
 ) {
 	Assert(font);
-	Assert(entry);
+	Assert(entry_out);
 
     float scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
 
@@ -6476,17 +6506,17 @@ Codepoint_GetData(
 											&t_entry->rect_subpixel.h);
     }
 
-	*entry = *t_entry;
+	*entry_out = *t_entry;
 }
 
 instant void
 Codepoint_GetPositionNext(
 	Codepoint *codepoint,
-	RectF *rect
+	RectF *rect_io
 ) {
 	Assert(codepoint);
 	Assert(codepoint->font);
-	Assert(rect);
+	Assert(rect_io);
 
 	/// rect_x: starting position for each line
 	///         to reset -> set 0 or x-offset
@@ -6498,9 +6528,9 @@ Codepoint_GetPositionNext(
 	///         set the correct start position for the
 	///         next codepoint
 
-	rect->x = rect->x + rect->w + codepoint->left_side_bearing;
-	rect->y = rect->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->font->descent;
-	rect->w = (float)codepoint->advance - codepoint->left_side_bearing;
+	rect_io->x = rect_io->x + rect_io->w + codepoint->left_side_bearing;
+	rect_io->y = rect_io->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->font->descent;
+	rect_io->w = (float)codepoint->advance - codepoint->left_side_bearing;
 }
 
 instant s32
@@ -6541,27 +6571,26 @@ Codepoint_GetStringAdvance(
 instant void
 Codepoint_SetNewline(
 	Font *font,
-	RectF *rect_position,
+	RectF *rect_position_io,
 	float x_offset_start = 0
 ) {
 	Assert(font);
-	Assert(rect_position);
+	Assert(rect_position_io);
 
-	rect_position->h += Font_GetLineHeight(font);
-	rect_position->x = x_offset_start;
-	rect_position->w = 0;
+	rect_position_io->h += Font_GetLineHeight(font);
+	rect_position_io->x = x_offset_start;
+	rect_position_io->w = 0;
 }
 
 instant void
 Codepoint_Destroy(
-	Codepoint *codepoint
+	Codepoint *codepoint_out
 ) {
-	Assert(codepoint);
-	Assert(codepoint->font);
+	Assert(codepoint_out);
+	Assert(codepoint_out->font);
 
-	Texture_Destroy(&codepoint->texture);
+	Texture_Destroy(&codepoint_out->texture);
 }
-
 
 /// ::: Text (OpenGL rendering)
 /// ===========================================================================
@@ -6593,8 +6622,8 @@ struct Text_Cursor {
 	s64 move_index_x = 0;
 	s64 move_index_y = 0;
 
-	u64 index_select_start = 0; // also current cursor position
-	u64 index_select_end   = 0;
+	u64 index_select_start = 0;
+	u64 index_select_end   = 0; // also current cursor position
 	bool is_selecting = false;
 
 	Color32 color_cursor = {1.0f, 0.0f, 0.0f, 1.0f};
@@ -6669,28 +6698,28 @@ Text_Create(
 
 instant void
 Text_Destroy(
-	Text *text
+	Text *text_out
 ) {
-	Assert(text);
+	Assert(text_out);
 
-	String_Destroy(&text->s_data);
+	String_Destroy(&text_out->s_data);
 }
 
 instant bool
 Text_HasChanged(
-	Text *text,
+	Text *text_io,
 	bool update_changes
 ) {
-	Assert(text);
+	Assert(text_io);
 
-	bool has_changed = text->s_data.changed;
+	bool has_changed = text_io->s_data.changed;
 
-	has_changed |= !Memory_Compare(&text->data, &text->data_prev, sizeof(text->data));
+	has_changed |= !Memory_Compare(&text_io->data, &text_io->data_prev, sizeof(text_io->data));
 
 	#if !DEBUG_UPDATE_ALWAYS
 	if (has_changed AND update_changes) {
-		text->data_prev = text->data;
-		text->s_data.changed = false;
+		text_io->data_prev = text_io->data;
+		text_io->s_data.changed = false;
 	}
 	#endif
 
@@ -6718,27 +6747,28 @@ Text_HasChanged(
 }
 
 instant s32
-Text_BuildLinesStatic(
+Text_BuildLines(
 	Text *text,
 	Array<String> *as_words,
-	Array<Text_Line> *a_text_line,
-	bool append_cursor_end
+	Array<Text_Line> *a_text_line_out,
+	bool will_append_cursor_end
 ) {
 	Assert(text);
 	Assert(as_words);
-	Assert(a_text_line);
+	Assert(a_text_line_out);
 
 	Font *font = text->font;
 	Rect  rect = text->data.rect;
 
 	Rect_AddPadding(&rect, text->data.rect_padding);
 
-	FOR_ARRAY(*a_text_line, it_line) {
-		Text_Line *t_text_line = &ARRAY_IT(*a_text_line, it_line);
+	/// clear existing lines
+	FOR_ARRAY(*a_text_line_out, it_line) {
+		Text_Line *t_text_line = &ARRAY_IT(*a_text_line_out, it_line);
 		String_Destroy(&t_text_line->s_data);
 		t_text_line->width_pixel = 0;
 	}
-	Array_ClearContainer(a_text_line);
+	Array_ClearContainer(a_text_line_out);
 
 	s32 height_max  = 0;
 
@@ -6746,9 +6776,10 @@ Text_BuildLinesStatic(
 	Rect rect_line_current = {rect.x, rect.y, 0, 0};
 	u64 advance_space = Codepoint_GetAdvance(font, ' ');
 
+	/// always add ' ' at the end
 	if (as_words->count == 0) {
-		if (append_cursor_end) {
-			Array_AddEmpty(a_text_line, &t_text_line);
+		if (will_append_cursor_end) {
+			Array_AddEmpty(a_text_line_out, &t_text_line);
 
 			t_text_line->width_pixel += advance_space;
 			String_Append(&t_text_line->s_data, " ", 1);
@@ -6756,16 +6787,16 @@ Text_BuildLinesStatic(
 		return height_max;
 	}
 
-	Assert(a_text_line->count == 0);
+	Assert(a_text_line_out->count == 0);
 
 	s32 height_line = Font_GetLineHeight(font);
 	bool line_start = true;
 
-	if (as_words->count)
+	/// add first empty line to be filled
+	if (as_words->count) {
 		height_max += height_line;
-
-	if (as_words->count)
-		Array_AddEmpty(a_text_line, &t_text_line);
+		Array_AddEmpty(a_text_line_out, &t_text_line);
+	}
 
     FOR_ARRAY(*as_words, it_words) {
     	bool is_last_word = (it_words + 1 == as_words->count);
@@ -6786,7 +6817,7 @@ Text_BuildLinesStatic(
 			AND rect.w > 0
 			AND (rect_line_current.x - rect.x) + advance_word > rect.w
 		) {
-			Array_AddEmpty(a_text_line, &t_text_line);
+			Array_AddEmpty(a_text_line_out, &t_text_line);
 			line_start = true;
 
 			rect_line_current.x  = rect.x;
@@ -6801,7 +6832,7 @@ Text_BuildLinesStatic(
 			t_text_line->width_pixel += advance_word;
 			String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
 
-			Array_AddEmpty(a_text_line, &t_text_line);
+			Array_AddEmpty(a_text_line_out, &t_text_line);
 			line_start = true;
 
 			rect_line_current.x  = rect.x;
@@ -6809,7 +6840,8 @@ Text_BuildLinesStatic(
 
 			height_max += height_line;
 
-			if (is_last_word AND append_cursor_end) {
+			/// append ' ' on the last line-break
+			if (is_last_word AND will_append_cursor_end) {
 				t_text_line->width_pixel += advance_space;
 				String_Append(&t_text_line->s_data, " ", 1);
 			}
@@ -6821,7 +6853,8 @@ Text_BuildLinesStatic(
 		t_text_line->width_pixel += advance_word;
 		String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
 
-		if (is_last_word AND append_cursor_end) {
+		/// append ' ' on the last word
+		if (is_last_word AND will_append_cursor_end) {
 			t_text_line->width_pixel += advance_space;
 			String_Append(&t_text_line->s_data, " ", 1);
 		}
@@ -6830,6 +6863,168 @@ Text_BuildLinesStatic(
     }
 
 	return height_max;
+}
+
+instant void
+Text_AddLines(
+	Text *text,
+	Array<Vertex>    *a_vertex_chars_io,
+	Array<Text_Line> *a_text_lines,
+	bool include_offsets = true
+) {
+	Assert(a_text_lines);
+
+	Rect rect = text->data.rect;
+
+	Rect_AddPadding(&rect, text->data.rect_margin);
+	Rect_AddPadding(&rect, text->data.rect_padding);
+
+	u64 width_max = rect.w;
+
+	if (!width_max) {
+		FOR_ARRAY(*a_text_lines, it_line) {
+			Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
+
+			width_max = MAX(width_max, t_text_line->width_pixel);
+		}
+	}
+
+	float x_line_start = rect.x;
+
+	RectF rect_position = {	x_line_start, 0, 0, rect.y};
+
+	if (include_offsets) {
+		rect_position.x += text->data.rect_content.x;
+		rect_position.h += text->data.rect_content.y;
+		x_line_start    += text->data.rect_content.x;
+	}
+
+	bool has_cursor = text->data.is_editable;
+
+	if (has_cursor)
+		Vertex_ClearAttributes(&text->cursor.vertex_select);
+
+	u64 it_index = 0;
+
+	FOR_ARRAY(*a_text_lines, it_line) {
+		Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
+
+		u64 it_data = 0;
+
+		while(it_data < t_text_line->s_data.length) {
+			Codepoint codepoint;
+
+			s8 ch = t_text_line->s_data.value[it_data];
+
+			Codepoint_GetData(text->font, ch, &codepoint);
+			Codepoint_GetPositionNext(&codepoint, &rect_position);
+
+			u64 x_align_offset = 0;
+
+			if (width_max > t_text_line->width_pixel) {
+				if (     text->data.align_x == TEXT_ALIGN_X_MIDDLE)
+					x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
+				else if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
+					x_align_offset = (width_max - t_text_line->width_pixel);
+			}
+
+			/// for unavailable characters like ' '
+			if (!Texture_IsEmpty(&codepoint.texture)) {
+				Vertex *t_vertex;
+				Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex);
+
+				Vertex_Buffer<float> *t_attribute;
+
+				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
+				Array_Add(&t_attribute->a_buffer, rect_position.x + x_align_offset);
+				Array_Add(&t_attribute->a_buffer, rect_position.y);
+
+				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
+				Array_Add(&t_attribute->a_buffer, text->data.color.r);
+				Array_Add(&t_attribute->a_buffer, text->data.color.g);
+				Array_Add(&t_attribute->a_buffer, text->data.color.b);
+			}
+
+			++it_data;
+			++it_index;
+		}
+
+		Codepoint_SetNewline(text->font, &rect_position, x_line_start);
+	}
+}
+
+instant void
+Text_AddLines(
+	Text *text_io,
+	bool include_offsets = true
+) {
+	Assert(text_io);
+
+	Text_AddLines(text_io, &text_io->a_vertex_chars, &text_io->a_text_lines, include_offsets);
+}
+
+instant void
+Text_Clear(
+	Text *text_out
+) {
+	Assert(text_out);
+
+	Vertex_ClearAttributes(&text_out->a_vertex_chars);
+}
+
+instant void
+Text_RenderLines(
+	Text *text
+) {
+	Assert(text);
+
+	Vertex_Render(text->shader_set, &text->a_vertex_chars);
+}
+
+instant void Text_Cursor_Update(Text *text);
+
+instant bool
+Text_Update(
+	Text *text_io
+) {
+	Assert(text_io);
+
+	/// redraw text_io
+	if (Text_HasChanged(text_io, false)) {
+		String_SplitWordsStatic(&text_io->s_data, &text_io->as_words);
+		s32 text_height = Text_BuildLines(text_io, &text_io->as_words, &text_io->a_text_lines, true);
+
+		if (text_io->data.rect.h) {
+			s32 pad_height = text_io->data.rect_padding.y + text_io->data.rect_padding.h;
+
+			if (     text_io->data.align_y == TEXT_ALIGN_Y_CENTER)
+				text_io->data.rect_content.y = (text_io->data.rect.h - pad_height - text_height) >> 1;
+			else if (text_io->data.align_y == TEXT_ALIGN_Y_BOTTOM)
+				text_io->data.rect_content.y = (text_io->data.rect.h - pad_height - text_height);
+		}
+
+		text_io->data.rect_content.h = text_height;
+		text_io->data.rect_content.w = 0;
+
+		FOR_ARRAY(text_io->a_text_lines, it_line) {
+			Text_Line *t_line = &ARRAY_IT(text_io->a_text_lines, it_line);
+			text_io->data.rect_content.w = MAX(text_io->data.rect_content.w, (s64)t_line->width_pixel);
+		}
+
+		Text_Clear(text_io);
+		Text_AddLines(text_io, true);
+
+		Text_Cursor_Update(text_io);
+
+		Rect_ClampY(&text_io->data.rect_content, text_io->data.rect);
+
+		text_io->data_prev = text_io->data;
+		text_io->s_data.changed = false;
+
+		return true;
+	}
+
+	return false;
 }
 
 instant u64
@@ -6847,7 +7042,7 @@ Text_Cursor_FindIndex(
 	Rect rect = text->data.rect;
 	Rect_AddPadding(&rect, text->data.rect_padding);
 
-	point.x += text->data.rect_content.x;
+	point.x -= text->data.rect_content.x;
 	point.y += text->data.rect_content.y;
 
 	u64 width_max = rect.w;
@@ -6862,8 +7057,8 @@ Text_Cursor_FindIndex(
 	}
 
 	Rect rect_position_it = {
-		rect.x + text->data.rect_content.x,
-		rect.y + text->data.rect_content.y,
+		rect.x,
+		rect.y,
 		0,
 		Font_GetLineHeight(text->font)
 	};
@@ -6914,6 +7109,7 @@ Text_Cursor_FindIndex(
 				/// to make it target the first char
 				/// -> same as with the last char
 				Rect rect_position_start = rect_position_it;
+
 				float pos_w = rect_position_start.x + rect_position_start.w;
 				rect_position_start.x = rect.x;
 				rect_position_start.w = pos_w - rect_position_start.x;
@@ -6951,25 +7147,26 @@ Text_Cursor_FindIndex(
 
 instant void
 Text_Cursor_Flush(
-	Text *text
+	Text *text_io
 ) {
-	Assert(text);
+	Assert(text_io);
 
-	Text_Cursor *cursor = &text->cursor;
+	Text_Cursor *cursor = &text_io->cursor;
 
 	cursor->move_index_x = 0;
 	cursor->move_index_y = 0;
 
-	if (!text->cursor.is_selecting)
-		text->cursor.index_select_start = text->cursor.index_select_end;
+	if (!text_io->cursor.is_selecting)
+		text_io->cursor.index_select_start = text_io->cursor.index_select_end;
 }
 
-///@TODO: text scrolling when cursor is out of bound
+///@TODO: text scrolling x-axis backwards puts prev. char at the end
+///       and not the start of the visible line
 instant void
 Text_Cursor_Update(
-    Text *text
+    Text *text_io
 ) {
-	Assert(text);
+	Assert(text_io);
 
 	/// cursor selection -> end = current
 	bool found_start    = false;
@@ -6980,19 +7177,19 @@ Text_Cursor_Update(
 
 	u64 cursor_index = 0;
 
-	Text_Cursor *cursor = &text->cursor;
+	Text_Cursor *cursor = &text_io->cursor;
 
-	Rect rect = text->data.rect;
-	Rect_AddPadding(&rect, text->data.rect_padding);
+	Rect rect = text_io->data.rect;
+	Rect_AddPadding(&rect, text_io->data.rect_padding);
 
 	Codepoint codepoint_space;
-	Codepoint_GetData(text->font, ' ', &codepoint_space);
+	Codepoint_GetData(text_io->font, ' ', &codepoint_space);
 
 	u64 width_max = rect.w;
 
 	if (!width_max) {
-		FOR_ARRAY(text->a_text_lines, it_line) {
-			Text_Line *t_text_line = &ARRAY_IT(text->a_text_lines, it_line);
+		FOR_ARRAY(text_io->a_text_lines, it_line) {
+			Text_Line *t_text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
 
 			width_max = MAX(width_max, t_text_line->width_pixel);
 		}
@@ -7003,11 +7200,13 @@ Text_Cursor_Update(
 
 	Vertex_ClearAttributes(&cursor->vertex_select);
 
+	float x_pos_start = rect.x + text_io->data.rect_content.x;
+
 	Rect rect_position_it = {
-		rect.x + text->data.rect_content.x,
-		rect.y + text->data.rect_content.y,
+		x_pos_start,
+		rect.y + text_io->data.rect_content.y,
 		0,
-		Font_GetLineHeight(text->font)
+		Font_GetLineHeight(text_io->font)
 	};
 
 	/// lower boundary index check
@@ -7029,17 +7228,17 @@ Text_Cursor_Update(
 		cursor->index_select_end += cursor->move_index_x;
 	}
 
-	FOR(text->a_text_lines.count, it_line) {
-		Text_Line *text_line = &ARRAY_IT(text->a_text_lines, it_line);
+	FOR(text_io->a_text_lines.count, it_line) {
+		Text_Line *text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
 
 		/// horizontal alignment
 		/// -------------------------------------------------------------------
 		u64 x_align_offset = 0;
 
 		if (width_max > text_line->width_pixel) {
-			if (     text->data.align_x == TEXT_ALIGN_X_MIDDLE)
+			if (     text_io->data.align_x == TEXT_ALIGN_X_MIDDLE)
 				x_align_offset = (width_max - text_line->width_pixel) >> 1;
-			else if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
+			else if (text_io->data.align_x == TEXT_ALIGN_X_RIGHT)
 				x_align_offset = (width_max - text_line->width_pixel);
 		}
 
@@ -7053,7 +7252,7 @@ Text_Cursor_Update(
 
 			s8 character = text_line->s_data.value[it_data];
 
-			Codepoint_GetData(text->font, character, &codepoint);
+			Codepoint_GetData(text_io->font, character, &codepoint);
 			rect_position_it.w = codepoint.advance;
 
 			bool is_newline_char = (character == '\r' OR character == '\n');
@@ -7074,34 +7273,36 @@ Text_Cursor_Update(
 						else if (cursor->move_index_y > 0) {
 							Point pt_line = {
 								rect_position_it.x,
-								rect_position_it.y + Font_GetLineHeight(text->font)
+								rect_position_it.y + Font_GetLineHeight(text_io->font)
 							};
 
 							if (!cursor->is_selecting)
 								found_start = false;
 
-							cursor->index_select_end = Text_Cursor_FindIndex(text, pt_line);
+							/// 162
+							cursor->index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
 
-							Text_Cursor_Flush(text);
+							Text_Cursor_Flush(text_io);
 						}
 						else {
-							float y_line_prev_pos = rect_position_it.y - Font_GetLineHeight(text->font);
+							float y_line_prev_pos = rect_position_it.y - Font_GetLineHeight(text_io->font);
 
 							/// do not try to go before the first line
 							if (y_line_prev_pos >= rect.y) {
 								Point pt_line = {
 									rect_position_it.x,
-									rect_position_it.y - Font_GetLineHeight(text->font)
+									rect_position_it.y - Font_GetLineHeight(text_io->font)
 								};
 
-								cursor->index_select_end = Text_Cursor_FindIndex(text, pt_line);
+								/// 54
+								cursor->index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
 
-								Text_Cursor_Flush(text);
+								Text_Cursor_Flush(text_io);
 
-								return Text_Cursor_Update(text);
+								return Text_Cursor_Update(text_io);
 							}
 							else {
-								Text_Cursor_Flush(text);
+								Text_Cursor_Flush(text_io);
 								found_end = true;
 							}
 						}
@@ -7127,13 +7328,13 @@ Text_Cursor_Update(
                                 found_end = true;
 							}
 
-							Text_Cursor_Flush(text);
+							Text_Cursor_Flush(text_io);
 						}
 						else {
 							cursor->index_select_end -= it_data;
 
-							Text_Cursor_Flush(text);
-							return Text_Cursor_Update(text);
+							Text_Cursor_Flush(text_io);
+							return Text_Cursor_Update(text_io);
 						}
 					} break;
 				}
@@ -7160,13 +7361,35 @@ Text_Cursor_Update(
 					/// update index, if you seek to '\r' and skip to '\n'
 					cursor->index_select_end = cursor_index;
 
+					Rect rect_cursor = rect_position_it;
+
+					float *x_offset = &text_io->data.rect_content.x;
+
+					float cursor_pos_x        = rect_cursor.x - *x_offset;
+					float cursor_offset_pos_x = rect_cursor.x;
+
+					bool is_past_right_border = (cursor_offset_pos_x + rect_cursor.w > rect.x + rect.w);
+					bool is_past_left_border  = (cursor_offset_pos_x < rect.x);
+
+					if (is_past_right_border OR is_past_left_border) {
+						if (is_past_left_border) {
+							*x_offset = 0;
+						}
+						else if (is_past_right_border) {
+							*x_offset  = (rect.x + rect.w) - (cursor_pos_x + rect_cursor.w);
+						}
+
+						Text_Cursor_Flush(text_io);
+						Text_Update(text_io);
+						return;
+					}
+
+					rect_cursor.w = width_cursor;
+
 					if (!cursor->vertex_cursor.array_id)
 						cursor->vertex_cursor = Vertex_Create();
 
 					Vertex_ClearAttributes(&cursor->vertex_cursor);
-
-					Rect rect_cursor = rect_position_it;
-					rect_cursor.w = width_cursor;
 
 					Vertex_AddRect32(
 						&cursor->vertex_cursor,
@@ -7180,12 +7403,12 @@ Text_Cursor_Update(
 					/// to move to the start of the
 					/// line-break when using '\r\n'
 					if (cursor->move_index_x < 0) {
-						Text_Cursor_Flush(text);
+						Text_Cursor_Flush(text_io);
 
 						cursor->move_type    = CURSOR_MOVE_X;
 						cursor->move_index_x = -1;
 
-						return Text_Cursor_Update(text);
+						return Text_Cursor_Update(text_io);
 					}
 
 					/// skipping '\n' here when '\r\n'
@@ -7199,7 +7422,7 @@ Text_Cursor_Update(
 			is_newline_char_once = is_newline_char;
 		}
 
-		rect_position_it.x  = rect.x;
+		rect_position_it.x  = x_pos_start;
 		rect_position_it.y += rect_position_it.h;
 	}
 
@@ -7212,182 +7435,25 @@ Text_Cursor_Update(
 		cursor->index_select_end = cursor_index - 1;
 	}
 
-	Text_Cursor_Flush(text);
-}
-
-instant void
-Text_AddLines(
-	Text *text,
-	Array<Vertex>    *a_vertex_chars,
-	Array<Text_Line> *a_text_lines,
-	bool include_offsets = true
-) {
-	Assert(a_text_lines);
-
-	Rect rect = text->data.rect;
-
-	Rect_AddPadding(&rect, text->data.rect_margin);
-	Rect_AddPadding(&rect, text->data.rect_padding);
-
-	u64 width_max = rect.w;
-
-	if (!width_max) {
-		FOR_ARRAY(*a_text_lines, it_line) {
-			Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
-
-			width_max = MAX(width_max, t_text_line->width_pixel);
-		}
-	}
-
-	RectF rect_position = {	rect.x, 0, 0, rect.y};
-
-	if (include_offsets) {
-		rect_position.x += text->data.rect_content.x;
-		rect_position.h += text->data.rect_content.y;
-	}
-
-	bool has_cursor = text->data.is_editable;
-
-	if (has_cursor)
-		Vertex_ClearAttributes(&text->cursor.vertex_select);
-
-	u64 it_index = 0;
-
-	FOR_ARRAY(*a_text_lines, it_line) {
-		Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
-
-		u64 it_data = 0;
-
-		while(it_data < t_text_line->s_data.length) {
-			Codepoint codepoint;
-
-			s8 ch = t_text_line->s_data.value[it_data];
-
-			Codepoint_GetData(text->font, ch, &codepoint);
-			Codepoint_GetPositionNext(&codepoint, &rect_position);
-
-			u64 x_align_offset = 0;
-
-			if (width_max > t_text_line->width_pixel) {
-				if (     text->data.align_x == TEXT_ALIGN_X_MIDDLE)
-					x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
-				else if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
-					x_align_offset = (width_max - t_text_line->width_pixel);
-			}
-
-			/// for unavailable characters like ' '
-			if (!Texture_IsEmpty(&codepoint.texture)) {
-				Vertex *t_vertex;
-				Vertex_FindOrAdd(a_vertex_chars, &codepoint.texture, &t_vertex);
-
-				Vertex_Buffer<float> *t_attribute;
-
-				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, rect_position.x + x_align_offset);
-				Array_Add(&t_attribute->a_buffer, rect_position.y);
-
-				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, text->data.color.r);
-				Array_Add(&t_attribute->a_buffer, text->data.color.g);
-				Array_Add(&t_attribute->a_buffer, text->data.color.b);
-			}
-
-			++it_data;
-			++it_index;
-		}
-
-		Codepoint_SetNewline(text->font, &rect_position, rect.x);
-	}
-}
-
-instant void
-Text_AddLines(
-	Text *text,
-	bool include_offsets = true
-) {
-	Assert(text);
-
-	Text_AddLines(text, &text->a_vertex_chars, &text->a_text_lines, include_offsets);
-}
-
-instant void
-Text_Clear(
-	Text *text
-) {
-	Assert(text);
-
-	Vertex_ClearAttributes(&text->a_vertex_chars);
-}
-
-instant void
-Text_RenderLines(
-	Text *text
-) {
-	Assert(text);
-
-	Vertex_Render(text->shader_set, &text->a_vertex_chars);
-}
-
-instant bool
-Text_Update(
-	Text *text
-) {
-	Assert(text);
-
-	/// redraw text
-	if (Text_HasChanged(text, false)) {
-		String_SplitWordsStatic(&text->s_data, &text->as_words);
-		s32 text_height = Text_BuildLinesStatic(text, &text->as_words, &text->a_text_lines, true);
-
-		if (text->data.rect.h) {
-			s32 pad_height = text->data.rect_padding.y + text->data.rect_padding.h;
-
-			if (     text->data.align_y == TEXT_ALIGN_Y_CENTER)
-				text->data.rect_content.y = (text->data.rect.h - pad_height - text_height) >> 1;
-			else if (text->data.align_y == TEXT_ALIGN_Y_BOTTOM)
-				text->data.rect_content.y = (text->data.rect.h - pad_height - text_height);
-		}
-
-		text->data.rect_content.h = text_height;
-		text->data.rect_content.w = 0;
-
-		FOR_ARRAY(text->a_text_lines, it_line) {
-			Text_Line *t_line = &ARRAY_IT(text->a_text_lines, it_line);
-			text->data.rect_content.w = MAX(text->data.rect_content.w, (s64)t_line->width_pixel);
-		}
-
-		Text_Clear(text);
-		Text_AddLines(text, true);
-
-		Text_Cursor_Update(text);
-
-		Rect_Clamp(&text->data.rect_content, text->data.rect);
-
-		text->data_prev = text->data;
-		text->s_data.changed = false;
-
-		return true;
-	}
-
-	return false;
+	Text_Cursor_Flush(text_io);
 }
 
 ///@TODO: clipboard support(?)
 instant bool
 Text_UpdateInput(
-    Text *text,
+    Text *text_io,
     Keyboard *keyboard
 ) {
-	Assert(text);
+	Assert(text_io);
 	Assert(keyboard);
 
-	if (!text->data.is_editable)
+	if (!text_io->data.is_editable)
 		return false;
 
 	s8 offset_index_x = 0;
 	s8 offset_index_y = 0;
 
-	CURSOR_MOVE_TYPE *move_type = &text->cursor.move_type;
+	CURSOR_MOVE_TYPE *move_type = &text_io->cursor.move_type;
 
 	if (keyboard->down[VK_LEFT])  { offset_index_x = -1;
 									*move_type = CURSOR_MOVE_X; }
@@ -7404,7 +7470,7 @@ Text_UpdateInput(
 	if (keyboard->down[VK_END])   { offset_index_x =  1;
 									*move_type = CURSOR_MOVE_LINE_BORDER; }
 
-	text->cursor.is_selecting = (keyboard->pressing[VK_SHIFT] AND !keyboard->is_key_sym);
+	text_io->cursor.is_selecting = (keyboard->pressing[VK_SHIFT] AND !keyboard->is_key_sym);
 
 	if (keyboard->is_key_sym AND keyboard->is_down) {
 		char key = LOWORD(keyboard->key_sym);
@@ -7413,19 +7479,19 @@ Text_UpdateInput(
 
 		bool was_selection_removed = false;
 
-		if (text->cursor.index_select_start != text->cursor.index_select_end) {
+		if (text_io->cursor.index_select_start != text_io->cursor.index_select_end) {
 			String_Remove(
-				&text->s_data,
-				text->cursor.index_select_start,
-				text->cursor.index_select_end
+				&text_io->s_data,
+				text_io->cursor.index_select_start,
+				text_io->cursor.index_select_end
 			);
 
 			/// cursor and selection bounds will start at the
 			/// beginning of the selection
-			if (text->cursor.index_select_end > text->cursor.index_select_start)
-				text->cursor.index_select_end   = text->cursor.index_select_start;
+			if (text_io->cursor.index_select_end > text_io->cursor.index_select_start)
+				text_io->cursor.index_select_end   = text_io->cursor.index_select_start;
 			else
-				text->cursor.index_select_start = text->cursor.index_select_end;
+				text_io->cursor.index_select_start = text_io->cursor.index_select_end;
 
 			was_selection_removed = true;
 		}
@@ -7440,26 +7506,26 @@ Text_UpdateInput(
 				int a = 1;
 			}
 
-			text->cursor.move_index_x = String_Insert(
-											&text->s_data,
-											text->cursor.index_select_end,
+			text_io->cursor.move_index_x = String_Insert(
+											&text_io->s_data,
+											text_io->cursor.index_select_end,
 											key
 										);
 		}
 
-		Text_Update(text);
+		Text_Update(text_io);
 
 		return true;
 	}
 
 	if (offset_index_x != 0 OR offset_index_y != 0) {
-		if (!text->cursor.is_selecting)
-			text->cursor.index_select_start = text->cursor.index_select_end;
+		if (!text_io->cursor.is_selecting)
+			text_io->cursor.index_select_start = text_io->cursor.index_select_end;
 
-		text->cursor.move_index_x += offset_index_x;
-		text->cursor.move_index_y += offset_index_y;
+		text_io->cursor.move_index_x += offset_index_x;
+		text_io->cursor.move_index_y += offset_index_y;
 
-		Text_Cursor_Update(text);
+		Text_Cursor_Update(text_io);
 
 		return true;
 	}
@@ -7485,42 +7551,42 @@ Vertex_IsEmpty(
 
 instant void
 Text_Render(
-	Text *text
+	Text *text_io
 ) {
-	Assert(text);
+	Assert(text_io);
 
-	bool is_fixed_size = (text->data.rect.w OR text->data.rect.h);
+	bool is_fixed_size = (text_io->data.rect.w OR text_io->data.rect.h);
 
 	if (is_fixed_size)
-		OpenGL_Scissor(text->shader_set->window, text->data.rect);
+		OpenGL_Scissor(text_io->shader_set->window, text_io->data.rect);
 
 	/// redraw selection
-	if (text->data.is_editable AND text->cursor.vertex_select.a_attributes.count) {
-		ShaderSet_Use(text->shader_set, SHADER_PROG_RECT);
-		Rect_Render(text->shader_set, &text->cursor.vertex_select);
+	if (text_io->data.is_editable AND text_io->cursor.vertex_select.a_attributes.count) {
+		ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
+		Rect_Render(text_io->shader_set, &text_io->cursor.vertex_select);
 	}
 
 	/// redraw cursor
-	if (    text->cursor.show_cursor
-		AND text->data.is_editable
-		AND text->cursor.vertex_cursor.a_attributes.count
+	if (    text_io->cursor.show_cursor
+		AND text_io->data.is_editable
+		AND text_io->cursor.vertex_cursor.a_attributes.count
 	) {
-		if (Time_HasElapsed(&text->cursor.timer_blinking, text->cursor.blink_inverval_ms)) {
-			text->cursor.is_blink_on = !text->cursor.is_blink_on;
+		if (Time_HasElapsed(&text_io->cursor.timer_blinking, text_io->cursor.blink_inverval_ms)) {
+			text_io->cursor.is_blink_on = !text_io->cursor.is_blink_on;
 		}
 
-		if (text->cursor.is_blink_on) {
-			AssertMessage(!Vertex_IsEmpty(&text->cursor.vertex_cursor), "Cursor vertex data does not exists.");
+		if (text_io->cursor.is_blink_on) {
+			AssertMessage(!Vertex_IsEmpty(&text_io->cursor.vertex_cursor), "Cursor vertex data does not exists.");
 
-			ShaderSet_Use(text->shader_set, SHADER_PROG_RECT);
-			Rect_Render(text->shader_set, &text->cursor.vertex_cursor);
+			ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
+			Rect_Render(text_io->shader_set, &text_io->cursor.vertex_cursor);
 		}
 	}
 
-	if (text->a_vertex_chars.count) {
-		/// redraw last computed text
-		ShaderSet_Use(text->shader_set, SHADER_PROG_TEXT);
-		Vertex_Render(text->shader_set, &text->a_vertex_chars);
+	if (text_io->a_vertex_chars.count) {
+		/// redraw last computed text_io
+		ShaderSet_Use(text_io->shader_set, SHADER_PROG_TEXT);
+		Vertex_Render(text_io->shader_set, &text_io->a_vertex_chars);
 	}
 
 	if (is_fixed_size)
@@ -7530,8 +7596,8 @@ Text_Render(
 instant void
 Text_GetSize(
 	Text *text,
-	s32 *width,
-	s32 *height
+	s32 *width_out,
+	s32 *height_out
 ) {
 	Assert(text);
 
@@ -7540,12 +7606,12 @@ Text_GetSize(
 	static Array<String>    as_words;
 	static Array<Text_Line> a_text_lines;
 
-	if (height) {
+	if (height_out) {
 		String_SplitWordsStatic(&text->s_data, &as_words);
-		*height = Text_BuildLinesStatic(text, &as_words, &a_text_lines, false);
+		*height_out = Text_BuildLines(text, &as_words, &a_text_lines, false);
 	}
 
-	IF_SET(width)  = text->data.rect.w;
+	IF_SET(width_out)  = text->data.rect.w;
 }
 
 /// ::: LAYOUT
@@ -7597,59 +7663,59 @@ struct Layout {
 
 instant void
 Layout_Create(
-	Layout *layout,
+	Layout *layout_out,
 	Rect rect_area,
 	bool fill_last_block
 ) {
-	Assert(layout);
-	AssertMessage(!layout->a_blocks.count, "Layout already created. Layout_Resize might help.");
+	Assert(layout_out);
+	AssertMessage(!layout_out->a_blocks.count, "Layout already created. Layout_Resize might help.");
 
-	*layout = {};
-	layout->rect_full       = rect_area;
-	layout->rect_remaining  = rect_area;
-	layout->fill_last_block = fill_last_block;
+	*layout_out = {};
+	layout_out->rect_full       = rect_area;
+	layout_out->rect_remaining  = rect_area;
+	layout_out->fill_last_block = fill_last_block;
 }
 
 instant void
 Layout_Create(
-	Layout *layout,
+	Layout *layout_out,
 	Layout_Data *layout_data,
 	bool fill_last_block
 ) {
-	Assert(layout);
+	Assert(layout_out);
 	Assert(layout_data);
 
 	Rect rect_area = layout_data->settings.rect;
 
-	Layout_Create(layout, rect_area, fill_last_block);
+	Layout_Create(layout_out, rect_area, fill_last_block);
 }
 
 instant void
 Layout_CreateBlock(
-	Layout *layout,
+	Layout *layout_io,
 	LAYOUT_TYPE type,
 	LAYOUT_DOCK_TYPE dock_direction,
 	s32 expand_index = -1,
-	Layout_Block **layout_block = 0
+	Layout_Block **layout_block_out = 0
 ) {
-	Assert(layout);
+	Assert(layout_io);
 
 	Layout_Block *t_block;
 
-	Array_AddEmpty(&layout->a_blocks, &t_block);
+	Array_AddEmpty(&layout_io->a_blocks, &t_block);
 
 	t_block->type = type;
 	t_block->dock = dock_direction;
 	t_block->expand_index = expand_index;
 
-	if (layout_block)
-		*layout_block = t_block;
+	if (layout_block_out)
+		*layout_block_out = t_block;
 }
 
 instant void
 Layout_GetLastBlock(
 	Layout *layout,
-	Layout_Block **layout_block
+	Layout_Block **layout_block_out
 ) {
 	Assert(layout);
 
@@ -7658,19 +7724,19 @@ Layout_GetLastBlock(
 		return;
 	}
 
-	*layout_block = &ARRAY_IT(layout->a_blocks, layout->a_blocks.count - 1);
+	*layout_block_out = &ARRAY_IT(layout->a_blocks, layout->a_blocks.count - 1);
 }
 
 instant void
 Layout_Add(
-	Layout *layout,
+	Layout *layout_io,
 	Layout_Data *layout_data
 ) {
-	Assert(layout);
+	Assert(layout_io);
 	Assert(layout_data);
 
 	Layout_Block *current_block;
-	Layout_GetLastBlock(layout, &current_block);
+	Layout_GetLastBlock(layout_io, &current_block);
 
 	Array_Add(&current_block->ap_layout_data, layout_data);
 }
@@ -7678,7 +7744,7 @@ Layout_Add(
 struct Widget;
 
 instant void
-Layout_Add(Layout *layout, Widget *widget);
+Layout_Add(Layout *layout_io, Widget *widget);
 
 /// layout_block->expand_index (widgets):
 ///  0-max: expand widget with matching index
@@ -7689,47 +7755,47 @@ Layout_Add(Layout *layout, Widget *widget);
 ///   else: see -1
 instant void
 Layout_ArrangeBlockX(
-	Layout *layout,
-	Layout_Block *layout_block
+	Layout *layout_io,
+	Layout_Block *layout_block_io
 ) {
-	Assert(layout);
-	Assert(layout_block);
-	Assert(layout_block->type == LAYOUT_TYPE_X);
+	Assert(layout_io);
+	Assert(layout_block_io);
+	Assert(layout_block_io->type == LAYOUT_TYPE_X);
 
 	Layout_Block *t_block_last = 0;
-	Layout_GetLastBlock(layout, &t_block_last);
+	Layout_GetLastBlock(layout_io, &t_block_last);
 
-	bool is_last_block = (t_block_last == layout_block);
+	bool is_last_block = (t_block_last == layout_block_io);
 
-	s64 widget_count = layout_block->ap_layout_data.count;
+	s64 widget_count = layout_block_io->ap_layout_data.count;
 
 	if (!widget_count)
 		return;
 
-	s32 padding_size = layout_block->padding;
+	s32 padding_size = layout_block_io->padding;
 
 	if (padding_size % 2 != 0)  ++padding_size;
 
 	s32 padding_border   = padding_size >> 1;
-	s32 width_remaining  = layout->rect_remaining.w;
+	s32 width_remaining  = layout_io->rect_remaining.w;
 
 	float it_x = padding_border;
 	float it_y = padding_border;
 
-	bool is_overwriting = (	    layout_block->expand_index >= -4
-							AND layout_block->expand_index != -1
-							AND layout_block->expand_index < widget_count);
+	bool is_overwriting = (	    layout_block_io->expand_index >= -4
+							AND layout_block_io->expand_index != -1
+							AND layout_block_io->expand_index < widget_count);
 
 	s32 block_height = 0;
 	u64 widget_count_auto = widget_count;
 
 	/// pre-calc height for bottom alignment
-	FOR_ARRAY(layout_block->ap_layout_data, it_block) {
-		Layout_Data *t_data = ARRAY_IT(layout_block->ap_layout_data, it_block);
+	FOR_ARRAY(layout_block_io->ap_layout_data, it_block) {
+		Layout_Data *t_data = ARRAY_IT(layout_block_io->ap_layout_data, it_block);
 
 		Rect *rect = &t_data->settings.rect;
 
-		bool found_expander = ((s64)it_block == layout_block->expand_index);
+		bool found_expander = ((s64)it_block == layout_block_io->expand_index);
 
 		block_height  = MAX(block_height, rect->h);
 
@@ -7746,11 +7812,11 @@ Layout_ArrangeBlockX(
 	}
 
     width_remaining -= padding_size;
-	width_remaining -= layout_block->spacing * (widget_count - 1);
+	width_remaining -= layout_block_io->spacing * (widget_count - 1);
 
     block_height += padding_size;
 
-    switch (layout_block->expand_index) {
+    switch (layout_block_io->expand_index) {
     	case -3: {
     		it_x = (width_remaining + padding_border) >> 1;
     	} break;
@@ -7763,9 +7829,9 @@ Layout_ArrangeBlockX(
     }
 
     /// start drawing at the bottom
-	if (layout_block->dock == LAYOUT_DOCK_BOTTOMRIGHT) {
-		if (!is_last_block OR (is_last_block AND !layout->fill_last_block)) {
-			it_y += layout->rect_remaining.h - block_height;
+	if (layout_block_io->dock == LAYOUT_DOCK_BOTTOMRIGHT) {
+		if (!is_last_block OR (is_last_block AND !layout_io->fill_last_block)) {
+			it_y += layout_io->rect_remaining.h - block_height;
 		}
 	}
 
@@ -7775,21 +7841,21 @@ Layout_ArrangeBlockX(
 		width_avg_auto = ceil((float)width_remaining / widget_count_auto);
 
 	/// align horizontal
-    FOR_ARRAY(layout_block->ap_layout_data, it_block) {
-		Layout_Data *t_data = ARRAY_IT(layout_block->ap_layout_data, it_block);
+    FOR_ARRAY(layout_block_io->ap_layout_data, it_block) {
+		Layout_Data *t_data = ARRAY_IT(layout_block_io->ap_layout_data, it_block);
 
 		Rect *rect = &t_data->settings.rect;
 
 		/// center widgets in block
 		s32 center_block = (rect->h - (block_height - padding_size)) >> 1;
 
-		rect->x = layout->rect_remaining.x + it_x;
-		rect->y = layout->rect_remaining.y + it_y - center_block;
+		rect->x = layout_io->rect_remaining.x + it_x;
+		rect->y = layout_io->rect_remaining.y + it_y - center_block;
 
-		if (layout->fill_last_block AND is_last_block)
-			rect->h = layout->rect_remaining.h - padding_size;
+		if (layout_io->fill_last_block AND is_last_block)
+			rect->h = layout_io->rect_remaining.h - padding_size;
 
-		bool found_expander = ((s64)it_block == layout_block->expand_index);
+		bool found_expander = ((s64)it_block == layout_block_io->expand_index);
 
 		float x_step = rect->w;
 
@@ -7802,20 +7868,20 @@ Layout_ArrangeBlockX(
 				x_step = width_avg_auto;
 		}
 
-		float width_limit = layout->rect_remaining.w - it_x;
+		float width_limit = layout_io->rect_remaining.w - it_x;
 
 		if (x_step > width_limit)
 			x_step = width_limit;
 
 		rect->w = x_step;
-		it_x += x_step + layout_block->spacing;
+		it_x += x_step + layout_block_io->spacing;
     }
 
     /// cut of the top
-	if (layout_block->dock == LAYOUT_DOCK_TOPLEFT)
-		layout->rect_remaining.y += block_height;
+	if (layout_block_io->dock == LAYOUT_DOCK_TOPLEFT)
+		layout_io->rect_remaining.y += block_height;
 
-    layout->rect_remaining.h -= block_height;
+    layout_io->rect_remaining.h -= block_height;
 }
 
 /// layout_block->expand_index (widgets):
@@ -7827,47 +7893,47 @@ Layout_ArrangeBlockX(
 ///   else: see -1
 instant void
 Layout_ArrangeBlockY(
-	Layout *layout,
-	Layout_Block *layout_block
+	Layout *layout_io,
+	Layout_Block *layout_block_io
 ) {
-	Assert(layout);
-	Assert(layout_block);
-	Assert(layout_block->type == LAYOUT_TYPE_Y);
+	Assert(layout_io);
+	Assert(layout_block_io);
+	Assert(layout_block_io->type == LAYOUT_TYPE_Y);
 
 	Layout_Block *t_block_last = 0;
-	Layout_GetLastBlock(layout, &t_block_last);
+	Layout_GetLastBlock(layout_io, &t_block_last);
 
-	bool is_last_block = (t_block_last == layout_block);
+	bool is_last_block = (t_block_last == layout_block_io);
 
-	s64 widget_count = layout_block->ap_layout_data.count;
+	s64 widget_count = layout_block_io->ap_layout_data.count;
 
 	if (!widget_count)
 		return;
 
-	s32 padding_size     = layout_block->padding;
+	s32 padding_size     = layout_block_io->padding;
 
 	if (padding_size % 2 != 0)  ++padding_size;
 
 	s32 padding_border   = padding_size >> 1;
-	s32 height_remaining = layout->rect_remaining.h;
+	s32 height_remaining = layout_io->rect_remaining.h;
 
 	float it_x = padding_border;
 	float it_y = padding_border;
 
-	bool is_overwriting = (	    layout_block->expand_index >= -4
-							AND layout_block->expand_index != -1
-							AND layout_block->expand_index < widget_count);
+	bool is_overwriting = (	    layout_block_io->expand_index >= -4
+							AND layout_block_io->expand_index != -1
+							AND layout_block_io->expand_index < widget_count);
 
 	s32 block_width = 0;
 	u64 widget_count_auto = widget_count;
 
 	/// pre-calc width for bottom alignment
-	FOR_ARRAY(layout_block->ap_layout_data, it_block) {
-		Layout_Data *t_data = ARRAY_IT(layout_block->ap_layout_data, it_block);
+	FOR_ARRAY(layout_block_io->ap_layout_data, it_block) {
+		Layout_Data *t_data = ARRAY_IT(layout_block_io->ap_layout_data, it_block);
 
 		Rect *rect = &t_data->settings.rect;
 
-		bool found_expander = ((s64)it_block == layout_block->expand_index);
+		bool found_expander = ((s64)it_block == layout_block_io->expand_index);
 
 		block_width = MAX(block_width, rect->w);
 
@@ -7884,11 +7950,11 @@ Layout_ArrangeBlockY(
 	}
 
 	height_remaining -= padding_size;
-	height_remaining -= layout_block->spacing * (widget_count - 1);
+	height_remaining -= layout_block_io->spacing * (widget_count - 1);
 
     block_width += padding_size;
 
-    switch (layout_block->expand_index) {
+    switch (layout_block_io->expand_index) {
     	case -3: {
     		it_y = (height_remaining + padding_border) >> 1;
     	} break;
@@ -7901,9 +7967,9 @@ Layout_ArrangeBlockY(
     }
 
     /// start drawing right
-	if (layout_block->dock == LAYOUT_DOCK_BOTTOMRIGHT) {
-		if (!is_last_block OR (is_last_block AND !layout->fill_last_block)) {
-			it_x += layout->rect_remaining.w - block_width;
+	if (layout_block_io->dock == LAYOUT_DOCK_BOTTOMRIGHT) {
+		if (!is_last_block OR (is_last_block AND !layout_io->fill_last_block)) {
+			it_x += layout_io->rect_remaining.w - block_width;
 		}
 	}
 
@@ -7913,21 +7979,21 @@ Layout_ArrangeBlockY(
 		height_avg_auto = ceil((float)height_remaining / widget_count_auto);
 
 	/// align horizontal
-    FOR_ARRAY(layout_block->ap_layout_data, it_block) {
-		Layout_Data *t_data = ARRAY_IT(layout_block->ap_layout_data, it_block);
+    FOR_ARRAY(layout_block_io->ap_layout_data, it_block) {
+		Layout_Data *t_data = ARRAY_IT(layout_block_io->ap_layout_data, it_block);
 
 		Rect *rect = &t_data->settings.rect;
 
 		/// center widgets in block
 		s32 center_block = (rect->w - (block_width - padding_size)) >> 1;
 
-		rect->x = layout->rect_remaining.x + it_x - center_block;
-		rect->y = layout->rect_remaining.y + it_y;
+		rect->x = layout_io->rect_remaining.x + it_x - center_block;
+		rect->y = layout_io->rect_remaining.y + it_y;
 
-		if (layout->fill_last_block AND is_last_block)
-			rect->w = layout->rect_remaining.w - padding_size;
+		if (layout_io->fill_last_block AND is_last_block)
+			rect->w = layout_io->rect_remaining.w - padding_size;
 
-		bool found_expander = ((s64)it_block == layout_block->expand_index);
+		bool found_expander = ((s64)it_block == layout_block_io->expand_index);
 
 		float y_step = rect->h;
 
@@ -7940,60 +8006,60 @@ Layout_ArrangeBlockY(
 				y_step = height_avg_auto;
 		}
 
-		float height_limit = layout->rect_remaining.h - it_y;
+		float height_limit = layout_io->rect_remaining.h - it_y;
 
 		if (y_step > height_limit)
 			y_step = height_limit;
 
 		rect->h = y_step;
-		it_y += y_step + layout_block->spacing;
+		it_y += y_step + layout_block_io->spacing;
     }
 
     /// cut of the left
-	if (layout_block->dock == LAYOUT_DOCK_TOPLEFT)
-		layout->rect_remaining.x += block_width;
+	if (layout_block_io->dock == LAYOUT_DOCK_TOPLEFT)
+		layout_io->rect_remaining.x += block_width;
 
-    layout->rect_remaining.w -= block_width;
+    layout_io->rect_remaining.w -= block_width;
 }
 
 instant void
 Layout_Arrange(
-	Layout *layout
+	Layout *layout_io
 ) {
-	Assert(layout);
+	Assert(layout_io);
 
-	layout->rect_remaining = layout->rect_full;
+	layout_io->rect_remaining = layout_io->rect_full;
 
-	if (layout->padding % 2 != 0) ++layout->padding;
+	if (layout_io->padding % 2 != 0) ++layout_io->padding;
 
-	Rect_AddPadding(&layout->rect_remaining, {(float)layout->padding,
-                                              (float)layout->padding,
-												(s32)layout->padding,
-                                                (s32)layout->padding});
+	Rect_AddPadding(&layout_io->rect_remaining, {(float)layout_io->padding,
+                                              (float)layout_io->padding,
+												(s32)layout_io->padding,
+                                                (s32)layout_io->padding});
 
-	FOR_ARRAY(layout->a_blocks, it) {
-		Layout_Block *t_block = &ARRAY_IT(layout->a_blocks, it);
+	FOR_ARRAY(layout_io->a_blocks, it) {
+		Layout_Block *t_block = &ARRAY_IT(layout_io->a_blocks, it);
 
 		if (0) {}
 		else if (t_block->type == LAYOUT_TYPE_X)
-			Layout_ArrangeBlockX(layout, t_block);
+			Layout_ArrangeBlockX(layout_io, t_block);
 		else if (t_block->type == LAYOUT_TYPE_Y)
-			Layout_ArrangeBlockY(layout, t_block);
+			Layout_ArrangeBlockY(layout_io, t_block);
 	}
 }
 
 
 instant void
 Layout_Resize(
-	Layout *layout,
+	Layout *layout_io,
 	Rect rect_resize,
 	bool auto_arrange = true
 ) {
-	layout->rect_full       = rect_resize;
-	layout->rect_remaining  = rect_resize;
+	layout_io->rect_full       = rect_resize;
+	layout_io->rect_remaining  = rect_resize;
 
 	if (auto_arrange)
-		Layout_Arrange(layout);
+		Layout_Arrange(layout_io);
 }
 
 /// ::: Widget
@@ -8001,9 +8067,9 @@ Layout_Resize(
 struct Widget;
 
 typedef void (*Widget_OwnerDraw)
-	(Widget *widget);
+	(Widget *widget_io);
 typedef void (*Widget_UpdateCustomInputsSub)
-	(Widget *widget_parent, u64 sub_index);
+	(Widget *widget_parent_io, u64 sub_index);
 
 enum WIDGET_TYPE {
 	WIDGET_LABEL,
@@ -8112,13 +8178,13 @@ Widget *Widget::widget_focus_current = 0;
 
 instant void
 Widget_Cursor_RestartBlinking(
-	Widget *widget
+	Widget *widget_io
 ) {
-	Assert(widget);
+	Assert(widget_io);
 
-	widget->text.cursor.show_cursor = widget->data.has_focus;
-	Time_Reset(&widget->text.cursor.timer_blinking);
-	widget->text.cursor.is_blink_on = true;
+	widget_io->text.cursor.show_cursor = widget_io->data.has_focus;
+	Time_Reset(&widget_io->text.cursor.timer_blinking);
+	widget_io->text.cursor.is_blink_on = true;
 }
 
 instant bool
@@ -8134,7 +8200,7 @@ Widget_IsListType(
 
 instant void
 Widget_AddRow(
-	Widget *widget,
+	Widget *widget_io,
 	const char *c_row_data,
 	u64 c_length = 0
 ) {
@@ -8142,47 +8208,47 @@ Widget_AddRow(
 		return;
 
 	/// list contained in subwidgets
-	switch (widget->type) {
+	switch (widget_io->type) {
 		case WIDGET_COMBOBOX: {
-			widget = &ARRAY_IT(widget->a_subwidgets, 2);
+			widget_io = &ARRAY_IT(widget_io->a_subwidgets, 2);
 		} break;
 
 		default: {} break;
 	}
 
 	String *ts_data;
-	Array_AddEmpty(&widget->data.as_row_data, &ts_data);
+	Array_AddEmpty(&widget_io->data.as_row_data, &ts_data);
 	*ts_data = String_Copy(c_row_data, c_length);
 }
 
 instant void
 Widget_AddRows(
-	Widget *widget,
+	Widget *widget_io,
 	Array<String> *as_list
 ) {
-	Assert(widget);
+	Assert(widget_io);
 	Assert(as_list);
 
 	FOR_ARRAY(*as_list, it) {
 		String *ts_item = &ARRAY_IT(*as_list, it);
 
-		Widget_AddRow(widget, ts_item->value, ts_item->length);
+		Widget_AddRow(widget_io, ts_item->value, ts_item->length);
 	}
 }
 
 instant bool
 Mouse_IsHovering(
 	Widget *widget,
-	Mouse *mouse = 0
+	Mouse *mouse_out = 0
 ) {
 	Assert(widget);
 
 	Point t_point;
 	bool is_hovering_popout = false;
 
-	if (mouse) {
-		Mouse_GetPosition(mouse, widget->window);
-		t_point = mouse->point;
+	if (mouse_out) {
+		Mouse_GetPosition(mouse_out, widget->window);
+		t_point = mouse_out->point;
 	}
 	else {
 		Mouse_GetPosition(&t_point.x, &t_point.y, widget->window);
@@ -8194,7 +8260,7 @@ Mouse_IsHovering(
 		AND widget->widget_focus_current->data.is_floating
 	) {
 		if (widget->widget_focus_current->data.is_popout) {
-			is_hovering_popout = Mouse_IsHovering(widget->widget_focus_current, mouse);
+			is_hovering_popout = Mouse_IsHovering(widget->widget_focus_current, mouse_out);
 		}
 	}
 
@@ -8207,36 +8273,36 @@ Mouse_IsHovering(
 
 instant bool
 Widget_HasChanged(
-	Widget *widget,
+	Widget *widget_io,
 	bool update_changes
 ) {
-	Assert(widget);
+	Assert(widget_io);
 
 	bool result = false;
 
 	///@Note: updating text changed will happen
 	///       in a Text_Update
-	result = Text_HasChanged(&widget->text, false);
+	result = Text_HasChanged(&widget_io->text, false);
 
 	if (!result) {
 		result = !Memory_Compare(
-							&widget->layout_data.settings,
-							&widget->layout_data.settings_prev,
-							 sizeof(widget->layout_data.settings)
+							&widget_io->layout_data.settings,
+							&widget_io->layout_data.settings_prev,
+							 sizeof(widget_io->layout_data.settings)
 					  );
 	}
 
 	if (!result) {
 		result = !Memory_Compare(
-							&widget->data,
-							&widget->data_prev,
-							 sizeof(widget->data)
+							&widget_io->data,
+							&widget_io->data_prev,
+							 sizeof(widget_io->data)
 					  );
 	}
 
 	if (!result) {
-		FOR_ARRAY(widget->data.as_row_data, it) {
-			String *t_data = &ARRAY_IT(widget->data.as_row_data, it);
+		FOR_ARRAY(widget_io->data.as_row_data, it) {
+			String *t_data = &ARRAY_IT(widget_io->data.as_row_data, it);
 
 			if (t_data->changed) {
 				result = true;
@@ -8251,8 +8317,8 @@ Widget_HasChanged(
 
 	#if !DEBUG_UPDATE_ALWAYS
 	if (update_changes) {
-		widget->layout_data.settings_prev = widget->layout_data.settings;
-		widget->data_prev = widget->data;
+		widget_io->layout_data.settings_prev = widget_io->layout_data.settings;
+		widget_io->data_prev = widget_io->data;
 	}
 	#endif
 
@@ -8265,77 +8331,77 @@ Widget_HasChanged(
 instant void
 Widget_AddBorderSizes(
 	Widget *widget,
-	s32 *min_width,
-	s32 *min_height
+	s32 *min_width_io,
+	s32 *min_height_io
 ) {
 	Assert(widget);
 
 	Rect *rect_padding = &widget->text.data.rect_padding;
 
-	if (min_width) {
-		*min_width += rect_padding->x + rect_padding->w;
+	if (min_width_io) {
+		*min_width_io += rect_padding->x + rect_padding->w;
 
 		/// border size is used for the checbox,
 		/// not the border of the widget itself
 		if (widget->type != WIDGET_CHECKBOX)
-			*min_width += widget->data.border_size << 1;
+			*min_width_io += widget->data.border_size << 1;
 
-		*min_width +=   widget->text.data.rect_margin.x
+		*min_width_io +=   widget->text.data.rect_margin.x
 					  + widget->text.data.rect_margin.w;
 	}
 
-	if (min_height) {
-		*min_height += rect_padding->y + rect_padding->h;
+	if (min_height_io) {
+		*min_height_io += rect_padding->y + rect_padding->h;
 
 		/// border size is used for the checbox,
 		/// not the border of the widget itself
 		if (widget->type != WIDGET_CHECKBOX)
-			*min_height += widget->data.border_size << 1;
+			*min_height_io += widget->data.border_size << 1;
 
-		*min_height +=  widget->text.data.rect_margin.y
+		*min_height_io +=  widget->text.data.rect_margin.y
 					  + widget->text.data.rect_margin.h;
 	}
 }
 
 instant void
 Widget_SetFocus(
-	Widget *widget
+	Widget *widget_io
 ) {
-	Assert(widget);
+	Assert(widget_io);
 
-	if (!widget->data.is_focusable)
+	if (!widget_io->data.is_focusable)
 		return;
 
-    if (widget->widget_focus_current) {
-    	widget->widget_focus_current->data.has_focus = false;
+    if (widget_io->widget_focus_current) {
+    	widget_io->widget_focus_current->data.has_focus = false;
     }
 
-    widget->data.has_focus = true;
-    widget->widget_focus_current = widget;
+    widget_io->data.has_focus = true;
+    widget_io->widget_focus_current = widget_io;
 }
 
 instant bool
 Widget_Update(
-	Widget *widget
+	Widget *widget_io
 ) {
-	Assert(widget);
+	Assert(widget_io);
 
 	bool result = false;
 
-	FOR_ARRAY(widget->a_subwidgets, it) {
-		Widget *t_widget = &ARRAY_IT(widget->a_subwidgets, it);
+	FOR_ARRAY(widget_io->a_subwidgets, it) {
+		Widget *t_widget = &ARRAY_IT(widget_io->a_subwidgets, it);
 		Widget_Update(t_widget);
 	}
 
-	widget->events.on_text_change = Text_Update(&widget->text);
+	widget_io->events.on_text_change = Text_Update(&widget_io->text);
 
-	if (widget->trigger_autosize){
-		Layout_Data_Settings *layout_data = &widget->layout_data.settings;
-		Text_Data *settings = &widget->text.data;
+	if (widget_io->trigger_autosize){
+		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
+		Text_Data *settings = &widget_io->text.data;
 
 		if (layout_data->auto_width AND settings->rect_content.w) {
 			s32 width_auto = settings->rect_content.w;
-			Widget_AddBorderSizes(widget, &width_auto, 0);
+			Widget_AddBorderSizes(widget_io, &width_auto, 0);
 
 			if (layout_data->rect.w != width_auto) {
 				layout_data->rect.w  = width_auto;
@@ -8345,7 +8411,7 @@ Widget_Update(
 
 		if (layout_data->auto_height AND settings->rect_content.h) {
 			s32 height_auto = settings->rect_content.h;
-			Widget_AddBorderSizes(widget, 0, &height_auto);
+			Widget_AddBorderSizes(widget_io, 0, &height_auto);
 
 			if (layout_data->rect.h != height_auto) {
 				layout_data->rect.h  = height_auto;
@@ -8353,19 +8419,19 @@ Widget_Update(
 			}
 		}
 
-		widget->trigger_autosize = false;
+		widget_io->trigger_autosize = false;
 	}
 
-	if (widget->trigger_popout) {
-		widget->data.is_popout = !widget->data.is_popout;
-		widget->trigger_popout = false;
+	if (widget_io->trigger_popout) {
+		widget_io->data.is_popout = !widget_io->data.is_popout;
+		widget_io->trigger_popout = false;
 
-		if (widget->data.is_popout) {
-			Widget_SetFocus(widget);
+		if (widget_io->data.is_popout) {
+			Widget_SetFocus(widget_io);
 		}
 		else {
-			if (widget->widget_focus_on_popout) {
-				Widget_SetFocus(widget->widget_focus_on_popout);
+			if (widget_io->widget_focus_on_popout) {
+				Widget_SetFocus(widget_io->widget_focus_on_popout);
 			}
 		}
 	}
@@ -8375,46 +8441,46 @@ Widget_Update(
 
 instant void
 Widget_Redraw(
-	Widget *widget
+	Widget *widget_io
 ) {
-	Assert(widget);
+	Assert(widget_io);
 
-	if (widget->OwnerDraw) {
-		widget->OwnerDraw(widget);
+	if (widget_io->OwnerDraw) {
+		widget_io->OwnerDraw(widget_io);
 		return;
 	}
 
-	Vertex *t_vertex = &widget->vertex_rect;
-	Rect    rect_box =  widget->layout_data.settings.rect;
+	Vertex *t_vertex = &widget_io->vertex_rect;
+	Rect    rect_box =  widget_io->layout_data.settings.rect;
 
-	if (!t_vertex->array_id) Vertex_CreateStatic(t_vertex);
+	if (!t_vertex->array_id) Vertex_Create(t_vertex);
 	else                     Vertex_ClearAttributes(t_vertex);
 
-	switch (widget->type) {
+	switch (widget_io->type) {
 		case WIDGET_SPREADER: {
 		} break;
 
 		case WIDGET_TEXTBOX: {
-			widget->text.data.rect = widget->layout_data.settings.rect;
+			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
 
-			Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
+			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
 
-			if (Text_HasChanged(&widget->text, false)) {
-				Text_Cursor_Update(&widget->text);
+			if (Text_HasChanged(&widget_io->text, false)) {
+				Text_Cursor_Update(&widget_io->text);
 			}
 
-			Widget_Cursor_RestartBlinking(widget);
+			Widget_Cursor_RestartBlinking(widget_io);
 		} break;
 
 		case WIDGET_COMBOBOX: {
-			Rect *rect_layout = &widget->layout_data.settings.rect;
+			Rect *rect_layout = &widget_io->layout_data.settings.rect;
 
 			rect_layout->h = 0;
 
 			bool is_popped_out = false;
 
-            FOR_ARRAY(widget->a_subwidgets, it) {
-				Widget *t_widget = &ARRAY_IT(widget->a_subwidgets, it);
+            FOR_ARRAY(widget_io->a_subwidgets, it) {
+				Widget *t_widget = &ARRAY_IT(widget_io->a_subwidgets, it);
 				///@Remove?
 //				Widget_Update(t_widget);
 
@@ -8424,7 +8490,7 @@ Widget_Redraw(
             }
 
 			Layout layout;
-			Layout_Create(&layout, &widget->layout_data, false);
+			Layout_Create(&layout, &widget_io->layout_data, false);
 			layout.padding = 0;
 
 			Layout_Block *t_layout_block = 0;
@@ -8432,93 +8498,93 @@ Widget_Redraw(
 			t_layout_block->padding = 0;
 
 			/// label
-			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 0));
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 0));
 			/// button
-			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 1));
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 1));
 
 
 			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0, &t_layout_block);
 			t_layout_block->padding = 0;
 
 			/// list
-			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 2));
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 2));
 
 			Layout_Arrange(&layout);
 		} break;
 
 		case WIDGET_LABEL: {
-			widget->text.data.rect = widget->layout_data.settings.rect;
-			Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
+			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
+			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
 		} break;
 
 		case WIDGET_PICTUREBOX:
 		case WIDGET_LISTBOX: {
-			Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
+			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
 		} break;
 
 		case WIDGET_BUTTON: {
-			widget->text.data.rect = widget->layout_data.settings.rect;
+			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
 
-			Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
+			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
 
-			if (widget->data.border_size) {
+			if (widget_io->data.border_size) {
 				Rect_Resize(&rect_box, -1);
 
-				if (widget->data.has_focus)
-					Vertex_AddRect32(t_vertex, rect_box, widget->data.color_outline_selected);
+				if (widget_io->data.has_focus)
+					Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_outline_selected);
 				else
-					Vertex_AddRect32(t_vertex, rect_box, widget->data.color_outline_inactive);
+					Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_outline_inactive);
 
-				Rect_Resize(&rect_box, -widget->data.border_size);
-				Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
+				Rect_Resize(&rect_box, -widget_io->data.border_size);
+				Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
 			}
 		} break;
 
 		case WIDGET_CHECKBOX: {
-			widget->text.data.rect = widget->layout_data.settings.rect;
+			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
 
-			Vertex_AddRect32(t_vertex, rect_box, widget->data.color_background);
+			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
 
 			s32 check_offset = 2;
-			s32 check_h = widget->text.font->size - (check_offset << 1);
+			s32 check_h = widget_io->text.font->size - (check_offset << 1);
 			s32 check_w = check_h;
 
 			Rect rect_check = {
-				rect_box.x + check_offset + widget->text.data.rect_padding.x,
-				rect_box.y + check_offset + widget->text.data.rect_padding.y,
+				rect_box.x + check_offset + widget_io->text.data.rect_padding.x,
+				rect_box.y + check_offset + widget_io->text.data.rect_padding.y,
 				check_w,
 				check_h
 			};
 
-			widget->text.data.rect_margin = {
+			widget_io->text.data.rect_margin = {
 				(float)check_offset * 2 + check_w + 2,
 				0,
 				0,
 				0
 			};
 
-			if (widget->data.has_focus)
-				Vertex_AddRect32(t_vertex, rect_check, widget->data.color_outline_selected);
+			if (widget_io->data.has_focus)
+				Vertex_AddRect32(t_vertex, rect_check, widget_io->data.color_outline_selected);
 			else
-				Vertex_AddRect32(t_vertex, rect_check, widget->data.color_outline_inactive);
+				Vertex_AddRect32(t_vertex, rect_check, widget_io->data.color_outline_inactive);
 
-			Assert(widget->data.border_size);
-			Assert(widget->data.border_size < 20);
+			Assert(widget_io->data.border_size);
+			Assert(widget_io->data.border_size < 20);
 
-			widget->data.border_size = (widget->text.font->size / 10);
+			widget_io->data.border_size = (widget_io->text.font->size / 10);
 
-			Rect_Resize(&rect_check, -widget->data.border_size);
-			Vertex_AddRect32(t_vertex, rect_check, widget->data.color_background);
+			Rect_Resize(&rect_check, -widget_io->data.border_size);
+			Vertex_AddRect32(t_vertex, rect_check, widget_io->data.color_background);
 
-			if (widget->data.is_checked) {
+			if (widget_io->data.is_checked) {
 				Rect_Resize(&rect_check, -1);
-				Vertex_AddRect32(t_vertex, rect_check, widget->data.color_outline_selected);
+				Vertex_AddRect32(t_vertex, rect_check, widget_io->data.color_outline_selected);
 			}
 		} break;
 
 		case WIDGET_NUMBERPICKER: {
 			Layout layout;
-			Layout_Create(&layout, &widget->layout_data, false);
+			Layout_Create(&layout, &widget_io->layout_data, false);
 			layout.padding = 0;
 
 			Layout_Block *current_block;
@@ -8527,13 +8593,13 @@ Widget_Redraw(
 			current_block->spacing = 2;
 
 			/// label
-			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 0));
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 0));
 			/// spreader
-			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 3));
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 3));
 			/// button up
-			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 1));
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 1));
 			/// button down
-			Layout_Add(&layout, &ARRAY_IT(widget->a_subwidgets, 2));
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 2));
 			Layout_Arrange(&layout);
 		} break;
 
@@ -8545,52 +8611,52 @@ Widget_Redraw(
 
 instant void
 Widget_InvalidateBackground(
-	Widget *widget
+	Widget *widget_io
 ) {
-	Assert(widget);
+	Assert(widget_io);
 
-	Widget_Redraw(widget);
+	Widget_Redraw(widget_io);
 }
 
 /// return an non-rendered overlay widget (if exists)
 instant Widget *
 Widget_Render(
 	ShaderSet *shader_set,
-	Widget *widget,
+	Widget *widget_io,
 	bool render_overlay = false
 ) {
 	Assert(shader_set);
-	Assert(widget);
+	Assert(widget_io);
 
-	widget->text.shader_set = shader_set;
+	widget_io->text.shader_set = shader_set;
 
 	/// draw non-list data
-	if (!Widget_IsListType(widget)) {
-		if (widget->data.is_floating AND !render_overlay) {
-			return widget;
+	if (!Widget_IsListType(widget_io)) {
+		if (widget_io->data.is_floating AND !render_overlay) {
+			return widget_io;
 		}
 
-		if (Widget_HasChanged(widget, true)) {
-			Widget_InvalidateBackground(widget);
+		if (Widget_HasChanged(widget_io, true)) {
+			Widget_InvalidateBackground(widget_io);
 		}
 
-		if (widget->vertex_rect.a_attributes.count) {
+		if (widget_io->vertex_rect.a_attributes.count) {
 			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
-			Rect_Render(shader_set, &widget->vertex_rect);
+			Rect_Render(shader_set, &widget_io->vertex_rect);
 		}
 
-		if (widget->vertex_rect.texture.ID) {
+		if (widget_io->vertex_rect.texture.ID) {
 			ShaderSet_Use(shader_set, SHADER_PROG_TEXTURE_SIZE);
 
 			s32 width, height;
-			Texture_GetSizeAndBind(&widget->vertex_rect.texture, &width, &height);
+			Texture_GetSizeAndBind(&widget_io->vertex_rect.texture, &width, &height);
 
-			Rect rect_tex_aspect = widget->layout_data.settings.rect;
+			Rect rect_tex_aspect = widget_io->layout_data.settings.rect;
 			Rect_GetAspect(&rect_tex_aspect, width, height);
 
 			static Vertex vertex_texture = Vertex_Create();
-			Vertex_SetTexture(shader_set, &vertex_texture, &widget->vertex_rect.texture);
-			vertex_texture.settings = widget->vertex_rect.settings;
+			Vertex_SetTexture(shader_set, &vertex_texture, &widget_io->vertex_rect.texture);
+			vertex_texture.settings = widget_io->vertex_rect.settings;
 
 			Vertex_AddRectTexture(&vertex_texture, rect_tex_aspect);
 			Rect_Render(shader_set, &vertex_texture);
@@ -8598,25 +8664,27 @@ Widget_Render(
 			Vertex_ClearAttributes(&vertex_texture);
 		}
 
-		Text_Render(&widget->text);
+		Text_Render(&widget_io->text);
 	}
 	else {
-		if (widget->data.is_floating AND (!widget->data.is_popout OR !render_overlay)) {
-			return widget;
+		/// do not draw a list widget,
+		/// if it should not be rendered as a popout
+		if (widget_io->data.is_floating AND (!widget_io->data.is_popout OR !render_overlay)) {
+			return widget_io;
 		}
 
 		///@Refactor: update for list data, might make more sense
 		///           to move it into a seperate update function
-		if (Widget_HasChanged(widget, true)) {
-			Vertex_ClearAttributes(&widget->vertex_rect);
-			Widget_InvalidateBackground(widget);
+		if (Widget_HasChanged(widget_io, true)) {
+			Vertex_ClearAttributes(&widget_io->vertex_rect);
+			Widget_InvalidateBackground(widget_io);
 
-			Text *t_text = &widget->text;
+			Text *t_text = &widget_io->text;
 
 			Text_Clear(t_text);
 
 			/// x y w
-			t_text->data.rect = widget->layout_data.settings.rect;
+			t_text->data.rect = widget_io->layout_data.settings.rect;
 			Rect *rect_text        = &t_text->data.rect;
 
 			s32 pad_left = 2;
@@ -8624,68 +8692,68 @@ Widget_Render(
 			rect_text->x += t_text->data.rect_content.x + pad_left;
 			rect_text->y += t_text->data.rect_content.y;
 
-			widget->rect_content.h = 0;
+			widget_io->rect_content.h = 0;
 
-			FOR_ARRAY(widget->data.as_row_data, it_row) {
-				String *ts_data = &ARRAY_IT(widget->data.as_row_data, it_row);
+			FOR_ARRAY(widget_io->data.as_row_data, it_row) {
+				String *ts_data = &ARRAY_IT(widget_io->data.as_row_data, it_row);
 
 				String_SplitWordsStatic(ts_data, &t_text->as_words);
-				rect_text->h = Text_BuildLinesStatic(t_text, &t_text->as_words, &t_text->a_text_lines, false);
+				rect_text->h = Text_BuildLines(t_text, &t_text->as_words, &t_text->a_text_lines, false);
 
-				if (Rect_IsIntersecting(rect_text, &widget->layout_data.settings.rect)) {
-					Color32 t_color_rect = widget->data.color_outline;
+				if (Rect_IsIntersecting(rect_text, &widget_io->layout_data.settings.rect)) {
+					Color32 t_color_rect = widget_io->data.color_outline;
 
-					if (widget->data.active_row_id == it_row) {
-						if (widget->data.has_focus)
-							t_color_rect = widget->data.color_outline_selected;
+					if (widget_io->data.active_row_id == it_row) {
+						if (widget_io->data.has_focus)
+							t_color_rect = widget_io->data.color_outline_selected;
 						else
-							t_color_rect = widget->data.color_outline_inactive;
+							t_color_rect = widget_io->data.color_outline_inactive;
 					}
 
 					Rect rect_box = *rect_text;
 					rect_box.x -= pad_left;
 
-					Vertex_AddRect32(&widget->vertex_rect, rect_box, t_color_rect);
+					Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
 
 					Text_AddLines(t_text, false);
 				}
 
-				s32 height_row_step = rect_text->h + widget->data.spacing;
+				s32 height_row_step = rect_text->h + widget_io->data.spacing;
 				rect_text->y           += height_row_step;
-				widget->rect_content.h += height_row_step;
+				widget_io->rect_content.h += height_row_step;
 
 				ts_data->changed = false;
 			}
 
 			/// revert for scissor
-			*rect_text = widget->layout_data.settings.rect;
+			*rect_text = widget_io->layout_data.settings.rect;
 
 			t_text->data_prev = t_text->data;
 		}
 
-		OpenGL_Scissor(shader_set->window, widget->layout_data.settings.rect);
+		OpenGL_Scissor(shader_set->window, widget_io->layout_data.settings.rect);
 
 		/// render rectangles + background
-		if (widget->vertex_rect.a_attributes.count) {
+		if (widget_io->vertex_rect.a_attributes.count) {
 			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
-			Rect_Render(shader_set, &widget->vertex_rect);
+			Rect_Render(shader_set, &widget_io->vertex_rect);
 		}
 
-		Text_Render(&widget->text);
+		Text_Render(&widget_io->text);
 
 		OpenGL_Scissor_Disable();
 	}
 
 	Widget *wg_overlay = 0;
 
-	FOR_ARRAY(widget->a_subwidgets, it_sub) {
-		Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
+	FOR_ARRAY(widget_io->a_subwidgets, it_sub) {
+		Widget *t_subwidget = &ARRAY_IT(widget_io->a_subwidgets, it_sub);
 
 		wg_overlay = Widget_Render(shader_set, t_subwidget);
 	}
 
 	/// Reset per Frame Event Data
-	widget->events = {};
+	widget_io->events = {};
 
 	return wg_overlay;
 }
@@ -8693,14 +8761,14 @@ Widget_Render(
 instant void
 Widget_Render(
 	ShaderSet *shader_set,
-	Array<Widget *> *ap_widgets
+	Array<Widget *> *ap_widgets_io
 ) {
-	Assert(ap_widgets);
+	Assert(ap_widgets_io);
 
 	Widget *wg_overlay = 0;
 
-    FOR_ARRAY(*ap_widgets, it_widget) {
-		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+    FOR_ARRAY(*ap_widgets_io, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets_io, it_widget);
 
 		Widget *twg_overlay_buffer = Widget_Render(shader_set, t_widget, false);
 
@@ -8720,22 +8788,22 @@ Widget_Render(
 
 instant void
 Widget_Destroy(
-	Widget *widget
+	Widget *widget_out
 ) {
-	Assert(widget);
+	Assert(widget_out);
 
-	Text_Destroy(&widget->text);
-	Vertex_Destroy(&widget->vertex_rect);
+	Text_Destroy(&widget_out->text);
+	Vertex_Destroy(&widget_out->vertex_rect);
 }
 
 instant void
 Widget_Destroy(
-	Array<Widget *> *ap_widgets
+	Array<Widget *> *ap_widgets_out
 ) {
-	Assert(ap_widgets);
+	Assert(ap_widgets_out);
 
-    FOR_ARRAY(*ap_widgets, it_widget) {
-		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+    FOR_ARRAY(*ap_widgets_out, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets_out, it_widget);
 
 		Text_Destroy(&t_widget->text);
 		Vertex_Destroy(&t_widget->vertex_rect);
@@ -8765,21 +8833,21 @@ Widget_IsFocusable(
 
 instant void
 Widget_UpdateFocus(
-	Array<Widget *> *ap_widgets,
+	Array<Widget *> *ap_widgets_io,
 	bool check_backward
 ) {
-	Assert(ap_widgets);
+	Assert(ap_widgets_io);
 
 	bool focus_set_next = false;
 
-	if (!ap_widgets->count)
+	if (!ap_widgets_io->count)
 		return;
 
 	static Array<Widget *> ap_widgets_all;
 	Array_ClearContainer(&ap_widgets_all);
 
-	FOR_ARRAY(*ap_widgets, it_widget) {
-		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+	FOR_ARRAY(*ap_widgets_io, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets_io, it_widget);
 		Array_Add(&ap_widgets_all, t_widget);
 
 		FOR_ARRAY(t_widget->a_subwidgets, it_sub) {
@@ -8860,12 +8928,12 @@ Widget_UpdateFocus(
 instant void
 Widget_CalcActiveRowRect(
 	Widget *widget,
-	Rect *rect_row
+	Rect *rect_row_out
 ) {
 	Assert(widget);
-    Assert(rect_row);
+    Assert(rect_row_out);
 
-    *rect_row = {};
+    *rect_row_out = {};
 
     String ts_data_backup = widget->text.s_data;
 
@@ -8884,7 +8952,7 @@ Widget_CalcActiveRowRect(
 		rect_item.h = height;
 
 		if (widget->data.active_row_id == it_row) {
-			*rect_row = rect_item;
+			*rect_row_out = rect_item;
 			break;
 		}
 
@@ -8938,22 +9006,22 @@ Widget_CalcActiveRowID(
 
 instant void
 Widget_UpdateInput(
-	Widget *widget
+	Widget *widget_io
 ) {
-	Assert(widget);
-	Assert(widget->window);
+	Assert(widget_io);
+	Assert(widget_io->window);
 
-    Keyboard *keyboard = widget->window->keyboard;
-    Mouse    *mouse    = widget->window->mouse;
+    Keyboard *keyboard = widget_io->window->keyboard;
+    Mouse    *mouse    = widget_io->window->mouse;
 
-    Rect *rect_widget = &widget->layout_data.settings.rect;
+    Rect *rect_widget = &widget_io->layout_data.settings.rect;
 
-    if (widget->a_subwidgets.count) {
-		FOR_ARRAY(widget->a_subwidgets, it_sub) {
-			Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
+    if (widget_io->a_subwidgets.count) {
+		FOR_ARRAY(widget_io->a_subwidgets, it_sub) {
+			Widget *t_subwidget = &ARRAY_IT(widget_io->a_subwidgets, it_sub);
 
 			if (t_subwidget->UpdateCustomInputs)
-				t_subwidget->UpdateCustomInputs(widget, it_sub);
+				t_subwidget->UpdateCustomInputs(widget_io, it_sub);
 			else
 				Widget_UpdateInput(t_subwidget);
 		}
@@ -8961,31 +9029,31 @@ Widget_UpdateInput(
 		return;
     }
 
-	if (!widget->data.is_focusable)
+	if (!widget_io->data.is_focusable)
 		return;
 
-	if (widget->data.is_floating AND !widget->data.is_popout)
+	if (widget_io->data.is_floating AND !widget_io->data.is_popout)
 		return;
 
-	bool got_focus = widget->data.has_focus;
-	u64  prev_active_row = widget->data.active_row_id;
+	bool got_focus = widget_io->data.has_focus;
+	u64  prev_active_row = widget_io->data.active_row_id;
 
-	bool has_text_cursor = widget->text.data.is_editable;
+	bool has_text_cursor = widget_io->text.data.is_editable;
 
-	bool is_scrollable_list = widget->data.has_scrollable_list;
-	bool is_scrollable      = widget->data.is_scrollable;
+	bool is_scrollable_list = widget_io->data.has_scrollable_list;
+	bool is_scrollable      = widget_io->data.is_scrollable;
 
     if (mouse) {
-		bool is_hovering = Mouse_IsHovering(widget, mouse);
+		bool is_hovering = Mouse_IsHovering(widget_io, mouse);
 
 		/// text selection
 		if (has_text_cursor AND is_hovering) {
-			Text *text = &widget->text;
+			Text *text = &widget_io->text;
 
 			text->cursor.is_selecting = mouse->pressing[0];
 
 			if (text->cursor.is_selecting) {
-				widget->data.has_focus = true;
+				widget_io->data.has_focus = true;
 
 				if (mouse->is_down) {
 					u64 index = Text_Cursor_FindIndex(text, mouse->point);
@@ -8998,7 +9066,7 @@ Widget_UpdateInput(
 
 					text->cursor.index_select_end   = index;
 
-					Widget_Cursor_RestartBlinking(widget);
+					Widget_Cursor_RestartBlinking(widget_io);
 				}
 
 				Text_Cursor_Update(text);
@@ -9010,30 +9078,30 @@ Widget_UpdateInput(
 			got_focus = is_hovering;
 
 			if (is_hovering) {
-				widget->events.on_trigger = true;
+				widget_io->events.on_trigger = true;
 			}
 
 			/// listbox entry selection
 			if (is_scrollable_list) {
-				u64 new_active_row_id = Widget_CalcActiveRowID(widget, mouse);
+				u64 new_active_row_id = Widget_CalcActiveRowID(widget_io, mouse);
 
-				if (new_active_row_id != widget->data.active_row_id) {
-					widget->data.active_row_id = new_active_row_id;
-					widget->events.on_list_change_index = true;
+				if (new_active_row_id != widget_io->data.active_row_id) {
+					widget_io->data.active_row_id = new_active_row_id;
+					widget_io->events.on_list_change_index = true;
 				}
 				else {
-					widget->events.on_list_change_final = true;
+					widget_io->events.on_list_change_final = true;
 				}
 			}
 
 			/// checkbox toggle
-			if (got_focus AND widget->data.is_checkable) {
-				widget->data.is_checked = !widget->data.is_checked;
+			if (got_focus AND widget_io->data.is_checkable) {
+				widget_io->data.is_checked = !widget_io->data.is_checked;
 			}
 
 			/// focus change
-//			if (widget->data.has_focus != got_focus) {
-				widget->data.has_focus = got_focus;
+//			if (widget_io->data.has_focus != got_focus) {
+				widget_io->data.has_focus = got_focus;
 //			}
 		}
 
@@ -9042,95 +9110,95 @@ Widget_UpdateInput(
 			got_focus = is_hovering;
 
 			if (is_hovering) {
-				widget->events.on_trigger_secondary = true;
+				widget_io->events.on_trigger_secondary = true;
 			}
 		}
 
-		/// widget + list scrolling
+		/// widget_io + list scrolling
 		if (is_hovering AND (is_scrollable_list OR is_scrollable)) {
-			widget->text.data.rect_content.y += mouse->wheel;
+			widget_io->text.data.rect_content.y += mouse->wheel;
 
 			if (is_scrollable_list) {
-				widget->text.data.rect_content.w  = widget->rect_content.w;
-				widget->text.data.rect_content.h  = widget->rect_content.h;
+				widget_io->text.data.rect_content.w  = widget_io->rect_content.w;
+				widget_io->text.data.rect_content.h  = widget_io->rect_content.h;
 			}
 
-			Rect_Clamp(&widget->text.data.rect_content, widget->layout_data.settings.rect);
+			Rect_ClampY(&widget_io->text.data.rect_content, widget_io->layout_data.settings.rect);
 		}
     }
 
-    if (keyboard AND widget->data.has_focus) {
+    if (keyboard AND widget_io->data.has_focus) {
 		bool is_key_return = keyboard->up[VK_RETURN];
 		bool is_key_space  = keyboard->up[VK_SPACE];
 
         if (is_key_return OR is_key_space) {
-        	widget->events.on_trigger = true;
+        	widget_io->events.on_trigger = true;
         }
 
-		if (widget->data.is_checkable
+		if (widget_io->data.is_checkable
 			AND (   is_key_return
 				 OR is_key_space)
 		) {
-			widget->data.is_checked = !widget->data.is_checked;
+			widget_io->data.is_checked = !widget_io->data.is_checked;
 		}
 
 		if (is_scrollable_list) {
-			if (widget->data.active_row_id) {
+			if (widget_io->data.active_row_id) {
 				if (keyboard->down[VK_UP]) {
-					--widget->data.active_row_id;
-					widget->events.on_list_change_index = true;
+					--widget_io->data.active_row_id;
+					widget_io->events.on_list_change_index = true;
 				}
 
 				if (keyboard->down[VK_HOME]) {
-					if (widget->data.active_row_id != 0) {
-						widget->data.active_row_id = 0;
-						widget->events.on_list_change_index = true;
+					if (widget_io->data.active_row_id != 0) {
+						widget_io->data.active_row_id = 0;
+						widget_io->events.on_list_change_index = true;
 					}
 				}
 			}
 
-			if (    widget->data.as_row_data.count
-				AND widget->data.active_row_id < widget->data.as_row_data.count - 1
+			if (    widget_io->data.as_row_data.count
+				AND widget_io->data.active_row_id < widget_io->data.as_row_data.count - 1
 			) {
 				if (keyboard->down[VK_DOWN]) {
-					++widget->data.active_row_id;
-					widget->events.on_list_change_index = true;
+					++widget_io->data.active_row_id;
+					widget_io->events.on_list_change_index = true;
 				}
 
 				if (keyboard->down[VK_END]) {
-					widget->data.active_row_id = widget->data.as_row_data.count - 1;
-					widget->events.on_list_change_index = true;
+					widget_io->data.active_row_id = widget_io->data.as_row_data.count - 1;
+					widget_io->events.on_list_change_index = true;
 				}
 			}
 		}
 
-		if (Text_UpdateInput(&widget->text, keyboard)) {
-			Widget_Cursor_RestartBlinking(widget);
+		if (Text_UpdateInput(&widget_io->text, keyboard)) {
+			Widget_Cursor_RestartBlinking(widget_io);
 		}
     }
 
-    if (prev_active_row != widget->data.active_row_id AND is_scrollable_list) {
+    if (prev_active_row != widget_io->data.active_row_id AND is_scrollable_list) {
 		Rect rect_active_row;
-        Widget_CalcActiveRowRect(widget, &rect_active_row);
+        Widget_CalcActiveRowRect(widget_io, &rect_active_row);
 
 		if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
-			if (widget->data.scroll_type == WIDGET_SCROLL_ITEM) {
-				if (widget->data.active_row_id < prev_active_row) {
-					widget->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
+			if (widget_io->data.scroll_type == WIDGET_SCROLL_ITEM) {
+				if (widget_io->data.active_row_id < prev_active_row) {
+					widget_io->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
 				}
 				else {
-					widget->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
-					widget->text.data.rect_content.y += (rect_widget->h - rect_active_row.h);
+					widget_io->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
+					widget_io->text.data.rect_content.y += (rect_widget->h - rect_active_row.h);
 				}
 			}
-			else if (widget->data.scroll_type == WIDGET_SCROLL_BLOCK) {
+			else if (widget_io->data.scroll_type == WIDGET_SCROLL_BLOCK) {
 				if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
-					if (widget->data.active_row_id < prev_active_row) {
-						widget->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
-						widget->text.data.rect_content.y += (rect_widget->h - rect_active_row.h);
+					if (widget_io->data.active_row_id < prev_active_row) {
+						widget_io->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
+						widget_io->text.data.rect_content.y += (rect_widget->h - rect_active_row.h);
 					}
 					else {
-						widget->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
+						widget_io->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
 					}
 				}
 			}
@@ -9140,28 +9208,28 @@ Widget_UpdateInput(
 			}
 		}
 
-		Rect_Clamp(&widget->rect_content, *rect_widget);
+		Rect_ClampY(&widget_io->rect_content, *rect_widget);
     }
 }
 
 instant void
 Widget_GetSelectedRowStatic(
 	Widget *widget,
-	String *s_row_data
+	String *s_row_data_out
 ) {
 	Assert(widget);
-	Assert(s_row_data);
+	Assert(s_row_data_out);
 	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
 
 	if (!widget->data.as_row_data.count) {
-		*s_row_data = {};
+		String_Clear(s_row_data_out);
 		return;
 	}
 
 	String *ts_row_data = &ARRAY_IT(widget->data.as_row_data, widget->data.active_row_id);
 
-	String_Clear(s_row_data);
-	String_Append(s_row_data, ts_row_data->value, ts_row_data->length);
+	String_Clear(s_row_data_out);
+	String_Append(s_row_data_out, ts_row_data->value, ts_row_data->length);
 }
 
 instant String
@@ -9171,7 +9239,7 @@ Widget_GetSelectedRow(
 	Assert(widget);
 	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
 
-	String s_result;
+	String s_result = {};
 
 	if (!widget->data.as_row_data.count) {
 		return s_result;
@@ -9196,84 +9264,87 @@ Widget_GetSelectedRowID(
 
 instant void
 Widget_Update(
-	Array<Widget *> *ap_widgets,
+	Array<Widget *> *ap_widgets_io,
 	Keyboard *keyboard
 ) {
-	Assert(ap_widgets);
+	Assert(ap_widgets_io);
 	Assert(keyboard);
 
-	FOR_ARRAY(*ap_widgets, it_widget) {
-		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+	FOR_ARRAY(*ap_widgets_io, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets_io, it_widget);
 		Widget_Update(t_widget);
 	}
 
-	FOR_ARRAY(*ap_widgets, it_widget) {
-		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+	FOR_ARRAY(*ap_widgets_io, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets_io, it_widget);
 		Widget_UpdateInput(t_widget);
 	}
 
-	Widget_UpdateFocus(ap_widgets, keyboard->pressing[VK_SHIFT]);
+	Widget_UpdateFocus(ap_widgets_io, keyboard->pressing[VK_SHIFT]);
 }
 
 instant void
 Widget_ClearRows(
-	Widget *widget
+	Widget *widget_out
 ) {
-	Assert(widget);
+	Assert(widget_out);
 
-	Array_Clear(&widget->data.as_row_data);
+	Array_Clear(&widget_out->data.as_row_data);
 }
 
 instant void
 Layout_Add(
-	Layout *layout,
+	Layout *layout_io,
 	Widget *widget
 ) {
-	Assert(layout);
+	Assert(layout_io);
 	Assert(widget);
 
 	Layout_Block *current_block = 0;
-	Layout_GetLastBlock(layout, &current_block);
+	Layout_GetLastBlock(layout_io, &current_block);
 
 	Array_Add(&current_block->ap_layout_data, &widget->layout_data);
 }
 
 instant void
 Widget_LoadDirectoryList(
-	Widget *widget,
+	Widget *widget_io,
 	String *s_directory,
-	Array<Directory_Entry> *a_entries_rtn,
+	Array<Directory_Entry> *a_entries_out,
 	bool show_full_path = false
 ) {
-	Assert(widget);
-	Assert(widget->type == WIDGET_LISTBOX);
+	Assert(widget_io);
+	Assert(widget_io->type == WIDGET_LISTBOX);
 	Assert(s_directory);
 
 	/// in case the directory string came from the to be destroyed directory entries
 	static String ts_directory;
 	String_Append(&ts_directory, s_directory->value, s_directory->length);
 
-	FOR_ARRAY(*a_entries_rtn, it) {
-		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_rtn, it);
+	FOR_ARRAY(*a_entries_out, it) {
+		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_out, it);
 		String_Destroy(&t_entry->s_name);
 	}
 
-	Array_ClearContainer(a_entries_rtn);
+	Array_ClearContainer(a_entries_out);
 
-	widget->data.active_row_id = 0;
+	widget_io->data.active_row_id = 0;
 
 	/// remove "\" from directroy path (f.e. C:\) for consistency
 	if (String_EndWith(&ts_directory, "\\")) {
 		String_Remove(&ts_directory, ts_directory.length - 1, ts_directory.length);
 	}
 
-	File_ReadDirectory(a_entries_rtn, ts_directory.value, 0, ts_directory.length, true, 0, DIR_LIST_ONLY_DIR);
-	File_ReadDirectory(a_entries_rtn, ts_directory.value, 0, ts_directory.length, true, 0, DIR_LIST_ONLY_FILES);
+	/// will still include path into dir array, even if it is not rendering,
+	/// so the path does not have to concatonate the find the targeted file,
+	/// which is more practical, than simply knowing the filename
+	File_ReadDirectory(a_entries_out, ts_directory.value, 0, ts_directory.length, true, 0, DIR_LIST_ONLY_DIR);
+	File_ReadDirectory(a_entries_out, ts_directory.value, 0, ts_directory.length, true, 0, DIR_LIST_ONLY_FILES);
 
-	Widget_ClearRows(widget);
+	Widget_ClearRows(widget_io);
 
-	FOR_ARRAY(*a_entries_rtn, it) {
-		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_rtn, it);
+	FOR_ARRAY(*a_entries_out, it) {
+		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_out, it);
 
 		String ts_entry_name = t_entry->s_name;
 
@@ -9288,7 +9359,7 @@ Widget_LoadDirectoryList(
 			ts_entry_name.length -= 1;
 		}
 
-		Widget_AddRow(widget, ts_entry_name.value, ts_entry_name.length);
+		Widget_AddRow(widget_io, ts_entry_name.value, ts_entry_name.length);
 	}
 
 	String_Clear(&ts_directory);
@@ -9497,23 +9568,23 @@ Widget_CreateSpreader(
 
 instant void
 Widget_UpdateInputNumberPicker(
-	Widget *widget_parent,
+	Widget *widget_parent_io,
 	u64 sub_index
 ) {
-	Assert(widget_parent);
+	Assert(widget_parent_io);
 
-	Widget *widget = &ARRAY_IT(widget_parent->a_subwidgets, sub_index);
+	Widget *widget = &ARRAY_IT(widget_parent_io->a_subwidgets, sub_index);
 
 	Widget_UpdateInput(widget);
 
-	Widget *tw_label = &ARRAY_IT(widget_parent->a_subwidgets, 0);
+	Widget *tw_label = &ARRAY_IT(widget_parent_io->a_subwidgets, 0);
 
 	/// based on subwidget array index
 	switch (sub_index) {
 		case 1:
 		case 2: {
 			if (widget->events.on_trigger) {
-				Widget_Slide *t_slide = &widget_parent->slide;
+				Widget_Slide *t_slide = &widget_parent_io->slide;
 
 				t_slide->value = ToInt(&tw_label->text.s_data);
 
@@ -9541,27 +9612,27 @@ Widget_UpdateInputNumberPicker(
 
 instant void
 Widget_RedrawNumberPickerButton(
-	Widget *widget
+	Widget *widget_io
 ) {
-	Assert(widget);
+	Assert(widget_io);
 
-	Vertex *t_vertex = &widget->vertex_rect;
-	Rect    rect_box =  widget->layout_data.settings.rect;
+	Vertex *t_vertex = &widget_io->vertex_rect;
+	Rect    rect_box =  widget_io->layout_data.settings.rect;
 
-	if (!t_vertex->array_id) Vertex_CreateStatic(t_vertex);
+	if (!t_vertex->array_id) Vertex_Create(t_vertex);
 	else                     Vertex_ClearAttributes(t_vertex);
 
-	if (widget->data.has_focus)
-		Vertex_AddRect32(t_vertex, rect_box, widget->data.color_outline_selected);
+	if (widget_io->data.has_focus)
+		Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_outline_selected);
 	else
-		Vertex_AddRect32(t_vertex, rect_box, widget->data.color_outline);
+		Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_outline);
 
 	Rect_Resize(&rect_box, -2);
 	Vertex_AddRect32(t_vertex, rect_box, {1, 1, 1, 1});
 
-	widget->text.data.rect = widget->layout_data.settings.rect;
-	widget->text.data.rect.x += 1;
-	widget->text.data.rect.h -= 3;
+	widget_io->text.data.rect = widget_io->layout_data.settings.rect;
+	widget_io->text.data.rect.x += 1;
+	widget_io->text.data.rect.h -= 3;
 }
 
 instant Widget
@@ -9653,17 +9724,17 @@ Widget_CreateTextBox(
 
 instant void
 Widget_UpdateInputComboBox(
-	Widget *widget_parent,
+	Widget *widget_parent_io,
 	u64 sub_index
 ) {
-	Assert(widget_parent);
+	Assert(widget_parent_io);
 
-	Widget *widget = &ARRAY_IT(widget_parent->a_subwidgets, sub_index);
+	Widget *widget = &ARRAY_IT(widget_parent_io->a_subwidgets, sub_index);
 	Widget_UpdateInput(widget);
 
-	Widget *twg_label  = &ARRAY_IT(widget_parent->a_subwidgets, 0);
-	Widget *twg_button = &ARRAY_IT(widget_parent->a_subwidgets, 1);
-	Widget *twg_list   = &ARRAY_IT(widget_parent->a_subwidgets, 2);
+	Widget *twg_label  = &ARRAY_IT(widget_parent_io->a_subwidgets, 0);
+	Widget *twg_button = &ARRAY_IT(widget_parent_io->a_subwidgets, 1);
+	Widget *twg_list   = &ARRAY_IT(widget_parent_io->a_subwidgets, 2);
 
 	Assert(twg_list->window);
 
@@ -9683,11 +9754,11 @@ Widget_UpdateInputComboBox(
 		bool update_label = false;
 
 		if (twg_list->data.has_focus) {
-			if (widget_parent->type_select == WIDGET_SELECT_ON_INDEX_CHANGE) {
+			if (widget_parent_io->type_select == WIDGET_SELECT_ON_INDEX_CHANGE) {
 				update_label = true;
 			}
 
-			if (    widget_parent->type_select == WIDGET_SELECT_ON_RETURN
+			if (    widget_parent_io->type_select == WIDGET_SELECT_ON_RETURN
 				AND keyboard->up[VK_RETURN]
 			) {
 				update_label = true;
