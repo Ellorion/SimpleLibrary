@@ -1055,8 +1055,7 @@ Rect_GetAspect(
 	float aspect_src = (float) width_src /  height_src;
     float aspect_dst = (float)*width_dst / *height_dst;
 
-	if (0) {}
-    else if (aspect_dst > aspect_src) {
+	if (aspect_dst > aspect_src) {
 		float ratio = (aspect_dst / aspect_src);
 		float offset = *width_dst / ratio;
 
@@ -1066,7 +1065,8 @@ Rect_GetAspect(
 
 		*width_dst = floor(offset);
     }
-    else if (aspect_dst < aspect_src) {
+    else
+	if (aspect_dst < aspect_src) {
 		float ratio = (aspect_src / aspect_dst);
 		float offset = *height_dst / ratio;
 
@@ -2311,7 +2311,8 @@ String_Insert(
 			String_Remove(s_data_io, index_start + length, index_start);
 		}
 	}
-	else if (c_data == '\r' OR c_data == '\n') {
+	else
+	if (c_data == '\r' OR c_data == '\n') {
 		length = 1;
 		String_Insert(s_data_io, index_start, "\n", length);
 	}
@@ -2676,7 +2677,8 @@ Array_SplitRef(
 				s_element->value  -= len_delim;
 				s_element->length += len_delim;
 			}
-			else if (type == DELIMITER_ADD_BACK) {
+			else
+			if (type == DELIMITER_ADD_BACK) {
 				s_element->length += len_delim;
 			}
 		}
@@ -2804,7 +2806,8 @@ String_SplitWordsStatic(
 		if (as_lines_mac.count == 0) {
 			Array_Destroy(&as_lines_mac);
 		}
-		else if (as_lines_mac.count == 2) {
+		else
+		if (as_lines_mac.count == 2) {
 			String *ts_last_line = &ARRAY_IT(as_lines_mac, 1);
 
 			/// s_data.value could end with '\r\n' with only one line
@@ -3413,10 +3416,10 @@ File_HasChanged(
 	FILETIME prevWriteTime = *lwt;
 	GetFileTime(file_watcher->file, 0, 0, lwt);
 
-	if (0) {}
-	else if (lwt->dwHighDateTime != prevWriteTime.dwHighDateTime)
+	if (lwt->dwHighDateTime != prevWriteTime.dwHighDateTime)
 		has_changed = true;
-	else if (lwt->dwLowDateTime  != prevWriteTime.dwLowDateTime )
+	else
+	if (lwt->dwLowDateTime  != prevWriteTime.dwLowDateTime )
 		has_changed = true;
 
 	return has_changed;
@@ -6922,9 +6925,10 @@ Text_AddLines(
 			u64 x_align_offset = 0;
 
 			if (width_max > t_text_line->width_pixel) {
-				if (     text->data.align_x == TEXT_ALIGN_X_MIDDLE)
+				if (text->data.align_x == TEXT_ALIGN_X_MIDDLE)
 					x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
-				else if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
+				else
+				if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
 					x_align_offset = (width_max - t_text_line->width_pixel);
 			}
 
@@ -6997,9 +7001,10 @@ Text_Update(
 		if (text_io->data.rect.h) {
 			s32 pad_height = text_io->data.rect_padding.y + text_io->data.rect_padding.h;
 
-			if (     text_io->data.align_y == TEXT_ALIGN_Y_CENTER)
+			if (text_io->data.align_y == TEXT_ALIGN_Y_CENTER)
 				text_io->data.rect_content.y = (text_io->data.rect.h - pad_height - text_height) >> 1;
-			else if (text_io->data.align_y == TEXT_ALIGN_Y_BOTTOM)
+			else
+			if (text_io->data.align_y == TEXT_ALIGN_Y_BOTTOM)
 				text_io->data.rect_content.y = (text_io->data.rect.h - pad_height - text_height);
 		}
 
@@ -7043,7 +7048,7 @@ Text_Cursor_FindIndex(
 	Rect_AddPadding(&rect, text->data.rect_padding);
 
 	point.x -= text->data.rect_content.x;
-	point.y += text->data.rect_content.y;
+	point.y -= text->data.rect_content.y;
 
 	u64 width_max = rect.w;
 
@@ -7075,9 +7080,10 @@ Text_Cursor_FindIndex(
 		u64 x_align_offset = 0;
 
 		if (width_max > text_line->width_pixel) {
-			if (     text->data.align_x == TEXT_ALIGN_X_MIDDLE)
+			if (text->data.align_x == TEXT_ALIGN_X_MIDDLE)
 				x_align_offset = (width_max - text_line->width_pixel) >> 1;
-			else if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
+			else
+			if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
 				x_align_offset = (width_max - text_line->width_pixel);
 		}
 
@@ -7119,7 +7125,8 @@ Text_Cursor_FindIndex(
 					return cursor_index;
 				}
 			}
-			else if (Rect_IsIntersectingBorderless(&point, &rect_position_it)) {
+			else
+			if (Rect_IsIntersectingBorderless(&point, &rect_position_it)) {
 				found_index = true;
 				return cursor_index;
 			}
@@ -7160,8 +7167,6 @@ Text_Cursor_Flush(
 		text_io->cursor.index_select_start = text_io->cursor.index_select_end;
 }
 
-///@TODO: text scrolling x-axis backwards puts prev. char at the end
-///       and not the start of the visible line
 instant void
 Text_Cursor_Update(
     Text *text_io
@@ -7236,9 +7241,10 @@ Text_Cursor_Update(
 		u64 x_align_offset = 0;
 
 		if (width_max > text_line->width_pixel) {
-			if (     text_io->data.align_x == TEXT_ALIGN_X_MIDDLE)
+			if (text_io->data.align_x == TEXT_ALIGN_X_MIDDLE)
 				x_align_offset = (width_max - text_line->width_pixel) >> 1;
-			else if (text_io->data.align_x == TEXT_ALIGN_X_RIGHT)
+			else
+			if (text_io->data.align_x == TEXT_ALIGN_X_RIGHT)
 				x_align_offset = (width_max - text_line->width_pixel);
 		}
 
@@ -7260,7 +7266,7 @@ Text_Cursor_Update(
 			if (cursor->index_select_start == cursor_index AND !found_start)
 				found_start = true;
 
-			if (cursor->index_select_end == cursor_index AND !found_end) {
+			if (cursor->index_select_end   == cursor_index AND !found_end) {
 				switch (cursor->move_type) {
 					case CURSOR_MOVE_X: {
 						found_end = true;
@@ -7270,7 +7276,8 @@ Text_Cursor_Update(
 						if (cursor->move_index_y == 0) {
 							found_end = true;
 						}
-						else if (cursor->move_index_y > 0) {
+						else
+						if (cursor->move_index_y > 0) {
 							Point pt_line = {
 								rect_position_it.x,
 								rect_position_it.y + Font_GetLineHeight(text_io->font)
@@ -7279,22 +7286,22 @@ Text_Cursor_Update(
 							if (!cursor->is_selecting)
 								found_start = false;
 
-							/// 162
 							cursor->index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
 
 							Text_Cursor_Flush(text_io);
 						}
 						else {
-							float y_line_prev_pos = rect_position_it.y - Font_GetLineHeight(text_io->font);
+							float y_line_prev_pos = rect_position_it.y;
+							y_line_prev_pos -= text_io->data.rect_content.y;
+							y_line_prev_pos -= Font_GetLineHeight(text_io->font);
 
 							/// do not try to go before the first line
 							if (y_line_prev_pos >= rect.y) {
 								Point pt_line = {
 									rect_position_it.x,
-									rect_position_it.y - Font_GetLineHeight(text_io->font)
+									y_line_prev_pos
 								};
 
-								/// 54
 								cursor->index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
 
 								Text_Cursor_Flush(text_io);
@@ -7312,7 +7319,8 @@ Text_Cursor_Update(
 						if (cursor->move_index_x == 0) {
 							found_end = true;
 						}
-						else if (cursor->move_index_x > 0) {
+						else
+						if (cursor->move_index_x > 0) {
 							cursor->index_select_end -= it_data;
 							cursor->index_select_end += text_line->s_data.length;
 							cursor->index_select_end -= 1;
@@ -7364,19 +7372,49 @@ Text_Cursor_Update(
 					Rect rect_cursor = rect_position_it;
 
 					float *x_offset = &text_io->data.rect_content.x;
+					float *y_offset = &text_io->data.rect_content.y;
 
 					float cursor_pos_x        = rect_cursor.x - *x_offset;
 					float cursor_offset_pos_x = rect_cursor.x;
 
-					bool is_past_right_border = (cursor_offset_pos_x + rect_cursor.w > rect.x + rect.w);
-					bool is_past_left_border  = (cursor_offset_pos_x < rect.x);
+					float cursor_pos_y        = rect_cursor.y - *y_offset;
+					float cursor_offset_pos_y = rect_cursor.y;
+
+					bool is_past_right_border  = (cursor_offset_pos_x + rect_cursor.w > rect.x + rect.w);
+					bool is_past_left_border   = (cursor_offset_pos_x < rect.x);
+
+					bool is_past_top_border    = (cursor_offset_pos_y < rect.y);
+					bool is_past_bottom_border = (cursor_offset_pos_y + rect_cursor.h > rect.y + rect.h);
+
+					if (is_past_top_border OR is_past_bottom_border) {
+						*x_offset = 0;
+
+						if (is_past_top_border) {
+							*y_offset = rect.y - cursor_pos_y;
+						}
+						else
+						if (is_past_bottom_border) {
+							*y_offset = (rect.y + rect.h) - (cursor_pos_y + rect_cursor.h);
+						}
+
+						Text_Cursor_Flush(text_io);
+						Text_Update(text_io);
+						return;
+					}
 
 					if (is_past_right_border OR is_past_left_border) {
+						/// skip to see which chars are coming in either direction
+						u32 skip_space_mul_x = codepoint_space.advance * 4;
+
 						if (is_past_left_border) {
-							*x_offset = 0;
+							*x_offset = rect.x - cursor_pos_x + skip_space_mul_x;
+
+							if (*x_offset > 0)
+								*x_offset = 0;
 						}
-						else if (is_past_right_border) {
-							*x_offset  = (rect.x + rect.w) - (cursor_pos_x + rect_cursor.w);
+						else
+						if (is_past_right_border) {
+							*x_offset = (rect.x + rect.w) - (cursor_pos_x + rect_cursor.w) - skip_space_mul_x;
 						}
 
 						Text_Cursor_Flush(text_io);
@@ -7805,7 +7843,8 @@ Layout_ArrangeBlockX(
 				--widget_count_auto;
 			}
 		}
-		else if (!t_data->settings.auto_width) {
+		else
+		if (!t_data->settings.auto_width) {
 			width_remaining -= rect->w;
 			--widget_count_auto;
 		}
@@ -7943,7 +7982,8 @@ Layout_ArrangeBlockY(
 				--widget_count_auto;
 			}
 		}
-		else if (!t_data->settings.auto_height) {
+		else
+		if (!t_data->settings.auto_height) {
 			height_remaining -= rect->h;
 			--widget_count_auto;
 		}
@@ -8040,10 +8080,10 @@ Layout_Arrange(
 	FOR_ARRAY(layout_io->a_blocks, it) {
 		Layout_Block *t_block = &ARRAY_IT(layout_io->a_blocks, it);
 
-		if (0) {}
-		else if (t_block->type == LAYOUT_TYPE_X)
+		if (t_block->type == LAYOUT_TYPE_X)
 			Layout_ArrangeBlockX(layout_io, t_block);
-		else if (t_block->type == LAYOUT_TYPE_Y)
+		else
+		if (t_block->type == LAYOUT_TYPE_Y)
 			Layout_ArrangeBlockY(layout_io, t_block);
 	}
 }
@@ -9191,7 +9231,8 @@ Widget_UpdateInput(
 					widget_io->text.data.rect_content.y += (rect_widget->h - rect_active_row.h);
 				}
 			}
-			else if (widget_io->data.scroll_type == WIDGET_SCROLL_BLOCK) {
+			else
+			if (widget_io->data.scroll_type == WIDGET_SCROLL_BLOCK) {
 				if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
 					if (widget_io->data.active_row_id < prev_active_row) {
 						widget_io->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
@@ -9588,12 +9629,12 @@ Widget_UpdateInputNumberPicker(
 
 				t_slide->value = ToInt(&tw_label->text.s_data);
 
-				if (0) {}
-				else if (sub_index == 1) {
+				if (sub_index == 1) {
 					if (t_slide->value - t_slide->step >= t_slide->start)
 						t_slide->value -= t_slide->step;
 				}
-				else if (sub_index == 2) {
+				else
+				if (sub_index == 2) {
 					if (t_slide->value + t_slide->step <= t_slide->end)
 						t_slide->value += t_slide->step;
 				}
