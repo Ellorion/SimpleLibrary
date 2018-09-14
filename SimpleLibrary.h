@@ -6621,6 +6621,7 @@ enum TEXT_ALIGN_Y_TYPE {
 };
 
 enum CURSOR_MOVE_TYPE {
+	CURSOR_MOVE_NONE,
 	CURSOR_MOVE_X,
 	CURSOR_MOVE_Y,
 	CURSOR_MOVE_LINE_BORDER,
@@ -6632,7 +6633,7 @@ struct Text_Line {
 };
 
 struct Text_Cursor {
-	CURSOR_MOVE_TYPE move_type = CURSOR_MOVE_X;
+	CURSOR_MOVE_TYPE move_type = CURSOR_MOVE_NONE;
 	s64 move_index_x = 0;
 	s64 move_index_y = 0;
 
@@ -7064,6 +7065,8 @@ Text_Cursor_FindIndex(
 	Text_Cursor *cursor = &text->cursor;
 
 	Rect rect = text->data.rect;
+
+	Rect_AddPadding(&rect, text->data.rect_margin);
 	Rect_AddPadding(&rect, text->data.rect_padding);
 
 	Codepoint codepoint_space;
@@ -7193,6 +7196,19 @@ Text_Cursor_Flush(
 }
 
 instant void
+Text_Cursor_FlushFull(
+	Text *text_io
+) {
+	Assert(text_io);
+
+	text_io->cursor.move_type = CURSOR_MOVE_NONE;
+	Text_Cursor_Flush(text_io);
+}
+
+///@TODO: text-selection does not highlight prev.
+///       selected sections, when also using the
+///       mouse wheel
+instant void
 Text_Cursor_Update(
     Text *text_io
 ) {
@@ -7213,6 +7229,8 @@ Text_Cursor_Update(
 	Text_Cursor *cursor = &text_io->cursor;
 
 	Rect rect = text_io->data.rect;
+
+	Rect_AddPadding(&rect, text_io->data.rect_margin);
 	Rect_AddPadding(&rect, text_io->data.rect_padding);
 
 	Codepoint codepoint_space;
@@ -7296,6 +7314,7 @@ Text_Cursor_Update(
 
 			if (cursor->index_select_end   == cursor_index AND !found_end) {
 				switch (cursor->move_type) {
+					case CURSOR_MOVE_NONE:
 					case CURSOR_MOVE_X: {
 						found_end = true;
 					} break;
@@ -7319,33 +7338,16 @@ Text_Cursor_Update(
 							Text_Cursor_Flush(text_io);
 						}
 						else {
-							float y_line_prev_pos = rect_position_it.y;
-							y_line_prev_pos -= text_io->data.rect_content.y;
-							y_line_prev_pos -= Font_GetLineHeight(text_io->font);
+							Point pt_line = {
+								rect_position_it.x,
+								rect_position_it.y - Font_GetLineHeight(text_io->font)
+							};
 
-							LOG_DEBUG(1)
+							cursor->index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
 
-							/// do not try to go before the first line
-							if (y_line_prev_pos >= rect.y) {
-								LOG_DEBUG(2)
+							Text_Cursor_Flush(text_io);
 
-								Point pt_line = {
-									rect_position_it.x,
-									y_line_prev_pos
-								};
-
-								cursor->index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
-
-								LOG_DEBUG("target: " << cursor->index_select_end << " - idx: " << cursor_index)
-
-								Text_Cursor_Flush(text_io);
-
-								return Text_Cursor_Update(text_io);
-							}
-							else {
-								Text_Cursor_Flush(text_io);
-								found_end = true;
-							}
+							return Text_Cursor_Update(text_io);
 						}
 					} break;
 
@@ -7408,19 +7410,17 @@ Text_Cursor_Update(
 					float *x_offset = &text_io->data.rect_content.x;
 					float *y_offset = &text_io->data.rect_content.y;
 
-					float cursor_pos_x        = rect_cursor.x - *x_offset;
-					float cursor_offset_pos_x = rect_cursor.x;
+					/// exclude offsets
+					float cursor_pos_x         = rect_cursor.x - *x_offset;
+					float cursor_pos_y         = rect_cursor.y - *y_offset;
 
-					float cursor_pos_y        = rect_cursor.y - *y_offset;
-					float cursor_offset_pos_y = rect_cursor.y;
+					bool is_past_right_border  = (rect_cursor.x + rect_cursor.w > rect.x + rect.w);
+					bool is_past_left_border   = (rect_cursor.x < rect.x);
 
-					bool is_past_right_border  = (cursor_offset_pos_x + rect_cursor.w > rect.x + rect.w);
-					bool is_past_left_border   = (cursor_offset_pos_x < rect.x);
+					bool is_past_top_border    = (rect_cursor.y < rect.y);
+					bool is_past_bottom_border = (rect_cursor.y + rect_cursor.h > rect.y + rect.h);
 
-					bool is_past_top_border    = (cursor_offset_pos_y < rect.y);
-					bool is_past_bottom_border = (cursor_offset_pos_y + rect_cursor.h > rect.y + rect.h);
-
-					if (is_past_top_border OR is_past_bottom_border) {
+					if (cursor->move_type == CURSOR_MOVE_Y AND (is_past_top_border OR is_past_bottom_border)) {
 						*x_offset = 0;
 
 						if (is_past_top_border) {
@@ -7436,7 +7436,7 @@ Text_Cursor_Update(
 						return;
 					}
 
-					if (is_past_right_border OR is_past_left_border) {
+					if (cursor->move_type == CURSOR_MOVE_X AND (is_past_right_border OR is_past_left_border)) {
 						/// skip to see which chars are coming in either direction
 						u32 skip_space_mul_x = codepoint_space.advance * 4;
 
@@ -7507,7 +7507,7 @@ Text_Cursor_Update(
 		cursor->index_select_end = cursor_index - 1;
 	}
 
-	Text_Cursor_Flush(text_io);
+	Text_Cursor_FlushFull(text_io);
 }
 
 ///@TODO: clipboard support(?)
@@ -7526,6 +7526,8 @@ Text_UpdateInput(
 	s8 offset_index_y = 0;
 
 	CURSOR_MOVE_TYPE *move_type = &text_io->cursor.move_type;
+
+	*move_type = CURSOR_MOVE_NONE;
 
 	if (keyboard->down[VK_LEFT])  { offset_index_x = -1;
 									*move_type = CURSOR_MOVE_X; }
