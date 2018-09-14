@@ -3077,27 +3077,26 @@ CPU_GetFeatures() {
 	return (cpu_features);
 }
 
-///@TODO: clear possible existing buffer before adding
-instant void
-CPU_GetFeatures(
-	Array<const char *> *a_features_out
+instant Array<const char *>
+CPU_GetFeaturesName(
 ) {
-	Assert(a_features_out);
-	Assert(a_features_out->count == 0);
+	Array<const char *> a_features_out;
 
 	CPU_Features cpu_features = CPU_GetFeatures();
 
-	if (cpu_features.mmx)     Array_Add(a_features_out, "MMX");
-	if (cpu_features.mmx_ext) Array_Add(a_features_out, "MMX Ext");
+	if (cpu_features.mmx)     Array_Add(&a_features_out, "MMX");
+	if (cpu_features.mmx_ext) Array_Add(&a_features_out, "MMX Ext");
 
-	if (cpu_features.sse)     Array_Add(a_features_out, "SSE");
-	if (cpu_features.sse2)    Array_Add(a_features_out, "SSE2");
-	if (cpu_features.sse3)    Array_Add(a_features_out, "SSE3");
-	if (cpu_features.sse4_1)  Array_Add(a_features_out, "SSE4.1");
-	if (cpu_features.sse4_2)  Array_Add(a_features_out, "SSE4.2");
+	if (cpu_features.sse)     Array_Add(&a_features_out, "SSE");
+	if (cpu_features.sse2)    Array_Add(&a_features_out, "SSE2");
+	if (cpu_features.sse3)    Array_Add(&a_features_out, "SSE3");
+	if (cpu_features.sse4_1)  Array_Add(&a_features_out, "SSE4.1");
+	if (cpu_features.sse4_2)  Array_Add(&a_features_out, "SSE4.2");
 
-	if (cpu_features._3dnow)     Array_Add(a_features_out, "3DNow");
-	if (cpu_features._3dnow_ext) Array_Add(a_features_out, "3DNow Ext");
+	if (cpu_features._3dnow)     Array_Add(&a_features_out, "3DNow");
+	if (cpu_features._3dnow_ext) Array_Add(&a_features_out, "3DNow Ext");
+
+	return a_features_out;
 }
 
 /// ::: Files
@@ -5356,7 +5355,6 @@ operator == (
 	return String_IsEqual(b1.name, b2.name);
 }
 
-///@Hint: texture has to be bound first
 instant void
 Vertex_GetTextureSize(
 	Vertex *vertex,
@@ -5366,10 +5364,23 @@ Vertex_GetTextureSize(
 	Assert(vertex);
 	Assert(vertex->texture.ID);
 
-	///@TODO: check if there is a way to find out of a texture is already bound
+	GLint id_bound = 0;
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &id_bound);
+
+	bool need_bind_restoring = false;
+
+	if (vertex->texture.ID != (u32)id_bound) {
+		glBindTexture(GL_TEXTURE_2D, vertex->texture.ID);
+		need_bind_restoring = true;
+	}
 
     if (width_out)  glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH , width_out);
 	if (height_out) glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, height_out);
+
+	if (need_bind_restoring) {
+		glBindTexture(GL_TEXTURE_2D, id_bound);
+		LOG_DEBUG("Waring [Performance]: temporary bindings will decrease performance.");
+	}
 }
 
 inline void
@@ -6654,9 +6665,7 @@ struct Text_Data {
 
 	bool is_editable      = false;
 	bool use_word_wrap    = true;
-
-	///@TODO: implement me
-	bool ignore_linebreak = false;
+	bool strip_linebreak = false;
 };
 
 struct Text {
@@ -6819,6 +6828,7 @@ Text_BuildLines(
 			AND !line_start
 			AND rect.w > 0
 			AND (rect_line_current.x - rect.x) + advance_word > rect.w
+			AND !text->data.strip_linebreak
 		) {
 			Array_AddEmpty(a_text_line_out, &t_text_line);
 			line_start = true;
@@ -6832,6 +6842,8 @@ Text_BuildLines(
 		if (   String_EndWith(ts_word, "\n")
 			OR String_EndWith(ts_word, "\r")
 		) {
+			Assert(!text->data.strip_linebreak);
+
 			t_text_line->width_pixel += advance_word;
 			String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
 
@@ -6995,8 +7007,15 @@ Text_Update(
 
 	/// redraw text_io
 	if (Text_HasChanged(text_io, false)) {
+		if (text_io->data.strip_linebreak) {
+			String_Replace(&text_io->s_data, "\n", "");
+			String_Replace(&text_io->s_data, "\r", "");
+		}
+
 		String_SplitWordsStatic(&text_io->s_data, &text_io->as_words);
-		s32 text_height = Text_BuildLines(text_io, &text_io->as_words, &text_io->a_text_lines, true);
+
+		/// put " " at the end of the text, when it's editable for text cursor
+		s32 text_height = Text_BuildLines(text_io, &text_io->as_words, &text_io->a_text_lines, text_io->data.is_editable);
 
 		if (text_io->data.rect.h) {
 			s32 pad_height = text_io->data.rect_padding.y + text_io->data.rect_padding.h;
@@ -7047,12 +7066,11 @@ Text_Cursor_FindIndex(
 	Rect rect = text->data.rect;
 	Rect_AddPadding(&rect, text->data.rect_padding);
 
-	point.x -= text->data.rect_content.x;
-	point.y -= text->data.rect_content.y;
+	Codepoint codepoint_space;
+	Codepoint_GetData(text->font, ' ', &codepoint_space);
 
 	u64 width_max = rect.w;
 
-	/// for text x-alignment
 	if (!width_max) {
 		FOR_ARRAY(text->a_text_lines, it_line) {
 			Text_Line *t_text_line = &ARRAY_IT(text->a_text_lines, it_line);
@@ -7061,9 +7079,11 @@ Text_Cursor_FindIndex(
 		}
 	}
 
+	float x_pos_start = rect.x + text->data.rect_content.x;
+
 	Rect rect_position_it = {
-		rect.x,
-		rect.y,
+		x_pos_start,
+		rect.y + text->data.rect_content.y,
 		0,
 		Font_GetLineHeight(text->font)
 	};
@@ -7077,6 +7097,8 @@ Text_Cursor_FindIndex(
 	FOR(text->a_text_lines.count, it_line) {
 		Text_Line *text_line = &ARRAY_IT(text->a_text_lines, it_line);
 
+		/// horizontal alignment
+		/// -------------------------------------------------------------------
 		u64 x_align_offset = 0;
 
 		if (width_max > text_line->width_pixel) {
@@ -7088,17 +7110,21 @@ Text_Cursor_FindIndex(
 		}
 
 		rect_position_it.x += x_align_offset;
+		/// -------------------------------------------------------------------
+
+		bool is_newline_char_once = false;
 
 		FOR(text_line->s_data.length, it_data) {
 			bool is_last_char = (it_data + 1 == text_line->s_data.length);
 
 			Codepoint codepoint;
 
-			s8 ch = text_line->s_data.value[it_data];
+			s8 character = text_line->s_data.value[it_data];
 
-			Codepoint_GetData(text->font, ch, &codepoint);
+			Codepoint_GetData(text->font, character, &codepoint);
+			rect_position_it.w = codepoint.advance;
 
-			bool is_newline_char = (ch == '\r' OR ch == '\n');
+			bool is_newline_char = (character == '\r' OR character == '\n');
 
 			/// makes end-of-line chars selectable
 			/// by including the remaining width of a line in the last char
@@ -7117,7 +7143,7 @@ Text_Cursor_FindIndex(
 				Rect rect_position_start = rect_position_it;
 
 				float pos_w = rect_position_start.x + rect_position_start.w;
-				rect_position_start.x = rect.x;
+				rect_position_start.x = x_pos_start;
 				rect_position_start.w = pos_w - rect_position_start.x;
 
 				if (Rect_IsIntersectingBorderless(&point, &rect_position_start)) {
@@ -7141,13 +7167,12 @@ Text_Cursor_FindIndex(
 			}
 		}
 
-		rect_position_it.x  = rect.x;
+		rect_position_it.x  = x_pos_start;
 		rect_position_it.y += rect_position_it.h;
 	}
 
-	if (!found_index AND cursor_index) {
+	if (!found_index AND cursor_index)
 		--cursor_index;
-	}
 
 	return cursor_index;
 }
@@ -7172,6 +7197,9 @@ Text_Cursor_Update(
     Text *text_io
 ) {
 	Assert(text_io);
+
+	if (!text_io->data.is_editable)
+		return;
 
 	/// cursor selection -> end = current
 	bool found_start    = false;
@@ -7295,14 +7323,20 @@ Text_Cursor_Update(
 							y_line_prev_pos -= text_io->data.rect_content.y;
 							y_line_prev_pos -= Font_GetLineHeight(text_io->font);
 
+							LOG_DEBUG(1)
+
 							/// do not try to go before the first line
 							if (y_line_prev_pos >= rect.y) {
+								LOG_DEBUG(2)
+
 								Point pt_line = {
 									rect_position_it.x,
 									y_line_prev_pos
 								};
 
 								cursor->index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
+
+								LOG_DEBUG("target: " << cursor->index_select_end << " - idx: " << cursor_index)
 
 								Text_Cursor_Flush(text_io);
 
@@ -7512,6 +7546,11 @@ Text_UpdateInput(
 
 	if (keyboard->is_key_sym AND keyboard->is_down) {
 		char key = LOWORD(keyboard->key_sym);
+
+		bool is_linebreak = (key == '\n' OR key == '\r');
+
+		if (text_io->data.strip_linebreak AND is_linebreak)
+			return false;
 
 		*move_type = CURSOR_MOVE_X;
 
