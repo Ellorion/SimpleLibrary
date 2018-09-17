@@ -1,7 +1,6 @@
 #pragma once
 
-#define DEBUG_UPDATE_ALWAYS 0
-#define DEBUG 1
+#define DEBUG_EVENT_STATUS 0
 
 /// Compiler: g++ (6.3.0) (mingw)
 ///
@@ -775,7 +774,7 @@
 //		Window_ReadMessage(msg, running, window);
 //		OpenGL_AdjustScaleViewport(window);
 //
-//		Layout_Resize(&layout, {0, 0, window->width, window->height});
+//		Layout_Rearrange(&layout, {0, 0, window->width, window->height});
 //		Layout_Arrange(&layout);
 //
 //		/// hold shift-key to get reverse tab order
@@ -911,9 +910,17 @@ _AssertMessage(
 	debug_break();
 }
 
-/// ::: Debug
+/// ::: Messages
 /// ===========================================================================
+#if DEBUG_EVENT_STATUS
+	#define LOG_STATUS(_text) std::cout << _text;
+#else
+	#define LOG_STATUS(_text)
+#endif
+
 #define LOG_DEBUG(text) std::cout << /*"Frame [" << global_frame_count << "]: " <<*/ text << std::endl;
+
+#define LOG_WARNING(_text) std::cout << "Warning: " << _text << std::endl;
 
 /// ::: Utilities
 /// ===========================================================================
@@ -1019,6 +1026,19 @@ operator == (
 	if (data1.first == data2.first){
 		return true;
 	}
+
+	return false;
+}
+
+bool
+operator != (
+	Rect r1,
+	Rect r2
+) {
+	if (r1.x != r2.x)  return true;
+	if (r1.y != r2.y)  return true;
+	if (r1.w != r2.w)  return true;
+	if (r1.h != r2.h)  return true;
 
 	return false;
 }
@@ -2457,6 +2477,8 @@ struct Array {
 	u64   size     = 0;
 	u64   limit    = 0; /// in bytes
 	u64   count    = 0;
+
+	/// for string chunks for now
 	bool  by_reference = false;
 };
 
@@ -6664,8 +6686,8 @@ struct Text_Data {
 
 	Rect rect_content = {}; /// offset x/y, max width / height
 
-	bool is_editable      = false;
-	bool use_word_wrap    = true;
+	bool is_editable     = false;
+	bool use_word_wrap   = true;
 	bool strip_linebreak = false;
 };
 
@@ -6677,7 +6699,7 @@ struct Text {
 	Text_Data data;
 	Text_Data data_prev;
 
-	Text_Cursor   cursor;
+	Text_Cursor cursor;
 
 	Array<String>    as_words;
 	Array<Text_Line> a_text_lines;
@@ -6729,12 +6751,10 @@ Text_HasChanged(
 
 	has_changed |= !Memory_Compare(&text_io->data, &text_io->data_prev, sizeof(text_io->data));
 
-	#if !DEBUG_UPDATE_ALWAYS
 	if (has_changed AND update_changes) {
 		text_io->data_prev = text_io->data;
 		text_io->s_data.changed = false;
 	}
-	#endif
 
 	return has_changed;
 }
@@ -7001,13 +7021,29 @@ Text_RenderLines(
 instant void Text_Cursor_Update(Text *text);
 
 instant bool
+Text_Exists(
+	Text *text
+) {
+	Assert(text);
+
+	return (text->s_data.length > 0);
+}
+
+instant bool
 Text_Update(
 	Text *text_io
 ) {
 	Assert(text_io);
 
-	/// redraw text_io
+	if (!text_io->font) {
+		if (text_io->s_data.length)
+			LOG_WARNING("No font is set, while text is available.");
+
+		return false;
+	}
+
 	if (Text_HasChanged(text_io, false)) {
+		/// redraw text
 		if (text_io->data.strip_linebreak) {
 			String_Replace(&text_io->s_data, "\n", "");
 			String_Replace(&text_io->s_data, "\r", "");
@@ -7505,6 +7541,8 @@ Text_Cursor_Update(
 	/// upper boundary index check
 	if (!found_end_once) {
 		cursor->index_select_end = cursor_index - 1;
+		Text_Cursor_Flush(text_io);
+		return Text_Cursor_Update(text_io);
 	}
 
 	Text_Cursor_FlushFull(text_io);
@@ -7737,7 +7775,11 @@ struct Layout {
 	Rect rect_remaining;
 	bool fill_last_block = true;
 	u32  padding = LAYOUT_PADDING;
-	Array<Layout_Block> a_blocks;
+	Array<Layout_Block> a_layout_blocks;
+
+	/// convenience
+	/// -> to be rendered items for this layout
+	Array<Widget *> ap_widgets;
 };
 
 instant void
@@ -7747,12 +7789,24 @@ Layout_Create(
 	bool fill_last_block
 ) {
 	Assert(layout_out);
-	AssertMessage(!layout_out->a_blocks.count, "Layout already created. Layout_Resize might help.");
+	AssertMessage(!layout_out->a_layout_blocks.count, "Layout already created.");
 
 	*layout_out = {};
 	layout_out->rect_full       = rect_area;
 	layout_out->rect_remaining  = rect_area;
 	layout_out->fill_last_block = fill_last_block;
+}
+
+instant void
+Layout_Create(
+	Layout *layout_out,
+	Window *window,
+	bool fill_last_block
+) {
+	Assert(window);
+	Assert(layout_out);
+
+	Layout_Create(layout_out, {0, 0, window->width, window->height}, fill_last_block);
 }
 
 instant void
@@ -7781,7 +7835,7 @@ Layout_CreateBlock(
 
 	Layout_Block *t_block;
 
-	Array_AddEmpty(&layout_io->a_blocks, &t_block);
+	Array_AddEmpty(&layout_io->a_layout_blocks, &t_block);
 
 	t_block->type = type;
 	t_block->dock = dock_direction;
@@ -7798,13 +7852,17 @@ Layout_GetLastBlock(
 ) {
 	Assert(layout);
 
-	if (!layout->a_blocks.count) {
+	if (!layout->a_layout_blocks.count) {
 		AssertMessage(false, "GetLastBlock: No blocks in layout found.");
 		return;
 	}
 
-	*layout_block_out = &ARRAY_IT(layout->a_blocks, layout->a_blocks.count - 1);
+	*layout_block_out = &ARRAY_IT(layout->a_layout_blocks, layout->a_layout_blocks.count - 1);
 }
+
+struct Widget;
+
+instant void Layout_Add(Layout *layout_io, Widget *widget);
 
 instant void
 Layout_Add(
@@ -7819,11 +7877,6 @@ Layout_Add(
 
 	Array_Add(&current_block->ap_layout_data, layout_data);
 }
-
-struct Widget;
-
-instant void
-Layout_Add(Layout *layout_io, Widget *widget);
 
 /// layout_block->expand_index (widgets):
 ///  0-max: expand widget with matching index
@@ -8118,8 +8171,8 @@ Layout_Arrange(
 												(s32)layout_io->padding,
                                                 (s32)layout_io->padding});
 
-	FOR_ARRAY(layout_io->a_blocks, it) {
-		Layout_Block *t_block = &ARRAY_IT(layout_io->a_blocks, it);
+	FOR_ARRAY(layout_io->a_layout_blocks, it) {
+		Layout_Block *t_block = &ARRAY_IT(layout_io->a_layout_blocks, it);
 
 		if (t_block->type == LAYOUT_TYPE_X)
 			Layout_ArrangeBlockX(layout_io, t_block);
@@ -8131,16 +8184,39 @@ Layout_Arrange(
 
 
 instant void
-Layout_Resize(
+Layout_Rearrange(
 	Layout *layout_io,
-	Rect rect_resize,
-	bool auto_arrange = true
+	Rect rect_resize
 ) {
+	Assert(layout_io);
+
+	/// always arrange, since the elements in the layout
+	/// could have changed while the layout size has
+	/// stayed the same
 	layout_io->rect_full       = rect_resize;
 	layout_io->rect_remaining  = rect_resize;
 
-	if (auto_arrange)
-		Layout_Arrange(layout_io);
+	Layout_Arrange(layout_io);
+}
+
+instant void
+Layout_Rearrange(
+	Layout *layout_io,
+	Window *window
+) {
+	Assert(layout_io);
+	Assert(window);
+
+	Layout_Rearrange(layout_io, {0, 0, window->width, window->height});
+}
+
+instant Array<Widget *>
+Layout_GetWidgetArray(
+	Layout *layout
+) {
+	Assert(layout);
+
+	return layout->ap_widgets;
 }
 
 /// ::: Widget
@@ -8161,7 +8237,14 @@ enum WIDGET_TYPE {
 	WIDGET_SPREADER,
 	WIDGET_NUMBERPICKER,
 	WIDGET_TEXTBOX,
-	WIDGET_COMBOBOX
+	WIDGET_COMBOBOX,
+	WIDGET_PROGRESSBAR
+};
+
+enum WIDGET_COMBOBOX_TYPE {
+	WIDGET_COMBOBOX_TEXT = 0,
+	WIDGET_COMBOBOX_TOGGLE,
+	WIDGET_COMBOBOX_LIST
 };
 
 enum WIDGET_SCROLL_TYPE {
@@ -8186,7 +8269,7 @@ struct Widget_Data {
 	Color32 color_outline          = {0.8f, 0.8f, 0.8f, 1.0f}; //{0.0f, 0.0f, 1.0f, 1.0f};
 	Color32 color_outline_selected = {1.0f, 0.0f, 0.0f, 1.0f};
 	Color32 color_outline_inactive = {0.5f, 0.5f, 1.0f, 1.0f};
-	Color32 color_progress         = {0.2f, 0.2f, 0.6f, 1.0f};
+	Color32 color_progress         = {0.5f, 0.5f, 1.0f, 1.0f};
 
 	u64  active_row_id = 0;
 
@@ -8197,21 +8280,23 @@ struct Widget_Data {
 	bool is_scrollable = false;
 	bool is_checkable  = false;
 
+	bool can_popout_focus_change = false;
+
 	/// overlay
 	bool is_floating   = false; /// is overlay
 	bool is_popout     = false; /// visible overlay
 
 	bool has_focus  = false;
-	bool has_scrollable_list = false;
 	bool is_checked = false;
 
+	bool has_scrollable_list = false;
 	WIDGET_SCROLL_TYPE scroll_type = WIDGET_SCROLL_ITEM;
 
 	Array<String> as_row_data;
 };
 
 struct Widget {
-	Window *window;
+	Window *window = 0;
 
 	/// Defining Properties
 	WIDGET_TYPE type;
@@ -8249,13 +8334,33 @@ struct Widget {
 
 	/// Layout / Size
 	Layout_Data layout_data;
-	Rect rect_content;
+	Rect rect_content; /// x,y = offsets
 
 	/// Content
 	Array<Widget> a_subwidgets;
 };
 
 Widget *Widget::widget_focus_current = 0;
+
+instant Widget *
+Widget_GetSubWidget(
+	Widget *widget,
+	u64 index
+) {
+	Assert(widget);
+
+	if (!widget->a_subwidgets.count) {
+		LOG_WARNING("Subwidget does not exists. Default back to main widget.");
+		return widget;
+	}
+
+	if (index >= widget->a_subwidgets.count) {
+		LOG_WARNING("Subwidget index out of bounds. Default back to main widget.");
+		return widget;
+	}
+
+	return &ARRAY_IT(widget->a_subwidgets, index);
+}
 
 instant void
 Widget_Cursor_RestartBlinking(
@@ -8396,12 +8501,10 @@ Widget_HasChanged(
 		}
 	}
 
-	#if !DEBUG_UPDATE_ALWAYS
 	if (update_changes) {
 		widget_io->layout_data.settings_prev = widget_io->layout_data.settings;
 		widget_io->data_prev = widget_io->data;
 	}
-	#endif
 
 /// @NOTE: do NOT check subwidgets, since they will be added to the render list anyway
 ///        and might mess up the update checking
@@ -8459,6 +8562,9 @@ Widget_SetFocus(
 
     widget_io->data.has_focus = true;
     widget_io->widget_focus_current = widget_io;
+
+    if (widget_io->data.is_floating)
+		widget_io->data.is_popout = true;
 }
 
 instant bool
@@ -8469,9 +8575,21 @@ Widget_Update(
 
 	bool result = false;
 
+	LOG_STATUS("Update: " << widget_io->type << " ");
+
+	if (widget_io->a_subwidgets.count) {
+		LOG_STATUS("- Subwidgets: " << widget_io->a_subwidgets.count << " ");
+		LOG_STATUS("\n----------------------\n");
+	}
+
 	FOR_ARRAY(widget_io->a_subwidgets, it) {
 		Widget *t_widget = &ARRAY_IT(widget_io->a_subwidgets, it);
 		Widget_Update(t_widget);
+	}
+
+	if (widget_io->a_subwidgets.count) {
+		LOG_STATUS("----------------------");
+		LOG_STATUS("\nResume update: " << widget_io->type << " ");
 	}
 
 	widget_io->events.on_text_change = Text_Update(&widget_io->text);
@@ -8507,15 +8625,19 @@ Widget_Update(
 		widget_io->data.is_popout = !widget_io->data.is_popout;
 		widget_io->trigger_popout = false;
 
-		if (widget_io->data.is_popout) {
-			Widget_SetFocus(widget_io);
-		}
-		else {
-			if (widget_io->widget_focus_on_popout) {
-				Widget_SetFocus(widget_io->widget_focus_on_popout);
+		if (widget_io->data.can_popout_focus_change) {
+			if (widget_io->data.is_popout) {
+				Widget_SetFocus(widget_io);
+			}
+			else {
+				if (widget_io->widget_focus_on_popout) {
+					Widget_SetFocus(widget_io->widget_focus_on_popout);
+				}
 			}
 		}
 	}
+
+	LOG_STATUS("completed\n");
 
 	return result;
 }
@@ -8558,12 +8680,10 @@ Widget_Redraw(
 
 			rect_layout->h = 0;
 
-			bool is_popped_out = false;
-
+			/// calc. max. visible widget height to be used for the layout system,
+			/// in order to get preper horizontal alignment
             FOR_ARRAY(widget_io->a_subwidgets, it) {
 				Widget *t_widget = &ARRAY_IT(widget_io->a_subwidgets, it);
-				///@Remove?
-//				Widget_Update(t_widget);
 
                 if (!t_widget->data.is_floating) {
 					rect_layout->h = MAX(rect_layout->h, t_widget->layout_data.settings.rect.h);
@@ -8575,20 +8695,17 @@ Widget_Redraw(
 			layout.padding = 0;
 
 			Layout_Block *t_layout_block = 0;
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0, &t_layout_block);
-			t_layout_block->padding = 0;
-
-			/// label
-			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 0));
-			/// button
-			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 1));
-
 
 			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0, &t_layout_block);
 			t_layout_block->padding = 0;
 
-			/// list
-			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 2));
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_TEXT));
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_TOGGLE));
+
+			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0, &t_layout_block);
+			t_layout_block->padding = 0;
+
+			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_LIST));
 
 			Layout_Arrange(&layout);
 		} break;
@@ -8682,6 +8799,21 @@ Widget_Redraw(
 			/// button down
 			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 2));
 			Layout_Arrange(&layout);
+		} break;
+
+		case WIDGET_PROGRESSBAR: {
+			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
+
+			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
+
+			Rect rect_progress = rect_box;
+			Widget_Slide *slide = &widget_io->slide;
+
+			float percent = (float)slide->value / (slide->end - slide->start);
+
+			rect_progress.w *= percent;
+
+			Vertex_AddRect32(t_vertex, rect_progress, widget_io->data.color_progress);
 		} break;
 
 		default:
@@ -9181,9 +9313,7 @@ Widget_UpdateInput(
 			}
 
 			/// focus change
-//			if (widget_io->data.has_focus != got_focus) {
-				widget_io->data.has_focus = got_focus;
-//			}
+			widget_io->data.has_focus = got_focus;
 		}
 
 		/// right mouse button
@@ -9197,6 +9327,7 @@ Widget_UpdateInput(
 
 		/// widget_io + list scrolling
 		if (is_hovering AND (is_scrollable_list OR is_scrollable)) {
+			///@TODO: scroll horizontally when pressing shift + wheel
 			widget_io->text.data.rect_content.y += mouse->wheel;
 
 			if (is_scrollable_list) {
@@ -9386,6 +9517,8 @@ Layout_Add(
 	Layout_GetLastBlock(layout_io, &current_block);
 
 	Array_Add(&current_block->ap_layout_data, &widget->layout_data);
+
+	Array_Add(&layout_io->ap_widgets, widget);
 }
 
 instant void
@@ -9561,9 +9694,9 @@ Widget_CreateListbox(
 	t_widget.data.is_focusable = true;
 	t_widget.data.has_scrollable_list = true;
 
-	t_widget.text.data.rect  = rect_box;
+	t_widget.text.data.rect = rect_box;
 
-	t_widget.text.font  = font;
+	t_widget.text.font = font;
 
 	return t_widget;
 }
@@ -9638,7 +9771,7 @@ Widget_CreateSpreader(
 ) {
 	Assert(window);
 
-	Widget t_widget;
+	Widget t_widget = {};
 
     t_widget.type = WIDGET_SPREADER;
     t_widget.window = window;
@@ -9724,7 +9857,7 @@ Widget_CreateNumberPicker(
 	Rect rect_box,
 	Widget_Slide slide
 ) {
-	Widget t_widget;
+	Widget t_widget = {};
 
     t_widget.type = WIDGET_NUMBERPICKER;
     t_widget.window = window;
@@ -9770,7 +9903,7 @@ Widget_CreateTextBox(
 	Font *font,
 	Rect rect_box
 ) {
-	Widget t_widget;
+	Widget t_widget = {};
 
 	t_widget.text.data.rect_padding = {1, 1, 1, 1};
 
@@ -9804,6 +9937,38 @@ Widget_CreateTextBox(
 	return t_widget;
 }
 
+instant bool
+Widget_HasFocusInclSub(
+	Widget *widget
+) {
+	Assert(widget);
+
+	bool result = false;
+
+	result = widget->data.has_focus;
+	if (result)  return result;
+
+	FOR_ARRAY(widget->a_subwidgets, it_sub) {
+		Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
+
+		result = Widget_HasFocusInclSub(t_subwidget);
+		if (result)  return result;
+	}
+
+	return result;
+}
+
+instant void
+Widget_TriggerPopout(
+	Widget *widget,
+	bool can_focus_change
+) {
+	Assert(widget);
+
+	widget->data.can_popout_focus_change = can_focus_change;
+	widget->trigger_popout = true;
+}
+
 instant void
 Widget_UpdateInputComboBox(
 	Widget *widget_parent_io,
@@ -9814,80 +9979,94 @@ Widget_UpdateInputComboBox(
 	Widget *widget = &ARRAY_IT(widget_parent_io->a_subwidgets, sub_index);
 	Widget_UpdateInput(widget);
 
-	Widget *twg_label  = &ARRAY_IT(widget_parent_io->a_subwidgets, 0);
-	Widget *twg_button = &ARRAY_IT(widget_parent_io->a_subwidgets, 1);
-	Widget *twg_list   = &ARRAY_IT(widget_parent_io->a_subwidgets, 2);
+	Widget *wg_text   = &ARRAY_IT(widget_parent_io->a_subwidgets, WIDGET_COMBOBOX_TEXT);
+	Widget *wg_button = &ARRAY_IT(widget_parent_io->a_subwidgets, WIDGET_COMBOBOX_TOGGLE);
+	Widget *wg_list   = &ARRAY_IT(widget_parent_io->a_subwidgets, WIDGET_COMBOBOX_LIST);
 
-	Assert(twg_list->window);
+	Assert(wg_list->window);
 
-	Keyboard *keyboard = twg_list->window->keyboard;
-	Mouse    *mouse    = twg_list->window->mouse;
+	Keyboard *keyboard = wg_list->window->keyboard;
+	Mouse    *mouse    = wg_list->window->mouse;
 
-	/// show list
-	if (sub_index == 0 OR sub_index == 1) {
-        if (widget->events.on_trigger) {
-			twg_list->trigger_popout = true;
-        }
-	}
+	switch (sub_index) {
+		case WIDGET_COMBOBOX_TEXT: {
+			if (widget->data.has_focus) {
+				if (keyboard->up[VK_F4]) {
+					Widget_TriggerPopout(wg_list, false);
+				}
 
-	/// set label to list entry
-	if (sub_index == 2) {
-		bool hide_popout = false;
-		bool update_label = false;
-
-		if (twg_list->data.has_focus) {
-			if (widget_parent_io->type_select == WIDGET_SELECT_ON_INDEX_CHANGE) {
-				update_label = true;
+				if (keyboard->up[VK_DOWN]) {
+					Widget_SetFocus(wg_list);
+				}
 			}
+		} break;
 
-			if (    widget_parent_io->type_select == WIDGET_SELECT_ON_RETURN
-				AND keyboard->up[VK_RETURN]
-			) {
-				update_label = true;
-			}
-
-			if (keyboard->up[VK_RETURN]) {
-				hide_popout = true;
-
-				Keyboard_ResetKey(keyboard, VK_RETURN);
-			}
-
-			if (keyboard->up[VK_ESCAPE]) {
-				hide_popout = true;
-
-				Keyboard_ResetKey(keyboard, VK_ESCAPE);
-			}
-
+		case WIDGET_COMBOBOX_TOGGLE: {
 			if (widget->events.on_trigger) {
-				if (!twg_list->events.on_list_change_index) {
+				Widget_TriggerPopout(wg_list, true);
+			}
+		} break;
+
+		case WIDGET_COMBOBOX_LIST: {
+			bool hide_popout = false;
+			bool update_label = false;
+
+			if (wg_list->data.has_focus) {
+				if (widget_parent_io->type_select == WIDGET_SELECT_ON_INDEX_CHANGE) {
 					update_label = true;
+				}
+
+				if (    widget_parent_io->type_select == WIDGET_SELECT_ON_RETURN
+					AND keyboard->up[VK_RETURN]
+				) {
+					update_label = true;
+				}
+
+				if (keyboard->up[VK_RETURN]) {
+					hide_popout = true;
+
+					Keyboard_ResetKey(keyboard, VK_RETURN);
+				}
+
+				if (keyboard->up[VK_ESCAPE]) {
+					hide_popout = true;
+
+					Keyboard_ResetKey(keyboard, VK_ESCAPE);
+				}
+
+				if (widget->events.on_trigger) {
+					if (!wg_list->events.on_list_change_index) {
+						update_label = true;
+						hide_popout = true;
+					}
+				}
+
+				/// update label
+				if (update_label) {
+					static String s_row_data;
+					Widget_GetSelectedRowStatic(wg_list, &s_row_data);
+
+					if (!String_IsEqual(&wg_text->text.s_data, s_row_data.value, s_row_data.length)) {
+						String_Clear(&wg_text->text.s_data);
+						String_Append(&wg_text->text.s_data, s_row_data.value, s_row_data.length);
+						widget->events.on_text_change = true;
+					}
+				}
+			}
+			else {
+				if (!Widget_HasFocusInclSub(widget_parent_io)) {
 					hide_popout = true;
 				}
 			}
 
-			/// update label
-			if (update_label) {
-				static String s_row_data;
-				Widget_GetSelectedRowStatic(twg_list, &s_row_data);
+			if (hide_popout) {
+				if (wg_list->data.is_popout) {
+					widget->events.on_list_change_final = true;
 
-				if (!String_IsEqual(&twg_label->text.s_data, s_row_data.value, s_row_data.length)) {
-					String_Clear(&twg_label->text.s_data);
-					String_Append(&twg_label->text.s_data, s_row_data.value, s_row_data.length);
-					widget->events.on_text_change = true;
+					Widget_TriggerPopout(widget, true);
 				}
 			}
-		}
-		else {
-			hide_popout = true;
-		}
-
-		if (hide_popout) {
-			if (twg_list->data.is_popout) {
-				widget->events.on_list_change_final = true;
-
-				twg_list->trigger_popout = true;
-			}
-		}
+		} break;
 	}
 }
 
@@ -9898,7 +10077,7 @@ Widget_CreateComboBox(
 	Rect rect_box,
 	s32 combo_height
 ) {
-	Widget t_widget;
+	Widget t_widget = {};
 
 	if (!rect_box.w) {
 		rect_box.w = font->size;
@@ -9920,25 +10099,69 @@ Widget_CreateComboBox(
 	t_widget.layout_data.settings.auto_width = true;
 
 	Widget wg_text   = Widget_CreateTextBox(window, font, {});
-	Widget wg_button = Widget_CreateButton( window, font, {}, "X");
+	Widget wg_button = Widget_CreateButton( window, font, {}, "+");
 	Widget wg_list   = Widget_CreateListbox(window, font, {0, 0, 0, combo_height});
 
+	wg_text.UpdateCustomInputs   = Widget_UpdateInputComboBox;
 	wg_button.UpdateCustomInputs = Widget_UpdateInputComboBox;
 	wg_list.UpdateCustomInputs   = Widget_UpdateInputComboBox;
 
 	wg_list.data.is_floating = true;
+	wg_list.data.color_background = Color_MakeGrey(0.8f);
 
-	wg_text.text.data.rect_padding  = {2, 1, 2, 1};// {2, 2, 2, 2};
+	wg_text.text.data.rect_padding  = {2, 1, 2, 1};
+	wg_text.text.data.strip_linebreak = true;
 
 	wg_button.text.data.rect_margin  = {};
-	wg_button.text.data.rect_padding = {3, 0, 3, 0};
+	wg_button.text.data.rect_padding = {3, -1, 3, -1};
 	wg_button.data.border_size = 2;
 
-	                     Array_Add(&t_widget.a_subwidgets, wg_text);
-	Widget *twg_button = Array_Add(&t_widget.a_subwidgets, wg_button);
-	Widget *twg_list   = Array_Add(&t_widget.a_subwidgets, wg_list);
+	Widget *twg_text = Array_Add(&t_widget.a_subwidgets, wg_text);
+	Assert(t_widget.a_subwidgets.count - 1 == WIDGET_COMBOBOX_TEXT);
 
-	twg_list->widget_focus_on_popout = twg_button;
+	Widget *twg_button = Array_Add(&t_widget.a_subwidgets, wg_button);
+	Assert(t_widget.a_subwidgets.count - 1 == WIDGET_COMBOBOX_TOGGLE);
+
+	Widget *twg_list   = Array_Add(&t_widget.a_subwidgets, wg_list);
+	Assert(t_widget.a_subwidgets.count - 1 == WIDGET_COMBOBOX_LIST);
+
+	twg_list->widget_focus_on_popout = twg_text;
+
+	return t_widget;
+}
+
+instant Widget
+Widget_CreateProgressbar(
+	Window *window,
+	Font *font,
+	Rect rect_box,
+	Widget_Slide slide
+) {
+	Widget t_widget = {};
+
+	if (!rect_box.w) {
+		rect_box.w = font->size;
+		Widget_AddBorderSizes(&t_widget, &rect_box.w, 0);
+	}
+
+	if (!rect_box.h) {
+		rect_box.h = Font_GetLineHeight(font) + 2;
+		Widget_AddBorderSizes(&t_widget, 0, &rect_box.h);
+	}
+
+	t_widget.type         = WIDGET_PROGRESSBAR;
+	t_widget.rect_content = rect_box;
+	t_widget.window       = window;
+	t_widget.slide        = slide;
+
+	t_widget.data.is_focusable = false;
+
+	t_widget.text.font         = font;
+	t_widget.text.data.align_x = TEXT_ALIGN_X_MIDDLE;
+	t_widget.text.data.align_y = TEXT_ALIGN_Y_CENTER;
+
+	t_widget.layout_data.settings.rect = rect_box;
+	t_widget.layout_data.settings.auto_width = true;
 
 	return t_widget;
 }
