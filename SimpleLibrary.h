@@ -7473,11 +7473,14 @@ Text_Cursor_Update(
 							}
 
 							Text_Cursor_Flush(text_io);
+							cursor->move_type = CURSOR_MOVE_X;
 						}
 						else {
 							cursor->index_select_end -= it_data;
 
 							Text_Cursor_Flush(text_io);
+							cursor->move_type = CURSOR_MOVE_X;
+
 							return Text_Cursor_Update(text_io);
 						}
 					} break;
@@ -7616,6 +7619,8 @@ Text_Cursor_Update(
 ///@TODO: add support for '\t' input by locking widget
 ///       and preventing it to switch to another widget
 ///       unless another key is also pressed.
+///@TODO: pos / end key do not scroll x-axis
+///       when word-wrap is disabled and text overflows
 instant void
 Text_UpdateInput(
     Text *text_io,
