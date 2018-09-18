@@ -1253,6 +1253,18 @@ Clamp(
 }
 
 instant void
+Clamp(
+	u64 *value_io,
+	u64 min,
+	u64 max
+) {
+	Assert(value_io);
+
+	if (*value_io < min)  *value_io = min;
+	if (*value_io > max)  *value_io = max;
+}
+
+instant void
 Rect_ClampY(
 	Rect *rect_io,
 	Rect  rect_limit
@@ -1965,7 +1977,8 @@ String_CreateCBufferCopy(
 instant s64
 String_IndexOf(
 	String *s_data,
-	const char *key,
+	const char *c_key,
+	u64 c_length = 0,
 	s64 index_start = 0
 ) {
 	int result = -1;
@@ -1973,17 +1986,19 @@ String_IndexOf(
 	if (!s_data OR !s_data->length)
 		return result;
 
-	int length_key  = String_Length(key);
+	if (!c_length)
+		c_length  = String_Length(c_key);
 
-	if (length_key == 0)
+	if (c_length == 0)
 		return result;
 
 	u64 length_data = s_data->length;
 
-	if (index_start < 0) index_start = 0;
+	if (index_start < 0)
+		index_start = 0;
 
 	FOR_START(index_start, length_data, index) {
-		if (String_IsEqual(s_data->value + index, key, length_key)) {
+		if (String_IsEqual(s_data->value + index, c_key, c_length)) {
 			return index;
 		}
 	}
@@ -1994,7 +2009,8 @@ String_IndexOf(
 instant s64
 String_IndexOfRev(
 	String *s_data,
-	const char *key,
+	const char *c_key,
+	u64 c_length = 0,
 	s64 index_start = -1
 ) {
 	int result = -1;
@@ -2002,16 +2018,17 @@ String_IndexOfRev(
 	if (!s_data OR !s_data->length)
 		return result;
 
-	int len_key  = String_Length(key);
+	if (!c_length)
+		c_length  = String_Length(c_key);
 
-	if (len_key == 0)
+	if (c_length == 0)
 		return result;
 
 	if (index_start > (s64)s_data->length OR index_start < 0)
 		index_start = (s64)s_data->length;
 
 	for(s64 it = index_start; it >= 0; --it) {
-		if (String_IsEqual(s_data->value + it, key, len_key)) {
+		if (String_IsEqual(s_data->value + it, c_key, c_length)) {
 			return it;
 		}
 	}
@@ -2040,7 +2057,7 @@ String_Find(
 ) {
 	Assert(s_data);
 
-	s64 t_pos_found = String_IndexOf(s_data, find, pos_after_find);
+	s64 t_pos_found = String_IndexOf(s_data, find, 0, pos_after_find);
 
 	if (t_pos_found < 0) {
 		if (pos_found) *pos_found = t_pos_found;
@@ -2363,7 +2380,7 @@ String_Cut(
 		if (start < 0)
 			break;
 
-		end = String_IndexOf(s_data_io, c_end, start);
+		end = String_IndexOf(s_data_io, c_end, 0, start);
 
 		if (end > start)
 			String_Remove(s_data_io, start, end + len_end);
@@ -6024,16 +6041,19 @@ Keyboard_GetKeySym(
 	Assert(keyboard_io);
 	Assert(msg);
 
-	u16 ch = 0;
+	wchar_t ch = 0;
 	GetKeyboardState(keyboard_io->key_states);
 
 	keyboard_io->is_key_sym	= false;
-	keyboard_io->key_sym		= 0;
+	keyboard_io->key_sym    = 0;
 
-	if (ToAscii(msg->wParam,
-				MapVirtualKey(msg->wParam, 0),
-				keyboard_io->key_states, &ch, 0) > 0)
-	{
+	s32 result = ToUnicode(
+					msg->wParam,
+					MapVirtualKey(msg->wParam, 0),
+					keyboard_io->key_states, &ch, 1, 0
+				 );
+
+	if (result > 0) {
 		if (ch == VK_ESCAPE)  return;
 
 		keyboard_io->is_key_sym 	= true;
@@ -7545,25 +7565,32 @@ Text_Cursor_Update(
 		return Text_Cursor_Update(text_io);
 	}
 
-	Text_Cursor_FlushFull(text_io);
+ 	Text_Cursor_FlushFull(text_io);
 }
 
 ///@TODO: clipboard support(?)
-instant bool
+instant void
 Text_UpdateInput(
     Text *text_io,
-    Keyboard *keyboard
+    Keyboard *keyboard,
+    bool *text_changed_out = 0,
+    bool *cursor_changed_out = 0
 ) {
 	Assert(text_io);
 	Assert(keyboard);
 
+	if (text_changed_out)    *text_changed_out   = false;
+	if (cursor_changed_out)  *cursor_changed_out = false;
+
 	if (!text_io->data.is_editable)
-		return false;
+		return;
 
 	s8 offset_index_x = 0;
 	s8 offset_index_y = 0;
 
 	CURSOR_MOVE_TYPE *move_type = &text_io->cursor.move_type;
+
+	Text_Cursor *cursor = &text_io->cursor;
 
 	*move_type = CURSOR_MOVE_NONE;
 
@@ -7582,7 +7609,24 @@ Text_UpdateInput(
 	if (keyboard->down[VK_END])   { offset_index_x =  1;
 									*move_type = CURSOR_MOVE_LINE_BORDER; }
 
-	text_io->cursor.is_selecting = (keyboard->pressing[VK_SHIFT] AND !keyboard->is_key_sym);
+	cursor->is_selecting = (keyboard->pressing[VK_SHIFT] AND !keyboard->is_key_sym);
+
+	bool was_selecting = (cursor->index_select_start != cursor->index_select_end);
+
+	/// when selection turns off, seek selection start / end select position,
+	/// depending on the x-direction cursor movement
+	if (was_selecting AND !cursor->is_selecting AND offset_index_x != 0) {
+		if (offset_index_x < 0)
+			cursor->index_select_start = MIN(cursor->index_select_start, cursor->index_select_end);
+		else
+			cursor->index_select_start = MAX(cursor->index_select_start, cursor->index_select_end);
+
+		cursor->index_select_end = cursor->index_select_start;
+
+		offset_index_x = 0;
+
+		Text_Cursor_Update(text_io);
+	}
 
 	if (keyboard->is_key_sym AND keyboard->is_down) {
 		char key = LOWORD(keyboard->key_sym);
@@ -7590,25 +7634,39 @@ Text_UpdateInput(
 		bool is_linebreak = (key == '\n' OR key == '\r');
 
 		if (text_io->data.strip_linebreak AND is_linebreak)
-			return false;
+			return;
+
+		/// control + a
+		/// - select all text
+		if (key == 1) {
+			cursor->index_select_start = 0;
+			cursor->index_select_end = text_io->s_data.length;
+			cursor->is_selecting = true;
+
+			if (cursor_changed_out)  *cursor_changed_out = true;
+
+			Text_Cursor_Update(text_io);
+			return;
+		}
 
 		*move_type = CURSOR_MOVE_X;
 
 		bool was_selection_removed = false;
 
-		if (text_io->cursor.index_select_start != text_io->cursor.index_select_end) {
+		/// overwrite selected text
+		if (cursor->index_select_start != cursor->index_select_end) {
 			String_Remove(
 				&text_io->s_data,
-				text_io->cursor.index_select_start,
-				text_io->cursor.index_select_end
+				cursor->index_select_start,
+				cursor->index_select_end
 			);
 
 			/// cursor and selection bounds will start at the
 			/// beginning of the selection
-			if (text_io->cursor.index_select_end > text_io->cursor.index_select_start)
-				text_io->cursor.index_select_end   = text_io->cursor.index_select_start;
+			if (cursor->index_select_end > cursor->index_select_start)
+				cursor->index_select_end   = cursor->index_select_start;
 			else
-				text_io->cursor.index_select_start = text_io->cursor.index_select_end;
+				cursor->index_select_start = cursor->index_select_end;
 
 			was_selection_removed = true;
 		}
@@ -7619,35 +7677,28 @@ Text_UpdateInput(
 				 OR (    was_selection_removed
 					 AND key != '\b'))
 		) {
-			if (key == '\b') {
-				int a = 1;
-			}
-
-			text_io->cursor.move_index_x = String_Insert(
+			cursor->move_index_x = String_Insert(
 											&text_io->s_data,
-											text_io->cursor.index_select_end,
+											cursor->index_select_end,
 											key
 										);
 		}
-
-		Text_Update(text_io);
-
-		return true;
 	}
 
 	if (offset_index_x != 0 OR offset_index_y != 0) {
-		if (!text_io->cursor.is_selecting)
-			text_io->cursor.index_select_start = text_io->cursor.index_select_end;
+		if (!cursor->is_selecting)
+			cursor->index_select_start = cursor->index_select_end;
 
-		text_io->cursor.move_index_x += offset_index_x;
-		text_io->cursor.move_index_y += offset_index_y;
+		cursor->move_index_x += offset_index_x;
+		cursor->move_index_y += offset_index_y;
 
 		Text_Cursor_Update(text_io);
 
-		return true;
+		if (cursor_changed_out)  *cursor_changed_out = true;
 	}
 
-	return false;
+	/// string could have been appended, removed or cleared
+	if (text_changed_out)  *text_changed_out = text_io->s_data.changed;;
 }
 
 instant bool
@@ -7701,7 +7752,7 @@ Text_Render(
 	}
 
 	if (text_io->a_vertex_chars.count) {
-		/// redraw last computed text_io
+		/// redraw last computed text
 		ShaderSet_Use(text_io->shader_set, SHADER_PROG_TEXT);
 		Vertex_Render(text_io->shader_set, &text_io->a_vertex_chars);
 	}
@@ -7737,6 +7788,9 @@ Text_GetSize(
 #define LAYOUT_BLOCK_SPACING 2
 
 #define LAYOUT_PADDING 5
+
+///@TODO: minimizing window can mess up the layout when using auto-size
+///       label + checkbox next to each other
 
 enum LAYOUT_TYPE {
 	LAYOUT_TYPE_X,
@@ -8293,6 +8347,9 @@ struct Widget_Data {
 	WIDGET_SCROLL_TYPE scroll_type = WIDGET_SCROLL_ITEM;
 
 	Array<String> as_row_data;
+
+	String s_row_filter;
+	Array<String> a_filter_data;
 };
 
 struct Widget {
@@ -8592,7 +8649,13 @@ Widget_Update(
 		LOG_STATUS("\nResume update: " << widget_io->type << " ");
 	}
 
-	widget_io->events.on_text_change = Text_Update(&widget_io->text);
+	/// text needs to be processed at least once when no input in handled,
+	/// but do NOT do it for lists. lists take the list data and pass each row
+	/// through the text struct to generate text + positions.
+	/// using the update function here again, would invalidate that data,
+	/// since the data would definitely have changed
+	if (!Widget_IsListType(widget_io))
+		Text_Update(&widget_io->text);
 
 	if (widget_io->trigger_autosize){
 		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
@@ -8637,6 +8700,27 @@ Widget_Update(
 		}
 	}
 
+	if (widget_io->data.s_row_filter.changed) {
+		Array_Clear(&widget_io->data.a_filter_data);
+		widget_io->data.a_filter_data.by_reference = true;
+		widget_io->data.active_row_id = 0;
+
+		if (widget_io->data.s_row_filter.length) {
+			FOR_ARRAY(widget_io->data.as_row_data, it_row) {
+				String *ts_data = &ARRAY_IT(widget_io->data.as_row_data, it_row);
+
+				if (String_IndexOf(	ts_data,
+									widget_io->data.s_row_filter.value,
+									widget_io->data.s_row_filter.length) >= 0
+				) {
+					Array_Add(&widget_io->data.a_filter_data, *ts_data);
+				}
+			}
+		}
+
+		widget_io->data.s_row_filter.changed = false;
+	}
+
 	LOG_STATUS("completed\n");
 
 	return result;
@@ -8667,10 +8751,6 @@ Widget_Redraw(
 			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
 
 			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
-
-			if (Text_HasChanged(&widget_io->text, false)) {
-				Text_Cursor_Update(&widget_io->text);
-			}
 
 			Widget_Cursor_RestartBlinking(widget_io);
 		} break;
@@ -8831,6 +8911,24 @@ Widget_InvalidateBackground(
 	Widget_Redraw(widget_io);
 }
 
+instant void
+Widget_GetListArrayFiltered(
+	Widget *widget,
+	Array<String> **as_row_data_out
+) {
+	Assert(widget);
+	Assert(as_row_data_out);
+
+	Array<String> *as_target = &widget->data.as_row_data;
+
+	if (widget->data.s_row_filter.length) {
+		as_target = &widget->data.a_filter_data;
+		Clamp(&widget->data.active_row_id, 0, widget->data.a_filter_data.count - 1);
+	}
+
+	*as_row_data_out = as_target;
+}
+
 /// return an non-rendered overlay widget (if exists)
 instant Widget *
 Widget_Render(
@@ -8896,9 +8994,8 @@ Widget_Render(
 
 			Text_Clear(t_text);
 
-			/// x y w
 			t_text->data.rect = widget_io->layout_data.settings.rect;
-			Rect *rect_text        = &t_text->data.rect;
+			Rect *rect_text   = &t_text->data.rect;
 
 			s32 pad_left = 2;
 
@@ -8907,8 +9004,11 @@ Widget_Render(
 
 			widget_io->rect_content.h = 0;
 
-			FOR_ARRAY(widget_io->data.as_row_data, it_row) {
-				String *ts_data = &ARRAY_IT(widget_io->data.as_row_data, it_row);
+			Array<String> *as_target;
+			Widget_GetListArrayFiltered(widget_io, &as_target);
+
+			FOR_ARRAY(*as_target, it_row) {
+				String *ts_data = &ARRAY_IT(*as_target, it_row);
 
 				String_SplitWordsStatic(ts_data, &t_text->as_words);
 				rect_text->h = Text_BuildLines(t_text, &t_text->as_words, &t_text->a_text_lines, false);
@@ -9384,7 +9484,14 @@ Widget_UpdateInput(
 			}
 		}
 
-		if (Text_UpdateInput(&widget_io->text, keyboard)) {
+		bool has_text_changed;
+		bool has_cursor_changed;
+
+		Text_UpdateInput(&widget_io->text, keyboard, &has_text_changed, &has_cursor_changed);
+
+		widget_io->events.on_text_change = has_text_changed;
+
+		if (has_cursor_changed) {
 			Widget_Cursor_RestartBlinking(widget_io);
 		}
     }
@@ -9439,7 +9546,10 @@ Widget_GetSelectedRowStatic(
 		return;
 	}
 
-	String *ts_row_data = &ARRAY_IT(widget->data.as_row_data, widget->data.active_row_id);
+	Array<String> *as_target;
+	Widget_GetListArrayFiltered(widget, &as_target);
+
+	String *ts_row_data = &ARRAY_IT(*as_target, widget->data.active_row_id);
 
 	String_Clear(s_row_data_out);
 	String_Append(s_row_data_out, ts_row_data->value, ts_row_data->length);
@@ -9485,12 +9595,12 @@ Widget_Update(
 
 	FOR_ARRAY(*ap_widgets_io, it_widget) {
 		Widget *t_widget = ARRAY_IT(*ap_widgets_io, it_widget);
-		Widget_Update(t_widget);
+		Widget_UpdateInput(t_widget);
 	}
 
 	FOR_ARRAY(*ap_widgets_io, it_widget) {
 		Widget *t_widget = ARRAY_IT(*ap_widgets_io, it_widget);
-		Widget_UpdateInput(t_widget);
+		Widget_Update(t_widget);
 	}
 
 	Widget_UpdateFocus(ap_widgets_io, keyboard->pressing[VK_SHIFT]);
@@ -10041,7 +10151,6 @@ Widget_UpdateInputComboBox(
 					}
 				}
 
-				/// update label
 				if (update_label) {
 					static String s_row_data;
 					Widget_GetSelectedRowStatic(wg_list, &s_row_data);
@@ -10049,11 +10158,23 @@ Widget_UpdateInputComboBox(
 					if (!String_IsEqual(&wg_text->text.s_data, s_row_data.value, s_row_data.length)) {
 						String_Clear(&wg_text->text.s_data);
 						String_Append(&wg_text->text.s_data, s_row_data.value, s_row_data.length);
-						widget->events.on_text_change = true;
+						wg_text->events.on_text_change = true;
+
+						wg_text->text.cursor.index_select_end   = s_row_data.length;
+						wg_text->text.cursor.index_select_start = 0;
+
+						/// if this is not set, flushing cursor data after cursor was updated
+						/// will set both cursor indexes to the same value.
+						/// due to that, it won't be possible to check of something was prev.
+						/// selected, even if the selection is still visible (because flushing
+						/// is happening after selection process of done)
+						wg_text->text.cursor.is_selecting = true;
 					}
 				}
 			}
 			else {
+				/// so text can be typed into the combobox
+				/// while the list is visible
 				if (!Widget_HasFocusInclSub(widget_parent_io)) {
 					hide_popout = true;
 				}
