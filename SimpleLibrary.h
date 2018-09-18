@@ -6605,10 +6605,28 @@ Codepoint_GetAdvance(
 	return advance;
 }
 
+instant s32
+Codepoint_GetTabWidth(
+	float x,
+	s32 advance_space,
+	u32 tab_space_count = 4
+) {
+	s32 tab_width = (advance_space * (tab_space_count));
+
+	s32 tab_width_remaining = tab_width - (s32)x % tab_width;
+
+	/// extend max. tab width for compatability with other editors
+	if (tab_width_remaining < advance_space)
+		tab_width_remaining += tab_width;
+
+	return tab_width_remaining;
+}
 
 instant u64
 Codepoint_GetStringAdvance(
 	Font *font,
+	float x,
+	s32 advance_space,
 	String *s_data
 ) {
 	Assert(font);
@@ -6618,7 +6636,11 @@ Codepoint_GetStringAdvance(
 
 	FOR(s_data->length, it) {
 		char ch = s_data->value[it];
-		advance_word += Codepoint_GetAdvance(font, ch);
+
+		if (ch != '\t')
+			advance_word += Codepoint_GetAdvance(font, ch);
+		else
+			advance_word += Codepoint_GetTabWidth(x, advance_space);
 	}
 
 	return advance_word;
@@ -6856,7 +6878,12 @@ Text_BuildLines(
 
 		String *ts_word = &ARRAY_IT(*as_words, it_words);
 
-		u64 advance_word = Codepoint_GetStringAdvance(font, ts_word);
+		u64 advance_word = Codepoint_GetStringAdvance(
+								font,
+								rect_line_current.x - rect.x,
+								advance_space,
+								ts_word
+							);
 
 		if (!line_start) {
 			rect_line_current.x      += advance_space;
@@ -6921,6 +6948,8 @@ Text_BuildLines(
 	return height_max;
 }
 
+///@TODO: offsets as uniform and combine in shader,
+///       so scrolling does not have to reparse all the text
 instant void
 Text_AddLines(
 	Text *text,
@@ -6962,6 +6991,9 @@ Text_AddLines(
 
 	u64 it_index = 0;
 
+	Codepoint codepoint_space;
+	Codepoint_GetData(text->font, ' ', &codepoint_space);
+
 	FOR_ARRAY(*a_text_lines, it_line) {
 		Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
 
@@ -6973,6 +7005,14 @@ Text_AddLines(
 			s8 ch = t_text_line->s_data.value[it_data];
 
 			Codepoint_GetData(text->font, ch, &codepoint);
+
+			if (codepoint.codepoint == '\t') {
+				codepoint.advance = Codepoint_GetTabWidth(
+										rect_position.x - x_line_start,
+										codepoint_space.advance
+									);
+			}
+
 			Codepoint_GetPositionNext(&codepoint, &rect_position);
 
 			u64 x_align_offset = 0;
@@ -7361,6 +7401,10 @@ Text_Cursor_Update(
 			s8 character = text_line->s_data.value[it_data];
 
 			Codepoint_GetData(text_io->font, character, &codepoint);
+
+			if (codepoint.codepoint == '\t')
+				codepoint.advance = Codepoint_GetTabWidth(rect_position_it.x - x_pos_start, codepoint_space.advance);
+
 			rect_position_it.w = codepoint.advance;
 
 			bool is_newline_char = (character == '\r' OR character == '\n');
@@ -7569,6 +7613,9 @@ Text_Cursor_Update(
 }
 
 ///@TODO: clipboard support(?)
+///@TODO: add support for '\t' input by locking widget
+///       and preventing it to switch to another widget
+///       unless another key is also pressed.
 instant void
 Text_UpdateInput(
     Text *text_io,
@@ -7788,9 +7835,6 @@ Text_GetSize(
 #define LAYOUT_BLOCK_SPACING 2
 
 #define LAYOUT_PADDING 5
-
-///@TODO: minimizing window can mess up the layout when using auto-size
-///       label + checkbox next to each other
 
 enum LAYOUT_TYPE {
 	LAYOUT_TYPE_X,
@@ -8215,6 +8259,9 @@ Layout_Arrange(
 	Layout *layout_io
 ) {
 	Assert(layout_io);
+
+	if (!layout_io->rect_full.w)  return;
+	if (!layout_io->rect_full.h)  return;
 
 	layout_io->rect_remaining = layout_io->rect_full;
 
@@ -9427,7 +9474,7 @@ Widget_UpdateInput(
 
 		/// widget_io + list scrolling
 		if (is_hovering AND (is_scrollable_list OR is_scrollable)) {
-			///@TODO: scroll horizontally when pressing shift + wheel
+			///@TODO: scroll horizontally when pressing shift + wheel(?)
 			widget_io->text.data.rect_content.y += mouse->wheel;
 
 			if (is_scrollable_list) {
