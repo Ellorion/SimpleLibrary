@@ -1266,6 +1266,28 @@ Clamp(
 
 instant void
 Rect_ClampY(
+	float *y_io,
+	s32 height,
+	s32 max_height
+) {
+	Assert(y_io);
+
+	/// do not show negative space below the last visible
+	if (*y_io + height < max_height)
+		*y_io = max_height - height;
+
+	/// do not show negative space above the first visible
+	if (*y_io > 0)
+		*y_io = 0;
+
+	/// avoid scrolling, when all content is visible
+	if (height <= max_height)
+		*y_io = 0;
+}
+
+///@Obsolete
+instant void
+Rect_ClampY(
 	Rect *rect_io,
 	Rect  rect_limit
 ) {
@@ -1594,7 +1616,7 @@ Time_Measure(
 	LARGE_INTEGER largeCounter;
 	QueryPerformanceCounter(&largeCounter);
 
-	/// init timer_io
+	/// init timer
 	if (timer_io->hi_timer == 0) {
 		timer_io->hi_timer = largeCounter.QuadPart;
 		return 0.f;
@@ -1781,7 +1803,6 @@ To_String(
 	Assert(s_data_out);
 	Assert(c_data);
 
-//	*s_data_out = {};
 	String_Destroy(s_data_out);
 	String_Append(s_data_out, c_data, c_length);
 }
@@ -3939,7 +3960,6 @@ Window_UpdateAndResetInput(
 	SwapBuffers(window->hDC);
 
 	Mouse_Reset(window->mouse);
-//	Keyboard_ResetLastKey(window->keyboard);
 
 	Keyboard_Reset(window->keyboard, false);
 }
@@ -4657,6 +4677,8 @@ R"(
 	uniform float scale_x  = 1.0f;
 	uniform float scale_y  = 1.0f;
 
+	uniform float y_offset = 0.0f;
+
 	in vec2 vertex_position;
 	in vec3 text_color;
 
@@ -4689,7 +4711,7 @@ R"(
 	} o_Vertex;
 
 	void main() {
-		gl_Position = vec4(vertex_position, 0, 1);
+		gl_Position = vec4(vertex_position.x, vertex_position.y + y_offset, 0, 1);
 		o_Vertex.proj_matrix = proj_matrix;
 		o_Vertex.scale_matrix = scale_matrix;
 		o_Vertex.text_color  = text_color;
@@ -5753,8 +5775,7 @@ Rect_Render(
 
 /// ::: Mouse
 /// ===========================================================================
-#define MOUSE_WHEEL_GET_DELTA(value) GET_WHEEL_DELTA_WPARAM(value) / 120
-
+#define MOUSE_WHEEL_GET_DELTA(value) (GET_WHEEL_DELTA_WPARAM(value) / WHEEL_DELTA)
 #define MOUSE_BUTTON_COUNT 3
 
 struct Mouse {
@@ -5814,7 +5835,6 @@ Mouse_Reset(
 	mouse_out->wheel = 0;
 
 	FOR(MOUSE_BUTTON_COUNT, it) {
-//		mouse_out->double_click[it] = false;
 		mouse_out->down[it] = false;
 		mouse_out->up[it]   = false;
 	}
@@ -6719,7 +6739,7 @@ struct Text_Cursor {
 	s64 move_index_y = 0;
 
 	u64 index_select_start = 0;
-	u64 index_select_end   = 0; // also current cursor position
+	u64 index_select_end   = 0; /// also current cursor position
 	bool is_selecting = false;
 
 	Color32 color_cursor = {1.0f, 0.0f, 0.0f, 1.0f};
@@ -6743,7 +6763,9 @@ struct Text_Data {
 	TEXT_ALIGN_X_TYPE align_x = TEXT_ALIGN_X_LEFT;
 	TEXT_ALIGN_Y_TYPE align_y = TEXT_ALIGN_Y_TOP;
 
-	Rect rect_content = {}; /// offset x/y, max width / height
+	float offset_x = 0.0f;
+	s32 content_width  = 0;
+	s32 content_height = 0;
 
 	bool is_editable     = false;
 	bool use_word_wrap   = true;
@@ -6754,6 +6776,9 @@ struct Text {
 	ShaderSet *shader_set = 0;
 	Font *font = 0;
 	String s_data = {};
+
+	/// always update with shader uniform
+	float offset_y = 0.0f;
 
 	Text_Data data;
 	Text_Data data_prev;
@@ -6965,8 +6990,29 @@ Text_BuildLines(
 	return height_max;
 }
 
-///@TODO: offsets as uniform and combine in shader,
-///       so scrolling does not have to reparse all the text
+///@TODO: fix: when overflow without word-wrap, that line will not adjust
+instant u64
+Text_GetAlignOffsetX(
+	Text *text,
+	u64 max_width,
+	Text_Line *text_line
+) {
+	Assert(text);
+	Assert(text_line);
+
+	u64 x_align_offset = 0;
+
+	if (max_width > text_line->width_pixel) {
+		if (text->data.align_x == TEXT_ALIGN_X_MIDDLE)
+			x_align_offset = (max_width - text_line->width_pixel) >> 1;
+		else
+		if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
+			x_align_offset = (max_width - text_line->width_pixel);
+	}
+
+	return x_align_offset;
+}
+
 instant void
 Text_AddLines(
 	Text *text,
@@ -6996,9 +7042,9 @@ Text_AddLines(
 	RectF rect_position = {	x_line_start, 0, 0, rect.y};
 
 	if (include_offsets) {
-		rect_position.x += text->data.rect_content.x;
-		rect_position.h += text->data.rect_content.y;
-		x_line_start    += text->data.rect_content.x;
+		rect_position.x += text->data.offset_x;
+		rect_position.h += text->offset_y;
+		x_line_start    += text->data.offset_x;
 	}
 
 	bool has_cursor = text->data.is_editable;
@@ -7031,15 +7077,7 @@ Text_AddLines(
 
 			Codepoint_GetPositionNext(&codepoint, &rect_position);
 
-			u64 x_align_offset = 0;
-
-			if (width_max > t_text_line->width_pixel) {
-				if (text->data.align_x == TEXT_ALIGN_X_MIDDLE)
-					x_align_offset = (width_max - t_text_line->width_pixel) >> 1;
-				else
-				if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
-					x_align_offset = (width_max - t_text_line->width_pixel);
-			}
+			u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, t_text_line);
 
 			/// for unavailable characters like ' '
 			if (!Texture_IsEmpty(&codepoint.texture)) {
@@ -7048,9 +7086,11 @@ Text_AddLines(
 
 				Vertex_Buffer<float> *t_attribute;
 
+				float y_pos = rect_position.y - text->offset_y;
+
 				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
 				Array_Add(&t_attribute->a_buffer, rect_position.x + x_align_offset);
-				Array_Add(&t_attribute->a_buffer, rect_position.y);
+				Array_Add(&t_attribute->a_buffer, y_pos);
 
 				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
 				Array_Add(&t_attribute->a_buffer, text->data.color.r);
@@ -7134,18 +7174,18 @@ Text_Update(
 			s32 pad_height = text_io->data.rect_padding.y + text_io->data.rect_padding.h;
 
 			if (text_io->data.align_y == TEXT_ALIGN_Y_CENTER)
-				text_io->data.rect_content.y = (text_io->data.rect.h - pad_height - text_height) >> 1;
+				text_io->offset_y = (text_io->data.rect.h - pad_height - text_height) >> 1;
 			else
 			if (text_io->data.align_y == TEXT_ALIGN_Y_BOTTOM)
-				text_io->data.rect_content.y = (text_io->data.rect.h - pad_height - text_height);
+				text_io->offset_y = (text_io->data.rect.h - pad_height - text_height);
 		}
 
-		text_io->data.rect_content.h = text_height;
-		text_io->data.rect_content.w = 0;
+		text_io->data.content_height = text_height;
+		text_io->data.content_width = 0;
 
 		FOR_ARRAY(text_io->a_text_lines, it_line) {
 			Text_Line *t_line = &ARRAY_IT(text_io->a_text_lines, it_line);
-			text_io->data.rect_content.w = MAX(text_io->data.rect_content.w, (s64)t_line->width_pixel);
+			text_io->data.content_width = MAX(text_io->data.content_width, (s64)t_line->width_pixel);
 		}
 
 		Text_Clear(text_io);
@@ -7153,7 +7193,11 @@ Text_Update(
 
 		Text_Cursor_Update(text_io);
 
-		Rect_ClampY(&text_io->data.rect_content, text_io->data.rect);
+		Rect_ClampY(
+			&text_io->offset_y,
+			text_io->data.content_height,
+			text_io->data.rect.h
+		);
 
 		text_io->data_prev = text_io->data;
 		text_io->s_data.changed = false;
@@ -7194,11 +7238,11 @@ Text_Cursor_FindIndex(
 		}
 	}
 
-	float x_pos_start = rect.x + text->data.rect_content.x;
+	float x_pos_start = rect.x + text->data.offset_x;
 
 	Rect rect_position_it = {
 		x_pos_start,
-		rect.y + text->data.rect_content.y,
+		rect.y + text->offset_y,
 		0,
 		Font_GetLineHeight(text->font)
 	};
@@ -7212,20 +7256,8 @@ Text_Cursor_FindIndex(
 	FOR(text->a_text_lines.count, it_line) {
 		Text_Line *text_line = &ARRAY_IT(text->a_text_lines, it_line);
 
-		/// horizontal alignment
-		/// -------------------------------------------------------------------
-		u64 x_align_offset = 0;
-
-		if (width_max > text_line->width_pixel) {
-			if (text->data.align_x == TEXT_ALIGN_X_MIDDLE)
-				x_align_offset = (width_max - text_line->width_pixel) >> 1;
-			else
-			if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
-				x_align_offset = (width_max - text_line->width_pixel);
-		}
-
+		u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, text_line);
 		rect_position_it.x += x_align_offset;
-		/// -------------------------------------------------------------------
 
 		bool is_newline_char_once = false;
 
@@ -7370,11 +7402,11 @@ Text_Cursor_Update(
 
 	Vertex_ClearAttributes(&cursor->vertex_select);
 
-	float x_pos_start = rect.x + text_io->data.rect_content.x;
+	float x_pos_start = rect.x + text_io->data.offset_x;
 
 	Rect rect_position_it = {
 		x_pos_start,
-		rect.y + text_io->data.rect_content.y,
+		rect.y + text_io->offset_y,
 		0,
 		Font_GetLineHeight(text_io->font)
 	};
@@ -7401,20 +7433,8 @@ Text_Cursor_Update(
 	FOR(text_io->a_text_lines.count, it_line) {
 		Text_Line *text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
 
-		/// horizontal alignment
-		/// -------------------------------------------------------------------
-		u64 x_align_offset = 0;
-
-		if (width_max > text_line->width_pixel) {
-			if (text_io->data.align_x == TEXT_ALIGN_X_MIDDLE)
-				x_align_offset = (width_max - text_line->width_pixel) >> 1;
-			else
-			if (text_io->data.align_x == TEXT_ALIGN_X_RIGHT)
-				x_align_offset = (width_max - text_line->width_pixel);
-		}
-
+		u64 x_align_offset = Text_GetAlignOffsetX(text_io, width_max, text_line);
 		rect_position_it.x += x_align_offset;
-		/// -------------------------------------------------------------------
 
 		bool is_newline_char_once = false;
 
@@ -7536,8 +7556,8 @@ Text_Cursor_Update(
 
 					Rect rect_cursor = rect_position_it;
 
-					float *x_offset = &text_io->data.rect_content.x;
-					float *y_offset = &text_io->data.rect_content.y;
+					float *x_offset = &text_io->data.offset_x;
+					float *y_offset = &text_io->offset_y;
 
 					/// exclude offsets
 					float cursor_pos_x         = rect_cursor.x - *x_offset;
@@ -7830,6 +7850,8 @@ Text_Render(
 	if (text_io->a_vertex_chars.count) {
 		/// redraw last computed text
 		ShaderSet_Use(text_io->shader_set, SHADER_PROG_TEXT);
+		Shader_SetValue(text_io->shader_set, "y_offset", text_io->offset_y);
+
 		Vertex_Render(text_io->shader_set, &text_io->a_vertex_chars);
 	}
 
@@ -8396,7 +8418,7 @@ struct Widget_Slide {
 
 struct Widget_Data {
 	Color32 color_background       = Color_MakeGrey(0.9f);
-	Color32 color_outline          = {0.8f, 0.8f, 0.8f, 1.0f}; //{0.0f, 0.0f, 1.0f, 1.0f};
+	Color32 color_outline          = {0.8f, 0.8f, 0.8f, 1.0f};
 	Color32 color_outline_selected = {1.0f, 0.0f, 0.0f, 1.0f};
 	Color32 color_outline_inactive = {0.5f, 0.5f, 1.0f, 1.0f};
 	Color32 color_progress         = {0.5f, 0.5f, 1.0f, 1.0f};
@@ -8737,8 +8759,8 @@ Widget_Update(
 		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
 		Text_Data *settings = &widget_io->text.data;
 
-		if (layout_data->auto_width AND settings->rect_content.w) {
-			s32 width_auto = settings->rect_content.w;
+		if (layout_data->auto_width AND settings->content_width) {
+			s32 width_auto = settings->content_width;
 			Widget_AddBorderSizes(widget_io, &width_auto, 0);
 
 			if (layout_data->rect.w != width_auto) {
@@ -8747,8 +8769,8 @@ Widget_Update(
 			}
 		}
 
-		if (layout_data->auto_height AND settings->rect_content.h) {
-			s32 height_auto = settings->rect_content.h;
+		if (layout_data->auto_height AND settings->content_height) {
+			s32 height_auto = settings->content_height;
 			Widget_AddBorderSizes(widget_io, 0, &height_auto);
 
 			if (layout_data->rect.h != height_auto) {
@@ -9075,8 +9097,8 @@ Widget_Render(
 
 			s32 pad_left = 2;
 
-			rect_text->x += t_text->data.rect_content.x + pad_left;
-			rect_text->y += t_text->data.rect_content.y;
+			rect_text->x += t_text->data.offset_x + pad_left;
+			rect_text->y += t_text->offset_y;
 
 			widget_io->rect_content.h = 0;
 
@@ -9327,8 +9349,8 @@ Widget_CalcActiveRowRect(
     String ts_data_backup = widget->text.s_data;
 
 	Rect rect_item  = widget->layout_data.settings.rect;
-	rect_item.x    += widget->text.data.rect_content.x;
-	rect_item.y    += widget->text.data.rect_content.y;
+	rect_item.x    += widget->text.data.offset_x;
+	rect_item.y    += widget->text.offset_y;
 
     FOR_ARRAY(widget->data.as_row_data, it_row) {
 		String *ts_data = &ARRAY_IT(widget->data.as_row_data, it_row);
@@ -9367,8 +9389,8 @@ Widget_CalcActiveRowID(
     String ts_data_backup = widget->text.s_data;
 
 	Rect rect_item  = widget->layout_data.settings.rect;
-	rect_item.x    += widget->text.data.rect_content.x;
-	rect_item.y    += widget->text.data.rect_content.y;
+	rect_item.x    += widget->text.data.offset_x;
+	rect_item.y    += widget->text.offset_y;
 
     FOR_ARRAY(widget->data.as_row_data, it_row) {
 		String *ts_data = &ARRAY_IT(widget->data.as_row_data, it_row);
@@ -9504,14 +9526,18 @@ Widget_UpdateInput(
 		/// widget_io + list scrolling
 		if (is_hovering AND (is_scrollable_list OR is_scrollable)) {
 			///@TODO: scroll horizontally when pressing shift + wheel(?)
-			widget_io->text.data.rect_content.y += mouse->wheel;
+			widget_io->text.offset_y += mouse->wheel;
 
 			if (is_scrollable_list) {
-				widget_io->text.data.rect_content.w  = widget_io->rect_content.w;
-				widget_io->text.data.rect_content.h  = widget_io->rect_content.h;
+				widget_io->text.data.content_width  = widget_io->rect_content.w;
+				widget_io->text.data.content_height = widget_io->rect_content.h;
 			}
 
-			Rect_ClampY(&widget_io->text.data.rect_content, widget_io->layout_data.settings.rect);
+			Rect_ClampY(
+				&widget_io->text.offset_y,
+				widget_io->text.data.content_height,
+				widget_io->text.data.rect.h
+			);
 		}
     }
 
@@ -9579,22 +9605,22 @@ Widget_UpdateInput(
 		if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
 			if (widget_io->data.scroll_type == WIDGET_SCROLL_ITEM) {
 				if (widget_io->data.active_row_id < prev_active_row) {
-					widget_io->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
+					widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
 				}
 				else {
-					widget_io->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
-					widget_io->text.data.rect_content.y += (rect_widget->h - rect_active_row.h);
+					widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
+					widget_io->text.offset_y += (rect_widget->h - rect_active_row.h);
 				}
 			}
 			else
 			if (widget_io->data.scroll_type == WIDGET_SCROLL_BLOCK) {
 				if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
 					if (widget_io->data.active_row_id < prev_active_row) {
-						widget_io->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
-						widget_io->text.data.rect_content.y += (rect_widget->h - rect_active_row.h);
+						widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
+						widget_io->text.offset_y += (rect_widget->h - rect_active_row.h);
 					}
 					else {
-						widget_io->text.data.rect_content.y -= (rect_active_row.y - rect_widget->y);
+						widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
 					}
 				}
 			}
