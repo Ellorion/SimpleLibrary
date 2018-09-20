@@ -4557,6 +4557,8 @@ R"(
 	uniform float scale_x = 1.0f;
 	uniform float scale_y = 1.0f;
 
+	uniform float y_offset = 0.0f;
+
 	in vec4 vertex_position;
 	in vec4 rect_color;
 
@@ -4589,7 +4591,11 @@ R"(
 	} o_Vertex;
 
 	void main() {
-		gl_Position           = vertex_position;
+		gl_Position           = vec4(vertex_position.x,
+									 vertex_position.y + y_offset,
+									 vertex_position.z,
+									 vertex_position.w + y_offset);
+
 		o_Vertex.proj_matrix  = proj_matrix;
 		o_Vertex.scale_matrix = scale_matrix;
 		o_Vertex.rect_color   = rect_color;
@@ -5339,6 +5345,9 @@ ShaderSet_Use(
 		} break;
 	}
 
+	/// reset uniforms
+	Shader_SetValue(shader_set_io, "y_offset", 0.0f);
+
 	if (prev_active_id == shader_set_io->active_id)
 		return;
 
@@ -5357,6 +5366,7 @@ ShaderSet_Use(
 		viewport.h = (float)t_window->height;
 
 		Shader_SetValue(shader_set_io, "viewport", (float *)&viewport, 4);
+
 		OpenGL_SetBlending(true);
 	}
 }
@@ -6990,7 +7000,10 @@ Text_BuildLines(
 	return height_max;
 }
 
-///@TODO: fix: when overflow without word-wrap, that line will not adjust
+///@Hint: line will NOT adjust, wenn word-wrap is disabled AND
+///       the text-line is visibly longer, otherwise it would not
+///       be possible to see the cursor at the beginning of such
+///       a line, if text editing is allowed
 instant u64
 Text_GetAlignOffsetX(
 	Text *text,
@@ -7356,9 +7369,6 @@ Text_Cursor_FlushFull(
 	Text_Cursor_Flush(text_io);
 }
 
-///@TODO: text-selection does not highlight prev.
-///       selected sections, when also using the
-///       mouse wheel
 instant void
 Text_Cursor_Update(
     Text *text_io
@@ -7542,9 +7552,12 @@ Text_Cursor_Update(
 											: codepoint_space.advance
 										 );
 
+				Rect rect_no_offset_y = rect_position_it;
+				rect_no_offset_y.y -= text_io->offset_y;
+
 				Vertex_AddRect32(
 					&cursor->vertex_select,
-					rect_position_it,
+					rect_no_offset_y,
 					cursor->color_select
 				);
 			}
@@ -7612,9 +7625,12 @@ Text_Cursor_Update(
 
 					Vertex_ClearAttributes(&cursor->vertex_cursor);
 
+					Rect rect_no_offset_y = rect_cursor;
+					rect_no_offset_y.y -= text_io->offset_y;
+
 					Vertex_AddRect32(
 						&cursor->vertex_cursor,
-						rect_cursor,
+						rect_no_offset_y,
 						cursor->color_cursor
 					);
 
@@ -7827,6 +7843,8 @@ Text_Render(
 	/// redraw selection
 	if (text_io->data.is_editable AND text_io->cursor.vertex_select.a_attributes.count) {
 		ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
+		Shader_SetValue(text_io->shader_set, "y_offset", text_io->offset_y);
+
 		Rect_Render(text_io->shader_set, &text_io->cursor.vertex_select);
 	}
 
@@ -7843,6 +7861,8 @@ Text_Render(
 			AssertMessage(!Vertex_IsEmpty(&text_io->cursor.vertex_cursor), "Cursor vertex data does not exists.");
 
 			ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
+			Shader_SetValue(text_io->shader_set, "y_offset", text_io->offset_y);
+
 			Rect_Render(text_io->shader_set, &text_io->cursor.vertex_cursor);
 		}
 	}
