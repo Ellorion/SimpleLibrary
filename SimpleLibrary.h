@@ -6565,6 +6565,40 @@ Codepoint_GetData(
 	*entry_out = *t_entry;
 }
 
+instant s32
+Codepoint_GetTabWidth(
+	float x,
+	s32 advance_space,
+	u32 tab_space_count = 4
+) {
+	s32 tab_width = (advance_space * (tab_space_count));
+
+	s32 tab_width_remaining = tab_width - (s32)x % tab_width;
+
+	/// extend max. tab width for compatability with other editors
+	if (tab_width_remaining < advance_space)
+		tab_width_remaining += tab_width;
+
+	return tab_width_remaining;
+}
+
+instant void
+Codepoint_GetDataConditional(
+	Font *font,
+	s32 codepoint,
+	Codepoint *entry_out,
+	float x,
+	s32 advance_space
+) {
+	Assert(font);
+	Assert(entry_out);
+
+	Codepoint_GetData(font, codepoint, entry_out);
+
+	if (entry_out->codepoint == '\t')
+		entry_out->advance = Codepoint_GetTabWidth(x, advance_space);
+}
+
 instant void
 Codepoint_GetPositionNext(
 	Codepoint *codepoint,
@@ -6603,23 +6637,6 @@ Codepoint_GetAdvance(
 	advance *= scale;
 
 	return advance;
-}
-
-instant s32
-Codepoint_GetTabWidth(
-	float x,
-	s32 advance_space,
-	u32 tab_space_count = 4
-) {
-	s32 tab_width = (advance_space * (tab_space_count));
-
-	s32 tab_width_remaining = tab_width - (s32)x % tab_width;
-
-	/// extend max. tab width for compatability with other editors
-	if (tab_width_remaining < advance_space)
-		tab_width_remaining += tab_width;
-
-	return tab_width_remaining;
 }
 
 instant u64
@@ -7004,14 +7021,13 @@ Text_AddLines(
 
 			s8 ch = t_text_line->s_data.value[it_data];
 
-			Codepoint_GetData(text->font, ch, &codepoint);
-
-			if (codepoint.codepoint == '\t') {
-				codepoint.advance = Codepoint_GetTabWidth(
-										rect_position.x - x_line_start,
-										codepoint_space.advance
-									);
-			}
+			Codepoint_GetDataConditional(
+				text->font,
+				ch,
+				&codepoint,
+				rect_position.x - x_line_start,
+				codepoint_space.advance
+			);
 
 			Codepoint_GetPositionNext(&codepoint, &rect_position);
 
@@ -7220,7 +7236,14 @@ Text_Cursor_FindIndex(
 
 			s8 character = text_line->s_data.value[it_data];
 
-			Codepoint_GetData(text->font, character, &codepoint);
+			Codepoint_GetDataConditional(
+				text->font,
+				character,
+				&codepoint,
+				rect_position_it.x - x_pos_start,
+				codepoint_space.advance
+			);
+
 			rect_position_it.w = codepoint.advance;
 
 			bool is_newline_char = (character == '\r' OR character == '\n');
@@ -7400,10 +7423,13 @@ Text_Cursor_Update(
 
 			s8 character = text_line->s_data.value[it_data];
 
-			Codepoint_GetData(text_io->font, character, &codepoint);
-
-			if (codepoint.codepoint == '\t')
-				codepoint.advance = Codepoint_GetTabWidth(rect_position_it.x - x_pos_start, codepoint_space.advance);
+			Codepoint_GetDataConditional(
+				text_io->font,
+				character,
+				&codepoint,
+				rect_position_it.x - x_pos_start,
+				codepoint_space.advance
+			);
 
 			rect_position_it.w = codepoint.advance;
 
@@ -7619,8 +7645,6 @@ Text_Cursor_Update(
 ///@TODO: add support for '\t' input by locking widget
 ///       and preventing it to switch to another widget
 ///       unless another key is also pressed.
-///@TODO: pos / end key do not scroll x-axis
-///       when word-wrap is disabled and text overflows
 instant void
 Text_UpdateInput(
     Text *text_io,
