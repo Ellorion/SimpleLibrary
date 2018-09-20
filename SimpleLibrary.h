@@ -3417,6 +3417,9 @@ File_ReadAll(
 	else
 		file = File_Open(c_filename, "r" , c_length);
 
+	if (!file.fp)
+		LOG_WARNING("File \"" << c_filename << "\" does not exists.");
+
 	String s_data = File_Read(&file);
 
 	File_Close(&file);
@@ -4557,6 +4560,7 @@ R"(
 	uniform float scale_x = 1.0f;
 	uniform float scale_y = 1.0f;
 
+	uniform float x_offset = 0.0f;
 	uniform float y_offset = 0.0f;
 
 	in vec4 vertex_position;
@@ -4591,9 +4595,9 @@ R"(
 	} o_Vertex;
 
 	void main() {
-		gl_Position           = vec4(vertex_position.x,
+		gl_Position           = vec4(vertex_position.x + x_offset,
 									 vertex_position.y + y_offset,
-									 vertex_position.z,
+									 vertex_position.z + x_offset,
 									 vertex_position.w + y_offset);
 
 		o_Vertex.proj_matrix  = proj_matrix;
@@ -4607,6 +4611,10 @@ R"(
 
 	layout(points) in;
 	layout(triangle_strip) out;
+
+	/// would show a disconnected section between 2 rects
+	/// when using 4 vertices and nvidia gfx card (tested with 1050)
+	/// so 6 vertices would overlap that area
 	layout(max_vertices = 6) out;
 
 	in Vertex_Data {
@@ -4683,6 +4691,7 @@ R"(
 	uniform float scale_x  = 1.0f;
 	uniform float scale_y  = 1.0f;
 
+	uniform float x_offset = 0.0f;
 	uniform float y_offset = 0.0f;
 
 	in vec2 vertex_position;
@@ -4717,7 +4726,11 @@ R"(
 	} o_Vertex;
 
 	void main() {
-		gl_Position = vec4(vertex_position.x, vertex_position.y + y_offset, 0, 1);
+		gl_Position = vec4( vertex_position.x + x_offset,
+							vertex_position.y + y_offset,
+							0,
+							1);
+
 		o_Vertex.proj_matrix = proj_matrix;
 		o_Vertex.scale_matrix = scale_matrix;
 		o_Vertex.text_color  = text_color;
@@ -4754,25 +4767,25 @@ R"(
 		vec4 v_pos_3 = matrix_mod * (point + vec4(0     , size.y, 0, 0) * scale_matrix);
 		vec4 v_pos_4 = matrix_mod * (point + vec4(size.x, size.y, 0, 0) * scale_matrix);
 
-		/// v1
+		/// v1 (top-left)
 		gl_Position = v_pos_1;
 		tex_coords = vec2(0, 0);
 		text_color = i_Vertex[0].text_color;
 		EmitVertex();
 
-		/// v3
+		/// v2 (bottom-left)
 		gl_Position = v_pos_2;
 		tex_coords = vec2(1, 0);
 		text_color = i_Vertex[0].text_color;
 		EmitVertex();
 
-		/// v2
+		/// v3 (top-right)
 		gl_Position = v_pos_3;
 		tex_coords = vec2(0, 1);
 		text_color = i_Vertex[0].text_color;
 		EmitVertex();
 
-		/// v4
+		/// v4 (bottom-rights)
 		gl_Position = v_pos_4;
 		tex_coords = vec2(1, 1);
 		text_color = i_Vertex[0].text_color;
@@ -5346,6 +5359,7 @@ ShaderSet_Use(
 	}
 
 	/// reset uniforms
+	Shader_SetValue(shader_set_io, "x_offset", 0.0f);
 	Shader_SetValue(shader_set_io, "y_offset", 0.0f);
 
 	if (prev_active_id == shader_set_io->active_id)
@@ -6773,7 +6787,6 @@ struct Text_Data {
 	TEXT_ALIGN_X_TYPE align_x = TEXT_ALIGN_X_LEFT;
 	TEXT_ALIGN_Y_TYPE align_y = TEXT_ALIGN_Y_TOP;
 
-	float offset_x = 0.0f;
 	s32 content_width  = 0;
 	s32 content_height = 0;
 
@@ -6788,6 +6801,7 @@ struct Text {
 	String s_data = {};
 
 	/// always update with shader uniform
+	float offset_x = 0.0f;
 	float offset_y = 0.0f;
 
 	Text_Data data;
@@ -7055,9 +7069,9 @@ Text_AddLines(
 	RectF rect_position = {	x_line_start, 0, 0, rect.y};
 
 	if (include_offsets) {
-		rect_position.x += text->data.offset_x;
+		rect_position.x += text->offset_x;
 		rect_position.h += text->offset_y;
-		x_line_start    += text->data.offset_x;
+		x_line_start    += text->offset_x;
 	}
 
 	bool has_cursor = text->data.is_editable;
@@ -7099,10 +7113,12 @@ Text_AddLines(
 
 				Vertex_Buffer<float> *t_attribute;
 
+				/// exclude offsets
+				float x_pos = rect_position.x - text->offset_x;
 				float y_pos = rect_position.y - text->offset_y;
 
 				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, rect_position.x + x_align_offset);
+				Array_Add(&t_attribute->a_buffer, x_pos + x_align_offset);
 				Array_Add(&t_attribute->a_buffer, y_pos);
 
 				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
@@ -7206,12 +7222,6 @@ Text_Update(
 
 		Text_Cursor_Update(text_io);
 
-		Rect_ClampY(
-			&text_io->offset_y,
-			text_io->data.content_height,
-			text_io->data.rect.h
-		);
-
 		text_io->data_prev = text_io->data;
 		text_io->s_data.changed = false;
 
@@ -7221,6 +7231,9 @@ Text_Update(
 	return false;
 }
 
+///@TODO: optimize performance by skipping text-lines
+///       when y is not in that line and avoid going
+///       through all the chars in every line
 instant u64
 Text_Cursor_FindIndex(
 	Text *text,
@@ -7251,7 +7264,7 @@ Text_Cursor_FindIndex(
 		}
 	}
 
-	float x_pos_start = rect.x + text->data.offset_x;
+	float x_pos_start = rect.x + text->offset_x;
 
 	Rect rect_position_it = {
 		x_pos_start,
@@ -7412,7 +7425,7 @@ Text_Cursor_Update(
 
 	Vertex_ClearAttributes(&cursor->vertex_select);
 
-	float x_pos_start = rect.x + text_io->data.offset_x;
+	float x_pos_start = rect.x + text_io->offset_x;
 
 	Rect rect_position_it = {
 		x_pos_start,
@@ -7552,12 +7565,13 @@ Text_Cursor_Update(
 											: codepoint_space.advance
 										 );
 
-				Rect rect_no_offset_y = rect_position_it;
-				rect_no_offset_y.y -= text_io->offset_y;
+				Rect rect_no_offset = rect_position_it;
+				rect_no_offset.x -= text_io->offset_x;
+				rect_no_offset.y -= text_io->offset_y;
 
 				Vertex_AddRect32(
 					&cursor->vertex_select,
-					rect_no_offset_y,
+					rect_no_offset,
 					cursor->color_select
 				);
 			}
@@ -7569,7 +7583,7 @@ Text_Cursor_Update(
 
 					Rect rect_cursor = rect_position_it;
 
-					float *x_offset = &text_io->data.offset_x;
+					float *x_offset = &text_io->offset_x;
 					float *y_offset = &text_io->offset_y;
 
 					/// exclude offsets
@@ -7581,6 +7595,24 @@ Text_Cursor_Update(
 
 					bool is_past_top_border    = (rect_cursor.y < rect.y);
 					bool is_past_bottom_border = (rect_cursor.y + rect_cursor.h > rect.y + rect.h);
+
+
+					rect_cursor.w = width_cursor;
+
+					if (!cursor->vertex_cursor.array_id)
+						cursor->vertex_cursor = Vertex_Create();
+
+					Vertex_ClearAttributes(&cursor->vertex_cursor);
+
+					Rect rect_no_offset = rect_cursor;
+					rect_no_offset.x -= text_io->offset_x;
+					rect_no_offset.y -= text_io->offset_y;
+
+					Vertex_AddRect32(
+						&cursor->vertex_cursor,
+						rect_no_offset,
+						cursor->color_cursor
+					);
 
 					if (cursor->move_type == CURSOR_MOVE_Y AND (is_past_top_border OR is_past_bottom_border)) {
 						*x_offset = 0;
@@ -7594,7 +7626,6 @@ Text_Cursor_Update(
 						}
 
 						Text_Cursor_Flush(text_io);
-						Text_Update(text_io);
 						return;
 					}
 
@@ -7614,27 +7645,15 @@ Text_Cursor_Update(
 						}
 
 						Text_Cursor_Flush(text_io);
-						Text_Update(text_io);
 						return;
 					}
 
-					rect_cursor.w = width_cursor;
-
-					if (!cursor->vertex_cursor.array_id)
-						cursor->vertex_cursor = Vertex_Create();
-
-					Vertex_ClearAttributes(&cursor->vertex_cursor);
-
-					Rect rect_no_offset_y = rect_cursor;
-					rect_no_offset_y.y -= text_io->offset_y;
-
-					Vertex_AddRect32(
-						&cursor->vertex_cursor,
-						rect_no_offset_y,
-						cursor->color_cursor
-					);
-
 					found_end_once = true;
+
+					if (found_start) {
+						Text_Cursor_Flush(text_io);
+						return;
+					}
 				}
 				else {
 					/// to move to the start of the
@@ -7843,6 +7862,7 @@ Text_Render(
 	/// redraw selection
 	if (text_io->data.is_editable AND text_io->cursor.vertex_select.a_attributes.count) {
 		ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
+		Shader_SetValue(text_io->shader_set, "x_offset", text_io->offset_x);
 		Shader_SetValue(text_io->shader_set, "y_offset", text_io->offset_y);
 
 		Rect_Render(text_io->shader_set, &text_io->cursor.vertex_select);
@@ -7861,6 +7881,7 @@ Text_Render(
 			AssertMessage(!Vertex_IsEmpty(&text_io->cursor.vertex_cursor), "Cursor vertex data does not exists.");
 
 			ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
+			Shader_SetValue(text_io->shader_set, "x_offset", text_io->offset_x);
 			Shader_SetValue(text_io->shader_set, "y_offset", text_io->offset_y);
 
 			Rect_Render(text_io->shader_set, &text_io->cursor.vertex_cursor);
@@ -7870,6 +7891,7 @@ Text_Render(
 	if (text_io->a_vertex_chars.count) {
 		/// redraw last computed text
 		ShaderSet_Use(text_io->shader_set, SHADER_PROG_TEXT);
+		Shader_SetValue(text_io->shader_set, "x_offset", text_io->offset_x);
 		Shader_SetValue(text_io->shader_set, "y_offset", text_io->offset_y);
 
 		Vertex_Render(text_io->shader_set, &text_io->a_vertex_chars);
@@ -8014,7 +8036,7 @@ Layout_CreateBlock(
 		*layout_block_out = t_block;
 }
 
-instant void
+instant bool
 Layout_GetLastBlock(
 	Layout *layout,
 	Layout_Block **layout_block_out
@@ -8022,11 +8044,13 @@ Layout_GetLastBlock(
 	Assert(layout);
 
 	if (!layout->a_layout_blocks.count) {
-		AssertMessage(false, "GetLastBlock: No blocks in layout found.");
-		return;
+		LOG_WARNING("GetLastBlock: No blocks in layout found.");
+		return false;
 	}
 
 	*layout_block_out = &ARRAY_IT(layout->a_layout_blocks, layout->a_layout_blocks.count - 1);
+
+	return true;
 }
 
 struct Widget;
@@ -8042,7 +8066,11 @@ Layout_Add(
 	Assert(layout_data);
 
 	Layout_Block *current_block;
-	Layout_GetLastBlock(layout_io, &current_block);
+
+	if(!Layout_GetLastBlock(layout_io, &current_block)) {
+		LOG_WARNING("Using default layout block: top-left - vertival align (y-axis).");
+		Layout_CreateBlock(layout_io, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT, -1, &current_block);
+	}
 
 	Array_Add(&current_block->ap_layout_data, layout_data);
 }
@@ -9117,7 +9145,7 @@ Widget_Render(
 
 			s32 pad_left = 2;
 
-			rect_text->x += t_text->data.offset_x + pad_left;
+			rect_text->x += t_text->offset_x + pad_left;
 			rect_text->y += t_text->offset_y;
 
 			widget_io->rect_content.h = 0;
@@ -9369,7 +9397,7 @@ Widget_CalcActiveRowRect(
     String ts_data_backup = widget->text.s_data;
 
 	Rect rect_item  = widget->layout_data.settings.rect;
-	rect_item.x    += widget->text.data.offset_x;
+	rect_item.x    += widget->text.offset_x;
 	rect_item.y    += widget->text.offset_y;
 
     FOR_ARRAY(widget->data.as_row_data, it_row) {
@@ -9409,7 +9437,7 @@ Widget_CalcActiveRowID(
     String ts_data_backup = widget->text.s_data;
 
 	Rect rect_item  = widget->layout_data.settings.rect;
-	rect_item.x    += widget->text.data.offset_x;
+	rect_item.x    += widget->text.offset_x;
 	rect_item.y    += widget->text.offset_y;
 
     FOR_ARRAY(widget->data.as_row_data, it_row) {
@@ -9564,9 +9592,14 @@ Widget_UpdateInput(
     if (keyboard AND widget_io->data.has_focus) {
 		bool is_key_return = keyboard->up[VK_RETURN];
 		bool is_key_space  = keyboard->up[VK_SPACE];
+		bool is_key_f10    = keyboard->up[VK_F10];
 
         if (is_key_return OR is_key_space) {
         	widget_io->events.on_trigger = true;
+        }
+
+        if (is_key_f10) {
+        	widget_io->events.on_trigger_secondary = true;
         }
 
 		if (widget_io->data.is_checkable
@@ -9707,13 +9740,15 @@ Widget_GetSelectedRowID(
 	return widget->data.active_row_id;
 }
 
-instant void
+instant bool
 Widget_Update(
 	Array<Widget *> *ap_widgets_io,
 	Keyboard *keyboard
 ) {
 	Assert(ap_widgets_io);
 	Assert(keyboard);
+
+	bool result = false;
 
 	FOR_ARRAY(*ap_widgets_io, it_widget) {
 		Widget *t_widget = ARRAY_IT(*ap_widgets_io, it_widget);
@@ -9722,10 +9757,15 @@ Widget_Update(
 
 	FOR_ARRAY(*ap_widgets_io, it_widget) {
 		Widget *t_widget = ARRAY_IT(*ap_widgets_io, it_widget);
-		Widget_Update(t_widget);
+
+		bool did_update = Widget_Update(t_widget);
+
+		if (did_update)  result = true;
 	}
 
 	Widget_UpdateFocus(ap_widgets_io, keyboard->pressing[VK_SHIFT]);
+
+	return result;
 }
 
 instant void
@@ -9745,11 +9785,9 @@ Layout_Add(
 	Assert(layout_io);
 	Assert(widget);
 
-	Layout_Block *current_block = 0;
-	Layout_GetLastBlock(layout_io, &current_block);
+	Layout_Add(layout_io, &widget->layout_data);
 
-	Array_Add(&current_block->ap_layout_data, &widget->layout_data);
-
+	/// convinence
 	Array_Add(&layout_io->ap_widgets, widget);
 }
 
