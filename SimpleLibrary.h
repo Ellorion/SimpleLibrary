@@ -1,6 +1,7 @@
 #pragma once
 
 #define DEBUG_EVENT_STATUS 0
+#define DEBUG_BENCHMARK    1
 
 /// Compiler: g++ (6.3.0) (mingw)
 ///
@@ -34,8 +35,11 @@
 ///               based on it
 ///     otherwise, the pointer will only be used for reading
 ///
-///     Function names that ends with "Static" have a byRef return parameter
+///     Function names that end with "Buffer" have a byRef return parameter
 ///     which needs manual freeing, in case it is not a static object / variable (tbd)
+///
+///     Function names that end with "Temp" issue a return value, which is only
+///     valid until that function is called again. (for temporary ownership)
 ///
 /// Return types: if a function returns a struct, it's memory needs to
 ///               be free'd to prevent memory leaks
@@ -922,10 +926,27 @@ _AssertMessage(
 
 #define LOG_WARNING(_text) std::cout << "Warning: " << _text << std::endl;
 
+#if DEBUG_BENCHMARK
+	#define LOG_MEASURE(_text) std::cout << "Measure [" << __FUNCTION__ << "]: " <<  _text << " ms" << std::endl;
+#else
+	#define LOG_MEASURE(_text)
+#endif
+
 /// ::: Utilities
 /// ===========================================================================
 #define MIN(val_1, val_2) ((val_1 < val_2) ? val_1 : val_2)
 #define MAX(val_1, val_2) ((val_1 < val_2) ? val_2 : val_1)
+
+#define MIN_LIMIT(val_1, val_2, _limit)					\
+	(													\
+		(val_1 < val_2) 								\
+			? ((val_1 > _limit)							\
+				? val_1									\
+				: ((val_2 > _limit) ? val_2 : _limit))	\
+			: ((val_2 > _limit) 						\
+				? val_2 								\
+				: ((val_1 > _limit) ? val_1 : _limit))	\
+	)
 
 //#define LOBYTE(x) ((x) & 0xFF)
 //#define HIBYTE(x) LOBYTE((x) >> 8)
@@ -1794,8 +1815,21 @@ String_Insert(
 	return c_length;
 }
 
-instant void
+instant String
 To_String(
+	const char *c_data,
+	u64 c_length = 0
+) {
+	Assert(c_data);
+
+	String s_result;
+	String_Append(&s_result, c_data, c_length);
+
+	return s_result;
+}
+
+instant void
+To_StringBuffer(
 	String *s_data_out,
 	const char *c_data,
 	u64 c_length = 0
@@ -1805,6 +1839,32 @@ To_String(
 
 	String_Destroy(s_data_out);
 	String_Append(s_data_out, c_data, c_length);
+}
+
+instant void
+String_Clear(
+	String *s_data_out
+) {
+	Assert(s_data_out);
+
+	s_data_out->length = 0;
+
+	s_data_out->changed = true;
+}
+
+instant String
+To_StringTemp(
+	const char *c_data,
+	u64 c_length = 0
+) {
+	Assert(c_data);
+
+	static String s_data_storage;
+	String_Clear(&s_data_storage);
+
+	String_Append(&s_data_storage, c_data, c_length);
+
+	return s_data_storage;
 }
 
 /// does NOT add memory for '\0'
@@ -2071,24 +2131,21 @@ String_StartWith(
 instant bool
 String_Find(
 	String *s_data,
-	const char *find,
-	s64 *pos_found = 0,
-	s64 pos_start = 0,
-	bool pos_after_find = false
+	const char *c_find,
+	u64 c_length = 0,
+	s64 *index_found = 0,
+	s64 pos_start = 0
 ) {
 	Assert(s_data);
 
-	s64 t_pos_found = String_IndexOf(s_data, find, 0, pos_after_find);
+	s64 t_index_found = String_IndexOf(s_data, c_find, c_length);
 
-	if (t_pos_found < 0) {
-		if (pos_found) *pos_found = t_pos_found;
+	if (t_index_found < 0) {
+		if (index_found) *index_found = t_index_found;
 		return false;
 	}
 
-	if (pos_after_find)
-		t_pos_found += String_Length(find);
-
-	if (pos_found) *pos_found = t_pos_found;
+	if (index_found) *index_found = t_index_found;
 
 	return true;
 }
@@ -2297,17 +2354,6 @@ String_Remove(
 }
 
 instant void
-String_Clear(
-	String *s_data_out
-) {
-	Assert(s_data_out);
-
-	s_data_out->length = 0;
-
-	s_data_out->changed = true;
-}
-
-instant void
 String_Replace(
 	String     *s_data_io,
 	const char *find,
@@ -2322,7 +2368,7 @@ String_Replace(
 	s64 find_length     = String_Length(find);
 	s64 replace_length  = String_Length(replace);
 
-	while(String_Find(s_data_io, find, &pos_found, pos_start)) {
+	while(String_Find(s_data_io, find, 0, &pos_found, pos_start)) {
 		String_Remove(s_data_io, pos_found, pos_found + find_length);
 		String_Insert(s_data_io, pos_found, replace);
 		pos_start += pos_found + replace_length;
@@ -2496,7 +2542,7 @@ operator > (
 
 #define FOR_ARRAY(_array, _it) 		\
 	for(u64 _it = 0;        		\
-		_it < (_array).count;       	\
+		_it < (_array).count;       \
 		++_it)
 
 #define FOR_ARRAY_REV(_array, _it)	\
@@ -2506,7 +2552,7 @@ operator > (
 
 #define FOR_ARRAY_START(_array, _start, _it) 	\
 	for(u64 _it = (_start);   					\
-		_it < (_array).count;       				\
+		_it < (_array).count;       			\
 		++_it)
 
 template <typename T>
@@ -2613,6 +2659,29 @@ Array_ReserveAdd(
 }
 
 template <typename T>
+instant void
+Array_Reserve(
+	Array<T> *array_io,
+	u64 count,
+	bool clear_zero = false
+) {
+	Assert(array_io);
+
+	u64 old_limit = array_io->limit;
+	u64 new_limit = array_io->size + sizeof(T) * count;
+
+	if (new_limit > array_io->limit) {
+		array_io->limit = new_limit;
+		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->limit);
+	}
+
+	if (clear_zero) {
+		/// only clear new reserved data
+		Memory_Set(array_io->memory + array_io->count, 0, array_io->limit - old_limit);
+	}
+}
+
+template <typename T>
 instant bool
 Array_Find(
 	Array<T> *array,
@@ -2701,6 +2770,50 @@ Array_Destroy(
     Array_DestroyContainer(array_out);
 }
 
+instant bool
+String_FindFirst(
+	String *s_data,
+	Array<String> *as_find,
+	s64 *index_delimiter_used_out = 0,
+	s64 *index_found_out = 0,
+	s64 pos_start = 0
+) {
+	Assert(s_data);
+	Assert(as_find);
+
+	s64 index_lowest = s_data->length;
+
+	s64 t_index_delimiter_used = -1;
+
+	FOR_ARRAY(*as_find, it) {
+		String *ts_find = &ARRAY_IT(*as_find, it);
+		s64 t_index_found = String_IndexOf(s_data, ts_find->value, ts_find->length);
+
+		if (t_index_found >= 0) {
+			if (t_index_found < index_lowest) {
+			 	t_index_delimiter_used = it;
+			}
+
+			index_lowest = MIN(index_lowest, t_index_found);
+		}
+	}
+
+	if (index_delimiter_used_out)
+		*index_delimiter_used_out = t_index_delimiter_used;
+
+	if (t_index_delimiter_used < 0) {
+		if (index_found_out)
+			*index_found_out = index_lowest;
+
+		return false;
+	}
+
+	if (index_found_out)
+		*index_found_out = index_lowest;
+
+	return true;
+}
+
 enum DELIMITER_TYPE {
 	DELIMITER_IGNORE,
 	/// Insert delimiter at the beginning of the next token
@@ -2708,129 +2821,6 @@ enum DELIMITER_TYPE {
 	/// Insert delimiter at the end if the current token
 	DELIMITER_ADD_BACK
 };
-
-instant Array<String>
-Array_SplitRef(
-	String *s_data,
-	const char *delimiter,
-	DELIMITER_TYPE type = DELIMITER_IGNORE
-
-) {
-	Assert(s_data);
-
-	Array<String> as_result;
-	as_result.by_reference = true;
-
-	String s_data_it = *s_data;
-	u64 len_delim = String_Length(delimiter);
-
-	s64 pos_found;
-	while(String_Find(&s_data_it, delimiter, &pos_found)) {
-		if (pos_found) {
-			String *s_element;
-			Array_AddEmpty(&as_result, &s_element);
-
-			s_element->value  = s_data_it.value;
-			s_element->length = pos_found;
-
-			if (type == DELIMITER_ADD_FRONT AND as_result.count) {
-				s_element->value  -= len_delim;
-				s_element->length += len_delim;
-			}
-			else
-			if (type == DELIMITER_ADD_BACK) {
-				s_element->length += len_delim;
-			}
-		}
-		else {
-			/// in case of f.e: "\n\n\n" with "\n" as delimiter
-			String *s_element;
-			Array_AddEmpty(&as_result, &s_element);
-
-			if (type == DELIMITER_ADD_BACK) {
-				s_element->value  = s_data_it.value;
-				s_element->length = len_delim;
-			}
-		}
-
-		s_data_it.value  += pos_found + len_delim;
-		s_data_it.length -= pos_found + len_delim;
-	}
-
-	if (s_data_it.length > 0) {
-		String *s_element;
-		Array_AddEmpty(&as_result, &s_element);
-
-		if (type == DELIMITER_ADD_FRONT AND as_result.count) {
-			s_element->value  -= len_delim;
-			s_element->length += len_delim;
-		}
-
-		s_element->value  = s_data_it.value;
-		s_element->length = s_data_it.length;
-	}
-
-	return as_result;
-}
-
-/// Will copy string values, so array content has to be free'd
-instant Array<String>
-Array_Split(
-	String *s_data,
-	const char *delimiter,
-	DELIMITER_TYPE type = DELIMITER_IGNORE
-
-) {
-	Assert(s_data);
-
-	Array<String> as_result;
-
-	String s_data_it = *s_data;
-	u64 len_delim = String_Length(delimiter);
-
-	s64 pos_found;
-	while(String_Find(&s_data_it, delimiter, &pos_found)) {
-		if (pos_found) {
-			String s_element;
-
-			if (type == DELIMITER_ADD_FRONT AND as_result.count) {
-				String_Append(&s_element, delimiter, len_delim);
-			}
-
-			String_Append(&s_element, s_data_it.value, pos_found);
-
-			if (type == DELIMITER_ADD_BACK) {
-				String_Append(&s_element, delimiter, len_delim);
-			}
-
-			Array_Add(&as_result, s_element);
-		}
-		else {
-			/// in case of f.e: "\n\n\n" with "\n" as delimiter
-			String *s_element;
-			Array_AddEmpty(&as_result, &s_element);
-
-			if (type == DELIMITER_ADD_BACK) {
-				String_Append(s_element, delimiter, len_delim);
-			}
-		}
-
-		s_data_it.value  += pos_found + len_delim;
-		s_data_it.length -= pos_found + len_delim;
-	}
-
-	if (s_data_it.length > 0) {
-		String s_element;
-
-		if (type == DELIMITER_ADD_FRONT AND as_result.count)
-			String_Append(&s_element, delimiter, len_delim);
-
-		String_Append(&s_element, s_data_it.value, s_data_it.length);
-		Array_Add(&as_result, s_element);
-	}
-
-	return as_result;
-}
 
 instant void
 Array_Clear(
@@ -2848,54 +2838,261 @@ Array_Clear(
     Array_ClearContainer(array_out);
 }
 
+///@Info: slower than String_SplitWordsBuffer
+///@RemoveMe(?)
 instant void
-String_SplitWordsStatic(
+Array_SplitWordsRefBuffer(
+	Array<String> *as_buffer_out,
+	String *s_data
+) {
+	Assert(s_data);
+
+	Array_Clear(as_buffer_out);
+	as_buffer_out->by_reference = true;
+
+	String s_data_it = *s_data;
+
+	DELIMITER_TYPE type_delim;
+	s64 index_found;
+
+	bool is_running = (s_data_it.length > 0);
+
+	s64 index_delimiter_used = 0;
+	static Array<String> as_delimiter;
+	Array_Reserve(&as_delimiter, 2);
+
+	Array_Clear(&as_delimiter);
+	Array_Add(&as_delimiter, To_String("\n"));
+	Array_Add(&as_delimiter, To_String(" "));
+
+	u64 c_length = 1;
+
+	while(is_running) {
+		is_running = String_FindFirst(&s_data_it, &as_delimiter, &index_delimiter_used, &index_found);
+
+		String *s_element;
+		Array_AddEmpty(as_buffer_out, &s_element);
+
+		if (index_delimiter_used == 0)
+			type_delim = DELIMITER_ADD_BACK;
+		else
+			type_delim = DELIMITER_IGNORE;
+
+		if (type_delim == DELIMITER_ADD_BACK OR index_found == 0)
+			s_element->length += c_length;
+
+		s_element->value   = s_data_it.value;
+		s_element->length += index_found;
+
+		if (type_delim == DELIMITER_ADD_FRONT AND as_buffer_out->count > 1) {
+			s_element->value  -= c_length;
+			s_element->length += c_length;
+		}
+
+		s_data_it.value  += index_found + c_length;
+		s_data_it.length -= index_found + c_length;
+	}
+}
+
+instant void
+Array_SplitRefBuffer(
+	Array<String> *as_buffer_out,
+	String *s_data,
+	const char *c_delimiter,
+	u64 c_length,
+	DELIMITER_TYPE type
+) {
+	Assert(s_data);
+
+	Array_Clear(as_buffer_out);
+	as_buffer_out->by_reference = true;
+
+	String s_data_it = *s_data;
+
+	if (!c_length)
+		c_length = String_Length(c_delimiter);
+
+	s64 index_found;
+
+	bool is_running = (s_data_it.length > 0);
+
+	while(is_running) {
+		if (!String_Find(&s_data_it, c_delimiter, c_length, &index_found)) {
+			/// add (the last or first) line without a delimiter
+			index_found = s_data_it.length;
+			type = DELIMITER_IGNORE;
+
+			Assert(s_data_it.length <= s_data->length);
+
+			if (!s_data_it.length)
+				break;
+
+			is_running = false;
+		}
+
+		String *s_element;
+		Array_AddEmpty(as_buffer_out, &s_element);
+
+		if (type == DELIMITER_ADD_BACK OR index_found == 0)
+			s_element->length += c_length;
+
+		s_element->value   = s_data_it.value;
+		s_element->length += index_found;
+
+		if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count > 1) {
+			s_element->value  -= c_length;
+			s_element->length += c_length;
+		}
+
+		s_data_it.value  += index_found + c_length;
+		s_data_it.length -= index_found + c_length;
+	}
+}
+
+instant Array<String>
+Array_SplitRef(
+	String *s_data,
+	const char *c_delimiter,
+	u64 c_length = 0,
+	DELIMITER_TYPE type = DELIMITER_IGNORE
+
+) {
+	Array<String> as_result;
+
+	Array_SplitRefBuffer(&as_result, s_data, c_delimiter, c_length, type);
+
+	return as_result;
+}
+
+/// Will copy string values, so array content has to be free'd
+instant void
+Array_SplitBuffer(
+	Array<String> *as_buffer_out,
+	String *s_data,
+	const char *c_delimiter,
+	u64 c_length = 0,
+	DELIMITER_TYPE type = DELIMITER_IGNORE
+
+) {
+	Assert(s_data);
+	Assert(as_buffer_out);
+
+	Array_Clear(as_buffer_out);
+
+	String s_data_it = *s_data;
+	u64 len_delim = String_Length(c_delimiter);
+
+	s64 pos_found;
+	while(String_Find(&s_data_it, c_delimiter, c_length, &pos_found)) {
+		if (pos_found) {
+			String s_element;
+
+			if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count) {
+				String_Append(&s_element, c_delimiter, len_delim);
+			}
+
+			String_Append(&s_element, s_data_it.value, pos_found);
+
+			if (type == DELIMITER_ADD_BACK) {
+				String_Append(&s_element, c_delimiter, len_delim);
+			}
+
+			Array_Add(as_buffer_out, s_element);
+		}
+		else {
+			/// in case of f.e: "\n\n\n" with "\n" as delimiter
+			String *s_element;
+			Array_AddEmpty(as_buffer_out, &s_element);
+
+			if (type == DELIMITER_ADD_BACK) {
+				String_Append(s_element, c_delimiter, len_delim);
+			}
+		}
+
+		s_data_it.value  += pos_found + len_delim;
+		s_data_it.length -= pos_found + len_delim;
+	}
+
+	if (s_data_it.length > 0) {
+		String s_element;
+
+		if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count)
+			String_Append(&s_element, c_delimiter, len_delim);
+
+		String_Append(&s_element, s_data_it.value, s_data_it.length);
+		Array_Add(as_buffer_out, s_element);
+	}
+}
+
+instant Array<String>
+Array_Split(
+	String *s_data,
+	const char *c_delimiter,
+	u64 c_length = 0,
+	DELIMITER_TYPE type = DELIMITER_IGNORE
+) {
+	Array<String> as_result;
+
+	Array_SplitBuffer(&as_result, s_data, c_delimiter, c_length, type);
+
+	return as_result;
+}
+
+instant void
+String_SplitWordsBuffer(
 	String *s_data,
 	Array<String> *as_words_out
 ) {
 	Assert(s_data);
 	Assert(as_words_out);
 
-	Array_Clear(as_words_out);
+#if DEBUG_BENCHMARK
+	Timer tmr_measure;
+	Time_Measure(&tmr_measure);
+#endif // DEBUG_BENCHMARK
 
-	Array<String> as_lines = Array_Split(s_data, "\n", DELIMITER_ADD_BACK);
+	Array_Clear(as_words_out);
+	as_words_out->by_reference = true;
+
+	static Array<String> as_lines;
+	Array_Clear(&as_lines);
+
+	Array_SplitRefBuffer(&as_lines, s_data, "\n", 1, DELIMITER_ADD_BACK);
 
 	if (as_lines.count <= 1) {
-		Array<String> as_lines_mac = Array_Split(s_data, "\r", DELIMITER_ADD_BACK);
+		static Array<String> as_lines_mac;
+		Array_Clear(&as_lines_mac);
 
-		if (as_lines_mac.count == 0) {
-			Array_Destroy(&as_lines_mac);
-		}
-		else
+		Array_SplitRefBuffer(&as_lines_mac, s_data, "\r", 1, DELIMITER_ADD_BACK);
+
 		if (as_lines_mac.count == 2) {
 			String *ts_last_line = &ARRAY_IT(as_lines_mac, 1);
 
 			/// s_data.value could end with '\r\n' with only one line
 			if (ts_last_line->length AND ts_last_line->value[0] == '\n') {
-				Array_Destroy(&as_lines_mac);
 			}
 			else {
-				Array_Destroy(&as_lines);
 				as_lines = as_lines_mac;
 			}
 		}
 		else {
-			Array_Destroy(&as_lines);
 			as_lines = as_lines_mac;
 		}
 	}
 
 	FOR_ARRAY(as_lines, it_lines) {
-		Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ");
+		static Array<String> as_words;
+		Array_Clear(&as_words);
 
-		FOR_ARRAY(tas_words, it_words) {
-			Array_Add(as_words_out, ARRAY_IT(tas_words, it_words));
+		Array_SplitRefBuffer(&as_words, &ARRAY_IT(as_lines, it_lines), " ", 1, DELIMITER_IGNORE);
+
+		FOR_ARRAY(as_words, it_words) {
+			String *s_word = &ARRAY_IT(as_words, it_words);
+			Array_Add(as_words_out, *s_word);
 		}
-
-		Array_DestroyContainer(&tas_words);
 	}
 
-	Array_Destroy(&as_lines);
+	LOG_MEASURE(Time_Measure(&tmr_measure));
 }
 
 template <typename T>
@@ -3410,6 +3607,11 @@ File_ReadAll(
 ) {
     Assert(c_filename);
 
+#if DEBUG_BENCHMARK
+	Timer tmr_measure;
+	Time_Measure(&tmr_measure);
+#endif // DEBUG_BENCHMARK
+
     File file;
 
     if (as_binary)
@@ -3425,6 +3627,8 @@ File_ReadAll(
 	File_Close(&file);
 
 	s_data.changed = true;
+
+	LOG_MEASURE("(" << c_filename << ") " << Time_Measure(&tmr_measure));
 
 	return s_data;
 }
@@ -3705,7 +3909,7 @@ Dialog_OpenFile(
     ofn.Flags        = 0x02000000 | OFN_FILEMUSTEXIST;
 
     if (GetOpenFileNameA(&ofn)) {
-		To_String(s_file_out, filename);
+		To_StringBuffer(s_file_out, filename);
 		result = true;
     }
 
@@ -3735,7 +3939,7 @@ Dialog_OpenDirectory(
 		Memory_Free(pidl);
 
 		if (result)
-			To_String(s_directory_out, directory);
+			To_StringBuffer(s_directory_out, directory);
 	}
 
     return result;
@@ -6757,17 +6961,23 @@ struct Text_Line {
 	String s_data;
 };
 
+struct Text_Cursor_Data {
+	u64 index_select_start = 0;
+	u64 index_select_end   = 0; /// also current cursor position
+
+	Color32 color_cursor = {1.0f, 0.0f, 0.0f, 1.0f};
+	Color32 color_select = {0.5f, 0.5f, 1.0f, 1.0f};
+};
+
 struct Text_Cursor {
 	CURSOR_MOVE_TYPE move_type = CURSOR_MOVE_NONE;
 	s64 move_index_x = 0;
 	s64 move_index_y = 0;
 
-	u64 index_select_start = 0;
-	u64 index_select_end   = 0; /// also current cursor position
-	bool is_selecting = false;
+	Text_Cursor_Data data;
+	Text_Cursor_Data data_prev;
 
-	Color32 color_cursor = {1.0f, 0.0f, 0.0f, 1.0f};
-	Color32 color_select = {0.5f, 0.5f, 1.0f, 1.0f};
+	bool is_selecting = false;
 
 	u32 blink_inverval_ms = 500;
 	Timer timer_blinking;
@@ -6898,6 +7108,11 @@ Text_BuildLines(
 	Assert(as_words);
 	Assert(a_text_line_out);
 
+#if DEBUG_BENCHMARK
+	Timer tmr_measure;
+	Time_Measure(&tmr_measure);
+#endif // DEBUG_BENCHMARK
+
 	Font *font = text->font;
 	Rect  rect = text->data.rect;
 
@@ -6951,7 +7166,10 @@ Text_BuildLines(
 								ts_word
 							);
 
-		if (!line_start) {
+		/// draw ' ' between words, unless there was no word,
+		/// then do not draw ' ' x2, since words are parsed
+		/// width ' ' as delimiter
+		if (!line_start AND !(ts_word->length == 1 AND *ts_word->value == ' ')) {
 			rect_line_current.x      += advance_space;
 			t_text_line->width_pixel += advance_space;
 			String_Append(&t_text_line->s_data, " ", 1);
@@ -7010,6 +7228,8 @@ Text_BuildLines(
 
 		line_start = false;
     }
+
+	LOG_MEASURE(Time_Measure(&tmr_measure));
 
 	return height_max;
 }
@@ -7117,14 +7337,21 @@ Text_AddLines(
 				float x_pos = rect_position.x - text->offset_x;
 				float y_pos = rect_position.y - text->offset_y;
 
-				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, x_pos + x_align_offset);
-				Array_Add(&t_attribute->a_buffer, y_pos);
+				{
+					Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
+					Array_ReserveAdd(&t_attribute->a_buffer, 2);
 
-				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
-				Array_Add(&t_attribute->a_buffer, text->data.color.r);
-				Array_Add(&t_attribute->a_buffer, text->data.color.g);
-				Array_Add(&t_attribute->a_buffer, text->data.color.b);
+					Array_Add(&t_attribute->a_buffer, x_pos + x_align_offset);
+					Array_Add(&t_attribute->a_buffer, y_pos);
+				}
+				{
+					Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
+					Array_ReserveAdd(&t_attribute->a_buffer, 3);
+
+					Array_Add(&t_attribute->a_buffer, text->data.color.r);
+					Array_Add(&t_attribute->a_buffer, text->data.color.g);
+					Array_Add(&t_attribute->a_buffer, text->data.color.b);
+				}
 			}
 
 			++it_data;
@@ -7142,7 +7369,14 @@ Text_AddLines(
 ) {
 	Assert(text_io);
 
+#if DEBUG_BENCHMARK
+	Timer tmr_measure;
+	Time_Measure(&tmr_measure);
+#endif // DEBUG_BENCHMARK
+
 	Text_AddLines(text_io, &text_io->a_vertex_chars, &text_io->a_text_lines, include_offsets);
+
+	LOG_MEASURE(Time_Measure(&tmr_measure));
 }
 
 instant void
@@ -7187,53 +7421,57 @@ Text_Update(
 		return false;
 	}
 
-	if (Text_HasChanged(text_io, false)) {
-		/// redraw text
-		if (text_io->data.strip_linebreak) {
-			String_Replace(&text_io->s_data, "\n", "");
-			String_Replace(&text_io->s_data, "\r", "");
-		}
+	if (!Text_HasChanged(text_io, false))
+		return false;
 
-		String_SplitWordsStatic(&text_io->s_data, &text_io->as_words);
+#if DEBUG_BENCHMARK
+	Timer tmr_measure;
+	Time_Measure(&tmr_measure);
+#endif // DEBUG_BENCHMARK
 
-		/// put " " at the end of the text, when it's editable for text cursor
-		s32 text_height = Text_BuildLines(text_io, &text_io->as_words, &text_io->a_text_lines, text_io->data.is_editable);
-
-		if (text_io->data.rect.h) {
-			s32 pad_height = text_io->data.rect_padding.y + text_io->data.rect_padding.h;
-
-			if (text_io->data.align_y == TEXT_ALIGN_Y_CENTER)
-				text_io->offset_y = (text_io->data.rect.h - pad_height - text_height) >> 1;
-			else
-			if (text_io->data.align_y == TEXT_ALIGN_Y_BOTTOM)
-				text_io->offset_y = (text_io->data.rect.h - pad_height - text_height);
-		}
-
-		text_io->data.content_height = text_height;
-		text_io->data.content_width = 0;
-
-		FOR_ARRAY(text_io->a_text_lines, it_line) {
-			Text_Line *t_line = &ARRAY_IT(text_io->a_text_lines, it_line);
-			text_io->data.content_width = MAX(text_io->data.content_width, (s64)t_line->width_pixel);
-		}
-
-		Text_Clear(text_io);
-		Text_AddLines(text_io, true);
-
-		Text_Cursor_Update(text_io);
-
-		text_io->data_prev = text_io->data;
-		text_io->s_data.changed = false;
-
-		return true;
+	/// redraw text
+	if (text_io->data.strip_linebreak) {
+		String_Replace(&text_io->s_data, "\n", "");
+		String_Replace(&text_io->s_data, "\r", "");
 	}
 
-	return false;
+	if (text_io->s_data.changed)
+		String_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
+
+	/// put " " at the end of the text, when it's editable for text cursor
+	s32 text_height = Text_BuildLines(text_io, &text_io->as_words, &text_io->a_text_lines, text_io->data.is_editable);
+
+	if (text_io->data.rect.h) {
+		s32 pad_height = text_io->data.rect_padding.y + text_io->data.rect_padding.h;
+
+		if (text_io->data.align_y == TEXT_ALIGN_Y_CENTER)
+			text_io->offset_y = (text_io->data.rect.h - pad_height - text_height) >> 1;
+		else
+		if (text_io->data.align_y == TEXT_ALIGN_Y_BOTTOM)
+			text_io->offset_y = (text_io->data.rect.h - pad_height - text_height);
+	}
+
+	text_io->data.content_height = text_height;
+	text_io->data.content_width = 0;
+
+	FOR_ARRAY(text_io->a_text_lines, it_line) {
+		Text_Line *t_line = &ARRAY_IT(text_io->a_text_lines, it_line);
+		text_io->data.content_width = MAX(text_io->data.content_width, (s64)t_line->width_pixel);
+	}
+
+	Text_Clear(text_io);
+	Text_AddLines(text_io, true);
+
+	Text_Cursor_Update(text_io);
+
+	LOG_MEASURE(Time_Measure(&tmr_measure));
+
+	text_io->data_prev = text_io->data;
+	text_io->s_data.changed = false;
+
+	return true;
 }
 
-///@TODO: optimize performance by skipping text-lines
-///       when y is not in that line and avoid going
-///       through all the chars in every line
 instant u64
 Text_Cursor_FindIndex(
 	Text *text,
@@ -7281,6 +7519,12 @@ Text_Cursor_FindIndex(
 
 	FOR(text->a_text_lines.count, it_line) {
 		Text_Line *text_line = &ARRAY_IT(text->a_text_lines, it_line);
+
+		if (rect_position_it.y + rect_position_it.h < point.y) {
+			cursor_index += text_line->s_data.length;
+			rect_position_it.y += rect_position_it.h;
+			continue;
+		}
 
 		u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, text_line);
 		rect_position_it.x += x_align_offset;
@@ -7369,7 +7613,7 @@ Text_Cursor_Flush(
 	cursor->move_index_y = 0;
 
 	if (!text_io->cursor.is_selecting)
-		text_io->cursor.index_select_start = text_io->cursor.index_select_end;
+		text_io->cursor.data.index_select_start = text_io->cursor.data.index_select_end;
 }
 
 instant void
@@ -7380,6 +7624,22 @@ Text_Cursor_FlushFull(
 
 	text_io->cursor.move_type = CURSOR_MOVE_NONE;
 	Text_Cursor_Flush(text_io);
+}
+
+instant bool
+Text_Cursor_HasChanged(
+	Text_Cursor *cursor,
+	bool update_changes
+) {
+	Assert(cursor);
+
+	bool has_changed = !Memory_Compare(&cursor->data, &cursor->data_prev, sizeof(cursor->data));
+
+	if (has_changed AND update_changes) {
+		cursor->data_prev = cursor->data;
+	}
+
+	return has_changed;
 }
 
 instant void
@@ -7436,25 +7696,33 @@ Text_Cursor_Update(
 
 	/// lower boundary index check
 	if (cursor->move_index_x < 0) {
-		if (cursor->index_select_end + cursor->move_index_x > cursor->index_select_end) {
+		if (cursor->data.index_select_end + cursor->move_index_x > cursor->data.index_select_end) {
 			cursor->move_index_x = 0;
 
 			if (!cursor->is_selecting)
-				cursor->index_select_start = 0;
+				cursor->data.index_select_start = 0;
 
-			cursor->index_select_end = 0;
+			cursor->data.index_select_end = 0;
 		}
 	}
 
 	if (cursor->move_type == CURSOR_MOVE_X) {
 		if (!cursor->is_selecting)
-			cursor->index_select_start += cursor->move_index_x;
+			cursor->data.index_select_start += cursor->move_index_x;
 
-		cursor->index_select_end += cursor->move_index_x;
+		cursor->data.index_select_end += cursor->move_index_x;
 	}
 
 	FOR(text_io->a_text_lines.count, it_line) {
 		Text_Line *text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
+
+		if (    cursor->data.index_select_start > cursor_index + text_line->s_data.length
+			AND cursor->data.index_select_end   > cursor_index + text_line->s_data.length
+		) {
+			cursor_index += text_line->s_data.length;
+			rect_position_it.y += rect_position_it.h;
+			continue;
+		}
 
 		u64 x_align_offset = Text_GetAlignOffsetX(text_io, width_max, text_line);
 		rect_position_it.x += x_align_offset;
@@ -7478,10 +7746,10 @@ Text_Cursor_Update(
 
 			bool is_newline_char = (character == '\r' OR character == '\n');
 
-			if (cursor->index_select_start == cursor_index AND !found_start)
+			if (cursor->data.index_select_start == cursor_index AND !found_start)
 				found_start = true;
 
-			if (cursor->index_select_end   == cursor_index AND !found_end) {
+			if (cursor->data.index_select_end   == cursor_index AND !found_end) {
 				switch (cursor->move_type) {
 					case CURSOR_MOVE_NONE:
 					case CURSOR_MOVE_X: {
@@ -7502,7 +7770,7 @@ Text_Cursor_Update(
 							if (!cursor->is_selecting)
 								found_start = false;
 
-							cursor->index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
+							cursor->data.index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
 
 							Text_Cursor_Flush(text_io);
 						}
@@ -7512,7 +7780,7 @@ Text_Cursor_Update(
 								rect_position_it.y - Font_GetLineHeight(text_io->font)
 							};
 
-							cursor->index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
+							cursor->data.index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
 
 							Text_Cursor_Flush(text_io);
 
@@ -7526,14 +7794,14 @@ Text_Cursor_Update(
 						}
 						else
 						if (cursor->move_index_x > 0) {
-							cursor->index_select_end -= it_data;
-							cursor->index_select_end += text_line->s_data.length;
-							cursor->index_select_end -= 1;
+							cursor->data.index_select_end -= it_data;
+							cursor->data.index_select_end += text_line->s_data.length;
+							cursor->data.index_select_end -= 1;
 
 							if (String_EndWith(&text_line->s_data, "\r\n"))
-								cursor->index_select_end -= 1;
+								cursor->data.index_select_end -= 1;
 
-							if (cursor->index_select_end != cursor_index) {
+							if (cursor->data.index_select_end != cursor_index) {
 								if (!cursor->is_selecting)
 									found_start = false;
 							}
@@ -7545,7 +7813,7 @@ Text_Cursor_Update(
 							cursor->move_type = CURSOR_MOVE_X;
 						}
 						else {
-							cursor->index_select_end -= it_data;
+							cursor->data.index_select_end -= it_data;
 
 							Text_Cursor_Flush(text_io);
 							cursor->move_type = CURSOR_MOVE_X;
@@ -7572,14 +7840,14 @@ Text_Cursor_Update(
 				Vertex_AddRect32(
 					&cursor->vertex_select,
 					rect_no_offset,
-					cursor->color_select
+					cursor->data.color_select
 				);
 			}
 
 			if (found_end AND !found_end_once) {
 				if (!is_newline_char_once) {
 					/// update index, if you seek to '\r' and skip to '\n'
-					cursor->index_select_end = cursor_index;
+					cursor->data.index_select_end = cursor_index;
 
 					Rect rect_cursor = rect_position_it;
 
@@ -7611,7 +7879,7 @@ Text_Cursor_Update(
 					Vertex_AddRect32(
 						&cursor->vertex_cursor,
 						rect_no_offset,
-						cursor->color_cursor
+						cursor->data.color_cursor
 					);
 
 					if (cursor->move_type == CURSOR_MOVE_Y AND (is_past_top_border OR is_past_bottom_border)) {
@@ -7650,6 +7918,9 @@ Text_Cursor_Update(
 
 					found_end_once = true;
 
+					///@Performance: will not help with large file
+					///              while moving the cursor at the
+					///              lower section of that text
 					if (found_start) {
 						Text_Cursor_Flush(text_io);
 						return;
@@ -7688,7 +7959,7 @@ Text_Cursor_Update(
 
 	/// upper boundary index check
 	if (!found_end_once) {
-		cursor->index_select_end = cursor_index - 1;
+		cursor->data.index_select_end = cursor_index - 1;
 		Text_Cursor_Flush(text_io);
 		return Text_Cursor_Update(text_io);
 	}
@@ -7742,22 +8013,35 @@ Text_UpdateInput(
 
 	cursor->is_selecting = (keyboard->pressing[VK_SHIFT] AND !keyboard->is_key_sym);
 
-	bool was_selecting = (cursor->index_select_start != cursor->index_select_end);
+	bool was_selecting = (cursor->data.index_select_start != cursor->data.index_select_end);
 
 	/// when selection turns off, seek selection start / end select position,
 	/// depending on the x-direction cursor movement
 	if (was_selecting AND !cursor->is_selecting AND offset_index_x != 0) {
 		if (offset_index_x < 0)
-			cursor->index_select_start = MIN(cursor->index_select_start, cursor->index_select_end);
+			cursor->data.index_select_start = MIN(cursor->data.index_select_start, cursor->data.index_select_end);
 		else
-			cursor->index_select_start = MAX(cursor->index_select_start, cursor->index_select_end);
+			cursor->data.index_select_start = MAX(cursor->data.index_select_start, cursor->data.index_select_end);
 
-		cursor->index_select_end = cursor->index_select_start;
+		cursor->data.index_select_end = cursor->data.index_select_start;
 
 		offset_index_x = 0;
 
 		Text_Cursor_Update(text_io);
 	}
+
+	if (offset_index_x != 0 OR offset_index_y != 0) {
+		if (!cursor->is_selecting)
+			cursor->data.index_select_start = cursor->data.index_select_end;
+
+		cursor->move_index_x += offset_index_x;
+		cursor->move_index_y += offset_index_y;
+
+		Text_Cursor_Update(text_io);
+
+		if (cursor_changed_out)  *cursor_changed_out = true;
+	}
+
 
 	if (keyboard->is_key_sym AND keyboard->is_down) {
 		char key = LOWORD(keyboard->key_sym);
@@ -7770,8 +8054,8 @@ Text_UpdateInput(
 		/// control + a
 		/// - select all text
 		if (key == 1) {
-			cursor->index_select_start = 0;
-			cursor->index_select_end = text_io->s_data.length;
+			cursor->data.index_select_start = 0;
+			cursor->data.index_select_end = text_io->s_data.length;
 			cursor->is_selecting = true;
 
 			if (cursor_changed_out)  *cursor_changed_out = true;
@@ -7785,19 +8069,19 @@ Text_UpdateInput(
 		bool was_selection_removed = false;
 
 		/// overwrite selected text
-		if (cursor->index_select_start != cursor->index_select_end) {
+		if (cursor->data.index_select_start != cursor->data.index_select_end) {
 			String_Remove(
 				&text_io->s_data,
-				cursor->index_select_start,
-				cursor->index_select_end
+				cursor->data.index_select_start,
+				cursor->data.index_select_end
 			);
 
 			/// cursor and selection bounds will start at the
 			/// beginning of the selection
-			if (cursor->index_select_end > cursor->index_select_start)
-				cursor->index_select_end   = cursor->index_select_start;
+			if (cursor->data.index_select_end > cursor->data.index_select_start)
+				cursor->data.index_select_end   = cursor->data.index_select_start;
 			else
-				cursor->index_select_start = cursor->index_select_end;
+				cursor->data.index_select_start = cursor->data.index_select_end;
 
 			was_selection_removed = true;
 		}
@@ -7809,23 +8093,11 @@ Text_UpdateInput(
 					 AND key != '\b'))
 		) {
 			cursor->move_index_x = String_Insert(
-											&text_io->s_data,
-											cursor->index_select_end,
-											key
-										);
+										&text_io->s_data,
+										cursor->data.index_select_end,
+										key
+									);
 		}
-	}
-
-	if (offset_index_x != 0 OR offset_index_y != 0) {
-		if (!cursor->is_selecting)
-			cursor->index_select_start = cursor->index_select_end;
-
-		cursor->move_index_x += offset_index_x;
-		cursor->move_index_y += offset_index_y;
-
-		Text_Cursor_Update(text_io);
-
-		if (cursor_changed_out)  *cursor_changed_out = true;
 	}
 
 	/// string could have been appended, removed or cleared
@@ -7915,7 +8187,7 @@ Text_GetSize(
 	static Array<Text_Line> a_text_lines;
 
 	if (height_out) {
-		String_SplitWordsStatic(&text->s_data, &as_words);
+		String_SplitWordsBuffer(&text->s_data, &as_words);
 		*height_out = Text_BuildLines(text, &as_words, &a_text_lines, false);
 	}
 
@@ -9156,7 +9428,7 @@ Widget_Render(
 			FOR_ARRAY(*as_target, it_row) {
 				String *ts_data = &ARRAY_IT(*as_target, it_row);
 
-				String_SplitWordsStatic(ts_data, &t_text->as_words);
+				String_SplitWordsBuffer(ts_data, &t_text->as_words);
 				rect_text->h = Text_BuildLines(t_text, &t_text->as_words, &t_text->a_text_lines, false);
 
 				if (Rect_IsIntersecting(rect_text, &widget_io->layout_data.settings.rect)) {
@@ -9517,13 +9789,13 @@ Widget_UpdateInput(
 				if (mouse->is_down) {
 					u64 index = Text_Cursor_FindIndex(text, mouse->point);
 
-					text->cursor.index_select_start = index;
-					text->cursor.index_select_end   = index;
+					text->cursor.data.index_select_start = index;
+					text->cursor.data.index_select_end   = index;
 				}
 				else {
 					u64 index = Text_Cursor_FindIndex(text, mouse->point);
 
-					text->cursor.index_select_end   = index;
+					text->cursor.data.index_select_end   = index;
 
 					Widget_Cursor_RestartBlinking(widget_io);
 				}
@@ -9688,7 +9960,7 @@ Widget_UpdateInput(
 }
 
 instant void
-Widget_GetSelectedRowStatic(
+Widget_GetSelectedRowBuffer(
 	Widget *widget,
 	String *s_row_data_out
 ) {
@@ -10313,15 +10585,15 @@ Widget_UpdateInputComboBox(
 
 				if (update_label) {
 					static String s_row_data;
-					Widget_GetSelectedRowStatic(wg_list, &s_row_data);
+					Widget_GetSelectedRowBuffer(wg_list, &s_row_data);
 
 					if (!String_IsEqual(&wg_text->text.s_data, s_row_data.value, s_row_data.length)) {
 						String_Clear(&wg_text->text.s_data);
 						String_Append(&wg_text->text.s_data, s_row_data.value, s_row_data.length);
 						wg_text->events.on_text_change = true;
 
-						wg_text->text.cursor.index_select_end   = s_row_data.length;
-						wg_text->text.cursor.index_select_start = 0;
+						wg_text->text.cursor.data.index_select_end   = s_row_data.length;
+						wg_text->text.cursor.data.index_select_start = 0;
 
 						/// if this is not set, flushing cursor data after cursor was updated
 						/// will set both cursor indexes to the same value.

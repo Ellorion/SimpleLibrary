@@ -51,7 +51,7 @@ Test_Strings(
 
 	/// store string in buffer (f.e. for filling dynamic string arrays)
 	String s_buffer;
-	To_String(&s_buffer, "buffer");
+	To_StringBuffer(&s_buffer, "buffer");
 	AssertMessage(String_IsEqual(&s_buffer, "buffer"), "String data does not match (buffer)");
 
 	String s_buffer_copy;
@@ -71,7 +71,7 @@ Test_Strings(
 	String_Append(&s_buffer, "copy_test");
 	To_CString(buffer, 100, &s_buffer);
 	String_Copy(buffer + 9, buffer);
-	To_String(&s_buffer, buffer);
+	To_StringBuffer(&s_buffer, buffer);
 	AssertMessage(String_IsEqual(&s_buffer, "copy_testcopy_test"), "C_string copy_test failed.");
 
 	String_Destroy(&s_buffer);
@@ -81,15 +81,15 @@ Test_Strings(
 	AssertMessage(String_StartWith(&s_buffer, "xxx_"), "String startwidth failed.");
 
 	long pos_found = 0;
-	if (String_Find(&s_buffer, "_xxx", &pos_found, 0, true)) {
-		AssertMessage(pos_found == 12, "Data in string not found at correct index.");
+	if (String_Find(&s_buffer, "_xxx", 0, &pos_found)) {
+		AssertMessage(pos_found == 8, "Data in string not found at correct index.");
 	}
 	else {
 		AssertMessage(false, "Could not find data in string.");
 	}
 
-	if (String_FindRev(&s_buffer, "_xxx", &pos_found, 0, true)) {
-		AssertMessage(pos_found == 12, "Data in string not found at correct index.");
+	if (String_FindRev(&s_buffer, "_xxx", &pos_found)) {
+		AssertMessage(pos_found == 8, "Data in string not found at correct index.");
 	}
 	else {
 		AssertMessage(false, "Could not find data in string.");
@@ -347,16 +347,19 @@ Test_Arrays(
 
 		///@Performance: text could be processed without having to split
 		///              data multiple times
-		Array<String> as_lines = Array_Split(&s_data, "\r\n", DELIMITER_ADD_BACK);
+		Array<String> as_lines = Array_Split(&s_data, "\r\n", 2, DELIMITER_ADD_BACK);
 		String_Destroy(&s_data);
 
 		Array<String> as_words;
 
 		FOR_ARRAY(as_lines, it_lines) {
-			Array<String> tas_words = Array_Split(&ARRAY_IT(as_lines, it_lines), " ", DELIMITER_ADD_FRONT);
+			String *ts_line = &ARRAY_IT(as_lines, it_lines);
+
+			Array<String> tas_words = Array_Split(ts_line, " ", 1, DELIMITER_ADD_FRONT);
 
 			FOR_ARRAY(tas_words, it_words) {
-				Array_Add(&as_words, ARRAY_IT(tas_words, it_words));
+				String *ts_word = &ARRAY_IT(tas_words, it_words);
+				Array_Add(&as_words, *ts_word);
 			}
 
 			/// keep string values in as_words valid
