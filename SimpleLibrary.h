@@ -927,9 +927,15 @@ _AssertMessage(
 #define LOG_WARNING(_text) std::cout << "Warning: " << _text << std::endl;
 
 #if DEBUG_BENCHMARK
-	#define LOG_MEASURE(_text) std::cout << "Measure [" << __FUNCTION__ << "]: " <<  _text << " ms" << std::endl;
+	#define MEASURE_START() \
+		Timer DEBUG_tmr_measure; \
+		Time_Measure(&DEBUG_tmr_measure);
+
+	#define MEASURE_END(_text) \
+		std::cout << "Measure [" << __FUNCTION__ << "]: " << _text << Time_Measure(&DEBUG_tmr_measure) << " ms" << std::endl;
 #else
-	#define LOG_MEASURE(_text)
+	#define MEASURE_START()
+	#define MEASURE_END()
 #endif
 
 /// ::: Utilities
@@ -3038,6 +3044,35 @@ Array_Split(
 	return as_result;
 }
 
+instant u64
+String_CalcWordCount(
+	String *s_data
+) {
+	Assert(s_data);
+
+	u64 index_start = 0;
+	u64 index_end   = 0;
+
+	u64 count_words = 0;
+
+	FOR(s_data->length, it) {
+		char value = s_data->value[it];
+
+		bool is_newline = (value == '\n');
+		bool is_space   = (value == ' ');
+
+		index_end = it;
+
+		if (is_space OR is_newline) {
+			++count_words;
+
+			index_start = it + 1;
+		}
+	}
+
+	return count_words;
+}
+
 instant void
 String_SplitWordsBuffer(
 	String *s_data,
@@ -3046,53 +3081,49 @@ String_SplitWordsBuffer(
 	Assert(s_data);
 	Assert(as_words_out);
 
-#if DEBUG_BENCHMARK
-	Timer tmr_measure;
-	Time_Measure(&tmr_measure);
-#endif // DEBUG_BENCHMARK
+	MEASURE_START();
 
-	Array_Clear(as_words_out);
-	as_words_out->by_reference = true;
+	if (as_words_out->limit) {
+		Array_Clear(as_words_out);
+	}
+	else {
+		as_words_out->by_reference = true;
+		Array_Reserve(as_words_out, String_CalcWordCount(s_data));
+	}
 
-	static Array<String> as_lines;
-	Array_Clear(&as_lines);
+	String *s_element;
 
-	Array_SplitRefBuffer(&as_lines, s_data, "\n", 1, DELIMITER_ADD_BACK);
+	if (s_data->length)
+		Array_AddEmpty(as_words_out, &s_element);
 
-	if (as_lines.count <= 1) {
-		static Array<String> as_lines_mac;
-		Array_Clear(&as_lines_mac);
+	u64 index_start = 0;
+	u64 index_end   = 0;
 
-		Array_SplitRefBuffer(&as_lines_mac, s_data, "\r", 1, DELIMITER_ADD_BACK);
+	FOR(s_data->length, it) {
+		char value = s_data->value[it];
 
-		if (as_lines_mac.count == 2) {
-			String *ts_last_line = &ARRAY_IT(as_lines_mac, 1);
+		bool is_newline = (value == '\n');
+		bool is_space   = (value == ' ');
 
-			/// s_data.value could end with '\r\n' with only one line
-			if (ts_last_line->length AND ts_last_line->value[0] == '\n') {
+		index_end = it;
+
+		if (is_space OR is_newline) {
+			if (is_newline)
+				++index_end;
+
+			if (index_end - index_start > 0) {
+				s_element->value  = s_data->value + index_start;
+				s_element->length = index_end - index_start;
 			}
-			else {
-				as_lines = as_lines_mac;
-			}
-		}
-		else {
-			as_lines = as_lines_mac;
+
+			Array_AddEmpty(as_words_out, &s_element);
+
+			/// add number of chars of the vzlue identifier
+			index_start = it + 1;
 		}
 	}
 
-	FOR_ARRAY(as_lines, it_lines) {
-		static Array<String> as_words;
-		Array_Clear(&as_words);
-
-		Array_SplitRefBuffer(&as_words, &ARRAY_IT(as_lines, it_lines), " ", 1, DELIMITER_IGNORE);
-
-		FOR_ARRAY(as_words, it_words) {
-			String *s_word = &ARRAY_IT(as_words, it_words);
-			Array_Add(as_words_out, *s_word);
-		}
-	}
-
-	LOG_MEASURE(Time_Measure(&tmr_measure));
+	MEASURE_END("");
 }
 
 template <typename T>
@@ -3607,10 +3638,7 @@ File_ReadAll(
 ) {
     Assert(c_filename);
 
-#if DEBUG_BENCHMARK
-	Timer tmr_measure;
-	Time_Measure(&tmr_measure);
-#endif // DEBUG_BENCHMARK
+	MEASURE_START();
 
     File file;
 
@@ -3628,7 +3656,7 @@ File_ReadAll(
 
 	s_data.changed = true;
 
-	LOG_MEASURE("(" << c_filename << ") " << Time_Measure(&tmr_measure));
+	MEASURE_END("(" << c_filename << ") ");
 
 	return s_data;
 }
@@ -7108,10 +7136,7 @@ Text_BuildLines(
 	Assert(as_words);
 	Assert(a_text_line_out);
 
-#if DEBUG_BENCHMARK
-	Timer tmr_measure;
-	Time_Measure(&tmr_measure);
-#endif // DEBUG_BENCHMARK
+	MEASURE_START();
 
 	Font *font = text->font;
 	Rect  rect = text->data.rect;
@@ -7229,7 +7254,7 @@ Text_BuildLines(
 		line_start = false;
     }
 
-	LOG_MEASURE(Time_Measure(&tmr_measure));
+    MEASURE_END("");
 
 	return height_max;
 }
@@ -7369,14 +7394,11 @@ Text_AddLines(
 ) {
 	Assert(text_io);
 
-#if DEBUG_BENCHMARK
-	Timer tmr_measure;
-	Time_Measure(&tmr_measure);
-#endif // DEBUG_BENCHMARK
+	MEASURE_START();
 
 	Text_AddLines(text_io, &text_io->a_vertex_chars, &text_io->a_text_lines, include_offsets);
 
-	LOG_MEASURE(Time_Measure(&tmr_measure));
+	MEASURE_END("");
 }
 
 instant void
@@ -7424,10 +7446,7 @@ Text_Update(
 	if (!Text_HasChanged(text_io, false))
 		return false;
 
-#if DEBUG_BENCHMARK
-	Timer tmr_measure;
-	Time_Measure(&tmr_measure);
-#endif // DEBUG_BENCHMARK
+	MEASURE_START();
 
 	/// redraw text
 	if (text_io->data.strip_linebreak) {
@@ -7464,7 +7483,7 @@ Text_Update(
 
 	Text_Cursor_Update(text_io);
 
-	LOG_MEASURE(Time_Measure(&tmr_measure));
+	MEASURE_END("");
 
 	text_io->data_prev = text_io->data;
 	text_io->s_data.changed = false;
@@ -8097,6 +8116,8 @@ Text_UpdateInput(
 										cursor->data.index_select_end,
 										key
 									);
+
+			if (cursor_changed_out)  *cursor_changed_out = true;
 		}
 	}
 
@@ -8838,7 +8859,7 @@ Widget_GetSubWidget(
 }
 
 instant void
-Widget_Cursor_RestartBlinking(
+Widget_Cursor_ResetBlinking(
 	Widget *widget_io
 ) {
 	Assert(widget_io);
@@ -9170,7 +9191,7 @@ Widget_Redraw(
 
 			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
 
-			Widget_Cursor_RestartBlinking(widget_io);
+			Widget_Cursor_ResetBlinking(widget_io);
 		} break;
 
 		case WIDGET_COMBOBOX: {
@@ -9797,7 +9818,7 @@ Widget_UpdateInput(
 
 					text->cursor.data.index_select_end   = index;
 
-					Widget_Cursor_RestartBlinking(widget_io);
+					Widget_Cursor_ResetBlinking(widget_io);
 				}
 
 				Text_Cursor_Update(text);
@@ -9919,7 +9940,7 @@ Widget_UpdateInput(
 		widget_io->events.on_text_change = has_text_changed;
 
 		if (has_cursor_changed) {
-			Widget_Cursor_RestartBlinking(widget_io);
+			Widget_Cursor_ResetBlinking(widget_io);
 		}
     }
 
