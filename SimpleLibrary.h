@@ -2140,13 +2140,18 @@ String_Find(
 	const char *c_find,
 	u64 c_length = 0,
 	s64 *index_found = 0,
-	s64 pos_start = 0
+	s64  index_start = 0
 ) {
 	Assert(s_data);
 
-	s64 t_index_found = String_IndexOf(s_data, c_find, c_length);
+	s64 t_index_found = String_IndexOf(s_data, c_find, c_length, index_start);
 
 	if (t_index_found < 0) {
+		t_index_found = s_data->length - index_start;
+
+		if (t_index_found < 0)
+			t_index_found = 0;
+
 		if (index_found) *index_found = t_index_found;
 		return false;
 	}
@@ -2369,15 +2374,15 @@ String_Replace(
 	Assert(find);
 	Assert(replace);
 
-	s64 pos_found = 0;
-	s64 pos_start = 0;
+	s64 index_found = 0;
+	s64 index_start = 0;
 	s64 find_length     = String_Length(find);
 	s64 replace_length  = String_Length(replace);
 
-	while(String_Find(s_data_io, find, 0, &pos_found, pos_start)) {
-		String_Remove(s_data_io, pos_found, pos_found + find_length);
-		String_Insert(s_data_io, pos_found, replace);
-		pos_start += pos_found + replace_length;
+  	while(String_Find(s_data_io, find, 0, &index_found, index_start)) {
+		String_Remove(s_data_io, index_found, index_found + find_length);
+		String_Insert(s_data_io, index_found, replace);
+		index_start += index_found + replace_length;
 	}
 
 	s_data_io->changed = true;
@@ -3121,6 +3126,12 @@ String_SplitWordsBuffer(
 			/// add number of chars of the vzlue identifier
 			index_start = it + 1;
 		}
+	}
+
+	/// for everything (left) that has no space or line-break
+	if (index_end - index_start > 0) {
+		s_element->value  = s_data->value + index_start;
+		s_element->length = index_end - index_start;
 	}
 
 	MEASURE_END("");
