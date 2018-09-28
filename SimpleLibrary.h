@@ -2850,62 +2850,6 @@ Array_Clear(
     Array_ClearContainer(array_out);
 }
 
-///@Info: slower than String_SplitWordsBuffer
-///@RemoveMe(?)
-instant void
-Array_SplitWordsRefBuffer(
-	Array<String> *as_buffer_out,
-	String *s_data
-) {
-	Assert(s_data);
-
-	Array_Clear(as_buffer_out);
-	as_buffer_out->by_reference = true;
-
-	String s_data_it = *s_data;
-
-	DELIMITER_TYPE type_delim;
-	s64 index_found;
-
-	bool is_running = (s_data_it.length > 0);
-
-	s64 index_delimiter_used = 0;
-	static Array<String> as_delimiter;
-	Array_Reserve(&as_delimiter, 2);
-
-	Array_Clear(&as_delimiter);
-	Array_Add(&as_delimiter, To_String("\n"));
-	Array_Add(&as_delimiter, To_String(" "));
-
-	u64 c_length = 1;
-
-	while(is_running) {
-		is_running = String_FindFirst(&s_data_it, &as_delimiter, &index_delimiter_used, &index_found);
-
-		String *s_element;
-		Array_AddEmpty(as_buffer_out, &s_element);
-
-		if (index_delimiter_used == 0)
-			type_delim = DELIMITER_ADD_BACK;
-		else
-			type_delim = DELIMITER_IGNORE;
-
-		if (type_delim == DELIMITER_ADD_BACK OR index_found == 0)
-			s_element->length += c_length;
-
-		s_element->value   = s_data_it.value;
-		s_element->length += index_found;
-
-		if (type_delim == DELIMITER_ADD_FRONT AND as_buffer_out->count > 1) {
-			s_element->value  -= c_length;
-			s_element->length += c_length;
-		}
-
-		s_data_it.value  += index_found + c_length;
-		s_data_it.length -= index_found + c_length;
-	}
-}
-
 instant void
 Array_SplitRefBuffer(
 	Array<String> *as_buffer_out,
@@ -3065,6 +3009,9 @@ String_CalcWordCount(
 			++count_words;
 	}
 
+	if (s_data->length AND !count_words)
+		++count_words;
+
 	return count_words;
 }
 
@@ -3087,10 +3034,12 @@ String_SplitWordsBuffer(
 		Array_Reserve(as_words_out, String_CalcWordCount(s_data));
 	}
 
+	if (!s_data->length)
+		return 0;
+
 	String *s_element;
 
-	if (s_data->length)
-		Array_AddEmpty(as_words_out, &s_element);
+	Array_AddEmpty(as_words_out, &s_element);
 
 	u64 index_start = 0;
 	u64 index_end   = 0;
@@ -3120,14 +3069,14 @@ String_SplitWordsBuffer(
 		}
 	}
 
-	s_element->value  = s_data->value + index_start;
+	s_element->value = s_data->value + index_start;
 
 	/// for everything (left) that has no space or line-break
 	if (index_end - index_start > 0)
 		s_element->length = (index_end - index_start) + 1;
-
-	/// for a curser position past the last one
-	s_element->length += 1;
+	else
+	if (index_start == index_end)
+		s_element->length = s_data->length - index_start;
 
 	MEASURE_END("");
 
@@ -7214,7 +7163,7 @@ Text_BuildLines(
 ) {
 	Assert(text);
 	Assert(as_words);
-	Assert(a_text_line_out);
+ 	Assert(a_text_line_out);
 
 	s32 max_height = 0;
 
@@ -7554,6 +7503,8 @@ Text_AddLines(
 		while(it_data < text_line->s_data.length) {
 			Codepoint codepoint;
 
+			Assert(text_line->s_data.value);
+
 			s8 ch = text_line->s_data.value[it_data];
 
 			Codepoint_GetDataConditional(
@@ -7672,6 +7623,7 @@ Text_Update(
 
 	u64 number_of_lines = 0;
 
+/// asdf
 #if !DEBUG_ALWAYS_UPDATE
 	if (text_io->s_data.changed)
 		number_of_lines = String_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
@@ -7884,6 +7836,32 @@ Text_Cursor_HasChanged(
 }
 
 instant void
+Text_Cursor_Render(
+	Text *text_io,
+	Rect rect_cursor,
+	s32 width_cursor
+) {
+	Text_Cursor *cursor = &text_io->cursor;
+
+	rect_cursor.w = width_cursor;
+
+	if (!cursor->vertex_cursor.array_id)
+		cursor->vertex_cursor = Vertex_Create();
+
+	Vertex_ClearAttributes(&cursor->vertex_cursor);
+
+	Rect rect_no_offset = rect_cursor;
+	rect_no_offset.x -= text_io->offset_x;
+	rect_no_offset.y -= text_io->offset_y;
+
+	Vertex_AddRect32(
+		&cursor->vertex_cursor,
+		rect_no_offset,
+		cursor->data.color_cursor
+	);
+}
+
+instant void
 Text_Cursor_Update(
     Text *text_io
 ) {
@@ -8091,6 +8069,7 @@ Text_Cursor_Update(
 					cursor->data.index_select_end = cursor_index;
 
 					Rect rect_cursor = rect_position_it;
+					Text_Cursor_Render(text_io, rect_cursor, width_cursor);
 
 					float *x_offset = &text_io->offset_x;
 					float *y_offset = &text_io->offset_y;
@@ -8104,24 +8083,6 @@ Text_Cursor_Update(
 
 					bool is_past_top_border    = (rect_cursor.y < rect.y);
 					bool is_past_bottom_border = (rect_cursor.y + rect_cursor.h > rect.y + rect.h);
-
-
-					rect_cursor.w = width_cursor;
-
-					if (!cursor->vertex_cursor.array_id)
-						cursor->vertex_cursor = Vertex_Create();
-
-					Vertex_ClearAttributes(&cursor->vertex_cursor);
-
-					Rect rect_no_offset = rect_cursor;
-					rect_no_offset.x -= text_io->offset_x;
-					rect_no_offset.y -= text_io->offset_y;
-
-					Vertex_AddRect32(
-						&cursor->vertex_cursor,
-						rect_no_offset,
-						cursor->data.color_cursor
-					);
 
 					if (cursor->move_type == CURSOR_MOVE_Y AND (is_past_top_border OR is_past_bottom_border)) {
 						*x_offset = 0;
@@ -8190,16 +8151,18 @@ Text_Cursor_Update(
 			is_newline_char_once = is_newline_char;
 		}
 
-		rect_position_it.x  = x_pos_start;
-		rect_position_it.y += rect_position_it.h;
+		if (it_line + 1 < text_io->a_text_lines.count) {
+			rect_position_it.x  = x_pos_start;
+			rect_position_it.y += rect_position_it.h;
+		}
 	}
 
-	/// make sure there is always a line
-	/// with at least a ' ' in it
-	Assert(cursor_index);
+	if (!found_end_once) {
+		Text_Cursor_Render(text_io, rect_position_it, width_cursor);
+	}
 
 	/// upper boundary index check
-	if (!found_end_once) {
+	if (!found_end_once AND cursor_index > text_io->s_data.length) {
 		cursor->data.index_select_end = cursor_index - 1;
 		Text_Cursor_Flush(text_io);
 		return Text_Cursor_Update(text_io);
