@@ -1,7 +1,8 @@
 #pragma once
 
-#define DEBUG_EVENT_STATUS 0
-#define DEBUG_BENCHMARK    1
+#define DEBUG_ALWAYS_UPDATE		0
+#define DEBUG_EVENT_STATUS		0
+#define DEBUG_BENCHMARK			1
 
 /// Compiler: g++ (6.3.0) (mingw)
 ///
@@ -2703,7 +2704,7 @@ Array_Find(
 
 	FOR_ARRAY(*array, it) {
 		if (ARRAY_IT(*array, it) == find) {
-			if (index) *index = it;
+			if (index)  *index = it;
 			return true;
 		}
 	}
@@ -2713,7 +2714,7 @@ Array_Find(
 
 template <typename T>
 instant bool
-Array_FindOrAddEmpty(
+Array_FindOrAdd(
 	Array<T> *array_io,
 	T find,
 	T **entry_out
@@ -3055,30 +3056,20 @@ String_CalcWordCount(
 ) {
 	Assert(s_data);
 
-	u64 index_start = 0;
-	u64 index_end   = 0;
-
 	u64 count_words = 0;
 
 	FOR(s_data->length, it) {
 		char value = s_data->value[it];
 
-		bool is_newline = (value == '\n');
-		bool is_space   = (value == ' ');
-
-		index_end = it;
-
-		if (is_space OR is_newline) {
+		if ((value == ' ') OR (value == '\n'))
 			++count_words;
-
-			index_start = it + 1;
-		}
 	}
 
 	return count_words;
 }
 
-instant void
+/// returns number of line-breaks
+instant u64
 String_SplitWordsBuffer(
 	String *s_data,
 	Array<String> *as_words_out
@@ -3104,37 +3095,43 @@ String_SplitWordsBuffer(
 	u64 index_start = 0;
 	u64 index_end   = 0;
 
+	u64 number_of_linebreaks = 0;
+
 	FOR(s_data->length, it) {
 		char value = s_data->value[it];
 
-		bool is_newline = (value == '\n');
-		bool is_space   = (value == ' ');
-
 		index_end = it;
 
-		if (is_space OR is_newline) {
-			if (is_newline)
-				++index_end;
+		if ((value == ' ') OR (value == '\n')) {
+			++index_end;
 
 			if (index_end - index_start > 0) {
 				s_element->value  = s_data->value + index_start;
-				s_element->length = index_end - index_start;
+				s_element->length = (index_end - index_start);
 			}
 
 			Array_AddEmpty(as_words_out, &s_element);
 
-			/// add number of chars of the vzlue identifier
+			if (value == '\n')
+				++number_of_linebreaks;
+
+			/// add number of chars of the value identifier
 			index_start = it + 1;
 		}
 	}
 
+	s_element->value  = s_data->value + index_start;
+
 	/// for everything (left) that has no space or line-break
-	if (index_end - index_start > 0) {
-		s_element->value  = s_data->value + index_start;
-		s_element->length = index_end - index_start;
-	}
+	if (index_end - index_start > 0)
+		s_element->length = (index_end - index_start) + 1;
+
+	/// for a curser position past the last one
+	s_element->length += 1;
 
 	MEASURE_END("");
+
+	return number_of_linebreaks;
 }
 
 template <typename T>
@@ -4009,7 +4006,6 @@ struct Window {
 LONG WINAPI WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	switch (uMsg) {
 		case WM_ACTIVATE: {
-
 		} break;
 
 		case WM_CLOSE: {
@@ -5941,8 +5937,7 @@ Vertex_FindOrAdd(
 	Vertex t_vertex_find;
 	t_vertex_find.texture = *texture_find;
 
-	if (!Array_FindOrAddEmpty(a_vertex_io, t_vertex_find, &t_vertex_entry))
-		*t_vertex_entry = t_vertex_find;
+	Array_FindOrAdd(a_vertex_io, t_vertex_find, &t_vertex_entry);
 
 	if (!t_vertex_entry->array_id)
 		Vertex_Create(t_vertex_entry);
@@ -5961,15 +5956,11 @@ Vertex_FindOrAddAttribute(
 	Assert(c_attribute_name);
 	Assert(a_buffer_out);
 
-	Vertex_Buffer<float> *t_attribute_entry;
 	Vertex_Buffer<float> t_attribute_find;
 	t_attribute_find.name = c_attribute_name;
 	t_attribute_find.group_count = group_count;
 
-	if (!Array_FindOrAddEmpty(&vertex_io->a_attributes, t_attribute_find, &t_attribute_entry))
-		*t_attribute_entry = t_attribute_find;
-
-	*a_buffer_out = t_attribute_entry;
+	Array_FindOrAdd(&vertex_io->a_attributes, t_attribute_find, a_buffer_out);
 }
 
 instant void
@@ -5983,6 +5974,7 @@ Vertex_AddTexturePosition(
 	Vertex_Buffer<float> *t_attribute;
 
 	Vertex_FindOrAddAttribute(vertex_io, 2, "vertex_position", &t_attribute);
+	Array_Reserve(&t_attribute->a_buffer, 2);
 	Array_Add(&t_attribute->a_buffer, x);
 	Array_Add(&t_attribute->a_buffer, y);
 }
@@ -5998,12 +5990,14 @@ Vertex_AddRect32(
 	Vertex_Buffer<float> *t_attribute;
 
 	Vertex_FindOrAddAttribute(vertex_io, 4, "vertex_position", &t_attribute);
+	Array_Reserve(&t_attribute->a_buffer, 4);
 	Array_Add(&t_attribute->a_buffer, (float)rect.x);
 	Array_Add(&t_attribute->a_buffer, (float)rect.y);
 	Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
 	Array_Add(&t_attribute->a_buffer, (float)rect.y + rect.h);
 
 	Vertex_FindOrAddAttribute(vertex_io, 4, "rect_color", &t_attribute);
+	Array_Reserve(&t_attribute->a_buffer, 4);
 	Array_Add(&t_attribute->a_buffer, (float)color.r);
 	Array_Add(&t_attribute->a_buffer, (float)color.g);
 	Array_Add(&t_attribute->a_buffer, (float)color.b);
@@ -6020,6 +6014,7 @@ Vertex_AddRectTexture(
 	Vertex_Buffer<float> *t_attribute;
 
 	Vertex_FindOrAddAttribute(vertex_io, 4, "vertex_position", &t_attribute);
+	Array_Reserve(&t_attribute->a_buffer, 4);
 	Array_Add(&t_attribute->a_buffer, (float)rect.x);
 	Array_Add(&t_attribute->a_buffer, (float)rect.y);
 	Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
@@ -6690,6 +6685,7 @@ struct Font {
 	s32 ascent = 0;
 	s32 descent = 0;
 	s32 linegap = 0;
+	float scale = 0.0f;
 	bool filter_linear = false;
 	Array<Codepoint> a_codepoint;
 };
@@ -6728,12 +6724,12 @@ Font_Load(
 		const u8 *c_data = (u8 *)font.s_data.value;
 		stbtt_InitFont(&font.info, c_data, stbtt_GetFontOffsetForIndex(c_data, 0));
 
-		float scale = stbtt_ScaleForPixelHeight(&font.info, font.size);
+		font.scale = stbtt_ScaleForPixelHeight(&font.info, font.size);
 
 		stbtt_GetFontVMetrics(&font.info, &font.ascent, &font.descent, &font.linegap);
-		font.ascent  *= scale;
-		font.descent *= scale;
-		font.linegap *= scale;
+		font.ascent  *= font.scale;
+		font.descent *= font.scale;
+		font.linegap *= font.scale;
     }
 
     return font;
@@ -6813,8 +6809,6 @@ Codepoint_GetData(
 	Assert(font);
 	Assert(entry_out);
 
-    float scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
-
     u64 t_index_find;
 
     Codepoint t_codepoint_find;
@@ -6823,7 +6817,7 @@ Codepoint_GetData(
 
     Codepoint *t_entry;
 
-    if (!Array_FindOrAddEmpty(&font->a_codepoint, t_codepoint_find, &t_entry)) {
+    if (!Array_FindOrAdd(&font->a_codepoint, t_codepoint_find, &t_entry)) {
 		/// get texture
 		t_entry->texture = Codepoint_ToTexture(font, codepoint);
 
@@ -6833,14 +6827,14 @@ Codepoint_GetData(
 									&t_entry->advance,
 									&t_entry->left_side_bearing);
 
-		t_entry->advance *= scale;
-		t_entry->left_side_bearing *= scale;
+		t_entry->advance *= font->scale;
+		t_entry->left_side_bearing *= font->scale;
 
 		/// get subpixel
 		stbtt_GetCodepointBitmapBoxSubpixel(&font->info,
 											codepoint,
-											scale,
-											scale,
+											font->scale,
+											font->scale,
 											0,
 											0,
 											&t_entry->rect_subpixel.x,
@@ -6917,11 +6911,10 @@ Codepoint_GetAdvance(
 ) {
 	Assert(font);
 
-	float scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
-
 	s32 advance;
+
 	stbtt_GetCodepointHMetrics(&font->info, codepoint, &advance, 0);
-	advance *= scale;
+	advance *= font->scale;
 
 	return advance;
 }
@@ -7039,9 +7032,9 @@ struct Text_Data {
 	s32 content_width  = 0;
 	s32 content_height = 0;
 
-	bool is_editable     = false;
-	bool use_word_wrap   = true;
-	bool strip_linebreak = false;
+	bool is_editable      = false;
+	bool use_word_wrap    = true;
+	bool use_no_linebreak = false;
 };
 
 struct Text {
@@ -7136,16 +7129,16 @@ Text_HasChanged(
 	return anything_changed;
 }
 
-instant s32
-Text_BuildLines(
+/// returns number of lines
+instant u64
+Text_CalcLineCount(
 	Text *text,
-	Array<String> *as_words,
-	Array<Text_Line> *a_text_line_out,
-	bool will_append_cursor_end
+	Array<String> *as_words
 ) {
 	Assert(text);
 	Assert(as_words);
-	Assert(a_text_line_out);
+
+	u64 count_lines = 0;
 
 	MEASURE_START();
 
@@ -7154,46 +7147,22 @@ Text_BuildLines(
 
 	Rect_AddPadding(&rect, text->data.rect_padding);
 
-	/// clear existing lines
-	FOR_ARRAY(*a_text_line_out, it_line) {
-		Text_Line *t_text_line = &ARRAY_IT(*a_text_line_out, it_line);
-		String_Destroy(&t_text_line->s_data);
-		t_text_line->width_pixel = 0;
-	}
-	Array_ClearContainer(a_text_line_out);
-
-	s32 height_max  = 0;
-
-	Text_Line *t_text_line;
 	Rect rect_line_current = {rect.x, rect.y, 0, 0};
+
 	u64 advance_space = Codepoint_GetAdvance(font, ' ');
-
-	/// always add ' ' at the end
-	if (as_words->count == 0) {
-		if (will_append_cursor_end) {
-			Array_AddEmpty(a_text_line_out, &t_text_line);
-
-			t_text_line->width_pixel += advance_space;
-			String_Append(&t_text_line->s_data, " ", 1);
-		}
-		return height_max;
-	}
-
-	Assert(a_text_line_out->count == 0);
-
-	s32 height_line = Font_GetLineHeight(font);
+	u64 index_line = 0;
 	bool line_start = true;
 
-	/// add first empty line to be filled
-	if (as_words->count) {
-		height_max += height_line;
-		Array_AddEmpty(a_text_line_out, &t_text_line);
-	}
+	/// words will be in sequential order in memory!
+	String *ts_data_it = &ARRAY_IT(*as_words, 0);
 
-    FOR_ARRAY(*as_words, it_words) {
-    	bool is_last_word = (it_words + 1 == as_words->count);
+	if (as_words->count)
+		++count_lines;
 
-		String *ts_word = &ARRAY_IT(*as_words, it_words);
+	u64 index_data = 0;
+
+	FOR_ARRAY(*as_words, it_word) {
+		String *ts_word = &ARRAY_IT(*as_words, it_word);
 
 		u64 advance_word = Codepoint_GetStringAdvance(
 								font,
@@ -7202,73 +7171,313 @@ Text_BuildLines(
 								ts_word
 							);
 
-		/// draw ' ' between words, unless there was no word,
-		/// then do not draw ' ' x2, since words are parsed
-		/// width ' ' as delimiter
-		if (!line_start AND !(ts_word->length == 1 AND *ts_word->value == ' ')) {
-			rect_line_current.x      += advance_space;
-			t_text_line->width_pixel += advance_space;
-			String_Append(&t_text_line->s_data, " ", 1);
-		}
-
 		/// word wrap
 		if (    text->data.use_word_wrap
 			AND !line_start
 			AND rect.w > 0
 			AND (rect_line_current.x - rect.x) + advance_word > rect.w
-			AND !text->data.strip_linebreak
+			AND !text->data.use_no_linebreak
 		) {
-			Array_AddEmpty(a_text_line_out, &t_text_line);
+			++count_lines;
 			line_start = true;
 
 			rect_line_current.x  = rect.x;
-			rect_line_current.y += height_line;
-
-			height_max += height_line;
 		}
 
-		if (   String_EndWith(ts_word, "\n")
-			OR String_EndWith(ts_word, "\r")
-		) {
-			Assert(!text->data.strip_linebreak);
+		index_data += ts_word->length;
 
-			t_text_line->width_pixel += advance_word;
-			String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
-
-			Array_AddEmpty(a_text_line_out, &t_text_line);
+		if (String_EndWith(ts_word, "\n", 1)) {
+			++count_lines;
 			line_start = true;
 
-			rect_line_current.x  = rect.x;
-			rect_line_current.y += height_line;
-
-			height_max += height_line;
-
-			/// append ' ' on the last line-break
-			if (is_last_word AND will_append_cursor_end) {
-				t_text_line->width_pixel += advance_space;
-				String_Append(&t_text_line->s_data, " ", 1);
-			}
+			rect_line_current.x = rect.x;
 
 			continue;
 		}
 
-		rect_line_current.x      += advance_word;
-		t_text_line->width_pixel += advance_word;
-		String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
+		rect_line_current.x += advance_word;
+		line_start = false;
+	}
 
-		/// append ' ' on the last word
-		if (is_last_word AND will_append_cursor_end) {
-			t_text_line->width_pixel += advance_space;
-			String_Append(&t_text_line->s_data, " ", 1);
+	MEASURE_END("");
+
+	return count_lines;
+}
+
+/// returns height in pixel
+instant s32
+Text_BuildLines(
+	Text *text,
+	Array<String> *as_words,
+	u64 number_of_linebreaks,
+	Array<Text_Line> *a_text_line_out
+) {
+	Assert(text);
+	Assert(as_words);
+	Assert(a_text_line_out);
+
+	s32 max_height = 0;
+
+	MEASURE_START();
+
+	Array_ClearContainer(a_text_line_out);
+
+	/// convert to number of fixed line-breaks
+	if (!text->data.use_word_wrap) {
+		Array_Reserve(a_text_line_out, number_of_linebreaks + 1);
+
+		max_height = (number_of_linebreaks + 1) * Font_GetLineHeight(text->font);
+
+		u64 limit_prev = a_text_line_out->limit;
+
+		Text_Line *text_line = 0;
+
+		/// words will be in sequential order in memory!
+		String *ts_data_it = &ARRAY_IT(*as_words, 0);
+
+		if (as_words->count) {
+			Array_AddEmpty(a_text_line_out, &text_line);
+			text_line->s_data.value = ts_data_it->value;
 		}
 
-		line_start = false;
-    }
+		u64 index_data = 0;
 
-    MEASURE_END("");
+		FOR_ARRAY(*as_words, it_word) {
+			String *ts_word = &ARRAY_IT(*as_words, it_word);
 
-	return height_max;
+			text_line->s_data.length += ts_word->length;
+
+			index_data += ts_word->length;
+
+			if (String_EndWith(ts_word, "\n", 1)) {
+				Array_AddEmpty(a_text_line_out, &text_line);
+				text_line->s_data.value = &ts_data_it->value[index_data];
+			}
+		}
+
+		/// make sure reservation worked
+		Assert(    limit_prev == a_text_line_out->limit
+			   AND a_text_line_out->size == a_text_line_out->limit);
+
+		MEASURE_END("(static line-break) ");
+	}
+	else {
+		/// do NOT calc. number of linebreaks (incl. word-wrap) and reserve
+		/// the amount of space needed to fit into the array
+		/// there is no benefit, since the amount of time needed to read all
+		/// the codepoint data is greater than the reduction in speed by
+		/// preallocating memory.
+		///
+		/// this works without word-wrap (in the code above) due to the lack
+		/// of codepoint data retrieval
+
+		Font *font = text->font;
+		Rect  rect = text->data.rect;
+
+		Rect_AddPadding(&rect, text->data.rect_padding);
+
+		Rect rect_line_current = {rect.x, rect.y, 0, 0};
+
+		u64 advance_space = Codepoint_GetAdvance(font, ' ');
+		s32 line_height = Font_GetLineHeight(font);
+		u64 index_line = 0;
+		bool line_start = true;
+
+		Text_Line *text_line = 0;
+
+		/// words will be in sequential order in memory!
+		String *ts_data_it = &ARRAY_IT(*as_words, 0);
+
+		if (as_words->count) {
+			max_height += line_height;
+			Array_AddEmpty(a_text_line_out, &text_line);
+			text_line->s_data.value = ts_data_it->value;
+		}
+
+		u64 index_data = 0;
+
+		FOR_ARRAY(*as_words, it_word) {
+			String *ts_word = &ARRAY_IT(*as_words, it_word);
+
+			u64 advance_word = Codepoint_GetStringAdvance(
+									font,
+									rect_line_current.x - rect.x,
+									advance_space,
+									ts_word
+								);
+
+			/// word wrap
+			if (    text->data.use_word_wrap
+				AND !line_start
+				AND rect.w > 0
+				AND (rect_line_current.x - rect.x) + advance_word > rect.w
+				AND !text->data.use_no_linebreak
+			) {
+				Array_AddEmpty(a_text_line_out, &text_line);
+				line_start = true;
+
+				text_line->s_data.value = &ts_data_it->value[index_data];
+
+				rect_line_current.x  = rect.x;
+				rect_line_current.y += line_height;
+
+				max_height += line_height;
+			}
+
+			text_line->s_data.length += ts_word->length;
+
+			index_data += ts_word->length;
+
+			if (String_EndWith(ts_word, "\n", 1)) {
+				Array_AddEmpty(a_text_line_out, &text_line);
+				line_start = true;
+
+				text_line->s_data.value = &ts_data_it->value[index_data];
+
+				rect_line_current.x  = rect.x;
+				rect_line_current.y += line_height;
+
+				max_height += line_height;
+
+				continue;
+			}
+
+			rect_line_current.x    += advance_word;
+			text_line->width_pixel += advance_word;
+			line_start = false;
+		}
+
+		MEASURE_END("(word-wrap) ");
+	}
+
+	return max_height;
 }
+
+/////@TODO: make this faster
+//instant s32
+//Text_BuildLines(
+//	Text *text,
+//	Array<String> *as_words,
+//	Array<Text_Line> *a_text_line_out,
+//	bool will_append_cursor_end
+//) {
+//	Assert(text);
+//	Assert(as_words);
+//	Assert(a_text_line_out);
+//
+//	MEASURE_START();
+//
+//	Font *font = text->font;
+//	Rect  rect = text->data.rect;
+//
+//	Rect_AddPadding(&rect, text->data.rect_padding);
+//
+//	/// clear existing lines
+//	FOR_ARRAY(*a_text_line_out, it_line) {
+//		Text_Line *t_text_line = &ARRAY_IT(*a_text_line_out, it_line);
+//		String_Destroy(&t_text_line->s_data);
+//		t_text_line->width_pixel = 0;
+//	}
+//	Array_ClearContainer(a_text_line_out);
+//
+//	s32 height_max  = 0;
+//
+//	Text_Line *t_text_line;
+//	Rect rect_line_current = {rect.x, rect.y, 0, 0};
+//	u64 advance_space = Codepoint_GetAdvance(font, ' ');
+//
+//	/// always add ' ' at the end
+//	if (as_words->count == 0) {
+//		if (will_append_cursor_end) {
+//			Array_AddEmpty(a_text_line_out, &t_text_line);
+//
+//			t_text_line->width_pixel += advance_space;
+//			String_Append(&t_text_line->s_data, " ", 1);
+//		}
+//		return height_max;
+//	}
+//
+//	Assert(a_text_line_out->count == 0);
+//
+//	s32 height_line = Font_GetLineHeight(font);
+//	bool line_start = true;
+//
+//	/// add first empty line to be filled
+//	if (as_words->count) {
+//		height_max += height_line;
+//		Array_AddEmpty(a_text_line_out, &t_text_line);
+//	}
+//
+//    FOR_ARRAY(*as_words, it_words) {
+//    	bool is_last_word = (it_words + 1 == as_words->count);
+//
+//		String *ts_word = &ARRAY_IT(*as_words, it_words);
+//
+//		u64 advance_word = Codepoint_GetStringAdvance(
+//								font,
+//								rect_line_current.x - rect.x,
+//								advance_space,
+//								ts_word
+//							);
+//
+//		/// word wrap
+//		if (    text->data.use_word_wrap
+//			AND !line_start
+//			AND rect.w > 0
+//			AND (rect_line_current.x - rect.x) + advance_word > rect.w
+//			AND !text->data.use_no_linebreak
+//		) {
+//			Array_AddEmpty(a_text_line_out, &t_text_line);
+//			line_start = true;
+//
+//			rect_line_current.x  = rect.x;
+//			rect_line_current.y += height_line;
+//
+//			height_max += height_line;
+//		}
+//
+//		if (   String_EndWith(ts_word, "\n")
+//			OR String_EndWith(ts_word, "\r")
+//		) {
+//			Assert(!text->data.use_no_linebreak);
+//
+//			t_text_line->width_pixel += advance_word;
+//			String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
+//
+//			Array_AddEmpty(a_text_line_out, &t_text_line);
+//			line_start = true;
+//
+//			rect_line_current.x  = rect.x;
+//			rect_line_current.y += height_line;
+//
+//			height_max += height_line;
+//
+//			/// append ' ' on the last line-break
+//			if (is_last_word AND will_append_cursor_end) {
+//				t_text_line->width_pixel += advance_space;
+//				String_Append(&t_text_line->s_data, " ", 1);
+//			}
+//
+//			continue;
+//		}
+//
+//		rect_line_current.x      += advance_word;
+//		t_text_line->width_pixel += advance_word;
+//		String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
+//
+//		/// append ' ' on the last word
+//		if (is_last_word AND will_append_cursor_end) {
+//			t_text_line->width_pixel += advance_space;
+//			String_Append(&t_text_line->s_data, " ", 1);
+//		}
+//
+//		line_start = false;
+//    }
+//
+//    MEASURE_END("");
+//
+//	return height_max;
+//}
 
 ///@Hint: line will NOT adjust, wenn word-wrap is disabled AND
 ///       the text-line is visibly longer, otherwise it would not
@@ -7315,7 +7524,6 @@ Text_AddLines(
 	if (!width_max) {
 		FOR_ARRAY(*a_text_lines, it_line) {
 			Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
-
 			width_max = MAX(width_max, t_text_line->width_pixel);
 		}
 	}
@@ -7335,20 +7543,18 @@ Text_AddLines(
 	if (has_cursor)
 		Vertex_ClearAttributes(&text->cursor.vertex_select);
 
-	u64 it_index = 0;
-
 	Codepoint codepoint_space;
 	Codepoint_GetData(text->font, ' ', &codepoint_space);
 
 	FOR_ARRAY(*a_text_lines, it_line) {
-		Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
+		Text_Line *text_line = &ARRAY_IT(*a_text_lines, it_line);
 
 		u64 it_data = 0;
 
-		while(it_data < t_text_line->s_data.length) {
+		while(it_data < text_line->s_data.length) {
 			Codepoint codepoint;
 
-			s8 ch = t_text_line->s_data.value[it_data];
+			s8 ch = text_line->s_data.value[it_data];
 
 			Codepoint_GetDataConditional(
 				text->font,
@@ -7360,7 +7566,7 @@ Text_AddLines(
 
 			Codepoint_GetPositionNext(&codepoint, &rect_position);
 
-			u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, t_text_line);
+			u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, text_line);
 
 			/// for unavailable characters like ' '
 			if (!Texture_IsEmpty(&codepoint.texture)) {
@@ -7376,14 +7582,12 @@ Text_AddLines(
 				{
 					Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
 					Array_ReserveAdd(&t_attribute->a_buffer, 2);
-
 					Array_Add(&t_attribute->a_buffer, x_pos + x_align_offset);
 					Array_Add(&t_attribute->a_buffer, y_pos);
 				}
 				{
 					Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
 					Array_ReserveAdd(&t_attribute->a_buffer, 3);
-
 					Array_Add(&t_attribute->a_buffer, text->data.color.r);
 					Array_Add(&t_attribute->a_buffer, text->data.color.g);
 					Array_Add(&t_attribute->a_buffer, text->data.color.b);
@@ -7391,7 +7595,6 @@ Text_AddLines(
 			}
 
 			++it_data;
-			++it_index;
 		}
 
 		Codepoint_SetNewline(text->font, &rect_position, x_line_start);
@@ -7454,22 +7657,30 @@ Text_Update(
 		return false;
 	}
 
+#if !DEBUG_ALWAYS_UPDATE
 	if (!Text_HasChanged(text_io, false))
 		return false;
+#endif
 
 	MEASURE_START();
 
 	/// redraw text
-	if (text_io->data.strip_linebreak) {
+	if (text_io->data.use_no_linebreak) {
 		String_Replace(&text_io->s_data, "\n", "");
 		String_Replace(&text_io->s_data, "\r", "");
 	}
 
+	u64 number_of_lines = 0;
+
+#if !DEBUG_ALWAYS_UPDATE
 	if (text_io->s_data.changed)
-		String_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
+		number_of_lines = String_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
+#else
+	number_of_lines = String_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
+#endif
 
 	/// put " " at the end of the text, when it's editable for text cursor
-	s32 text_height = Text_BuildLines(text_io, &text_io->as_words, &text_io->a_text_lines, text_io->data.is_editable);
+	s32 text_height = Text_BuildLines(text_io, &text_io->as_words, number_of_lines, &text_io->a_text_lines);
 
 	if (text_io->data.rect.h) {
 		s32 pad_height = text_io->data.rect_padding.y + text_io->data.rect_padding.h;
@@ -8078,7 +8289,7 @@ Text_UpdateInput(
 
 		bool is_linebreak = (key == '\n' OR key == '\r');
 
-		if (text_io->data.strip_linebreak AND is_linebreak)
+		if (text_io->data.use_no_linebreak AND is_linebreak)
 			return;
 
 		/// control + a
@@ -8219,8 +8430,8 @@ Text_GetSize(
 	static Array<Text_Line> a_text_lines;
 
 	if (height_out) {
-		String_SplitWordsBuffer(&text->s_data, &as_words);
-		*height_out = Text_BuildLines(text, &as_words, &a_text_lines, false);
+		u64 number_of_lines = String_SplitWordsBuffer(&text->s_data, &as_words);
+		*height_out = Text_BuildLines(text, &as_words, number_of_lines, &a_text_lines);
 	}
 
 	IF_SET(width_out)  = text->data.rect.w;
@@ -9460,8 +9671,8 @@ Widget_Render(
 			FOR_ARRAY(*as_target, it_row) {
 				String *ts_data = &ARRAY_IT(*as_target, it_row);
 
-				String_SplitWordsBuffer(ts_data, &t_text->as_words);
-				rect_text->h = Text_BuildLines(t_text, &t_text->as_words, &t_text->a_text_lines, false);
+				u64 number_of_lines = String_SplitWordsBuffer(ts_data, &t_text->as_words);
+				rect_text->h = Text_BuildLines(t_text, &t_text->as_words, number_of_lines, &t_text->a_text_lines);
 
 				if (Rect_IsIntersecting(rect_text, &widget_io->layout_data.settings.rect)) {
 					Color32 t_color_rect = widget_io->data.color_outline;
@@ -10695,7 +10906,7 @@ Widget_CreateComboBox(
 	wg_list.data.color_background = Color_MakeGrey(0.8f);
 
 	wg_text.text.data.rect_padding  = {2, 1, 2, 1};
-	wg_text.text.data.strip_linebreak = true;
+	wg_text.text.data.use_no_linebreak = true;
 
 	wg_button.text.data.rect_margin  = {};
 	wg_button.text.data.rect_padding = {3, -1, 3, -1};
