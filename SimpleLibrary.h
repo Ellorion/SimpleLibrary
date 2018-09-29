@@ -6935,6 +6935,7 @@ enum CURSOR_MOVE_TYPE {
 	CURSOR_MOVE_X,
 	CURSOR_MOVE_Y,
 	CURSOR_MOVE_LINE_BORDER,
+	CURSOR_MOVE_PAGE
 };
 
 struct Text_Line {
@@ -7861,6 +7862,198 @@ Text_Cursor_Render(
 	);
 }
 
+/// returns info if scrolling has happened
+instant bool
+Text_Cursor_Scroll(
+	Text *text_io,
+	Rect rect_cursor,
+	s32 advance_space
+) {
+	Rect rect = text_io->data.rect;
+
+	Text_Cursor *cursor = &text_io->cursor;
+
+	float *x_offset = &text_io->offset_x;
+	float *y_offset = &text_io->offset_y;
+
+	Rect_AddPadding(&rect, text_io->data.rect_margin);
+	Rect_AddPadding(&rect, text_io->data.rect_padding);
+
+	/// exclude offsets
+	float cursor_pos_x         = rect_cursor.x - *x_offset;
+	float cursor_pos_y         = rect_cursor.y - *y_offset;
+
+	bool is_past_right_border  = (rect_cursor.x + rect_cursor.w > rect.x + rect.w);
+	bool is_past_left_border   = (rect_cursor.x < rect.x);
+
+	bool is_past_top_border    = (rect_cursor.y < rect.y);
+	bool is_past_bottom_border = (rect_cursor.y + rect_cursor.h > rect.y + rect.h);
+
+	if (    (cursor->move_type == CURSOR_MOVE_Y OR cursor->move_type == CURSOR_MOVE_PAGE)
+		AND (is_past_top_border OR is_past_bottom_border)
+	) {
+		*x_offset = 0;
+
+		if (is_past_top_border) {
+			*y_offset = rect.y - cursor_pos_y;
+		}
+		else
+		if (is_past_bottom_border) {
+			*y_offset = (rect.y + rect.h) - (cursor_pos_y + rect_cursor.h);
+		}
+
+		Text_Cursor_Flush(text_io);
+		return true;
+	}
+
+	if (cursor->move_type == CURSOR_MOVE_X AND (is_past_right_border OR is_past_left_border)) {
+		/// skip to see which chars are coming in either direction
+		u32 skip_space_mul_x = advance_space * 4;
+
+		if (is_past_left_border) {
+			*x_offset = rect.x - cursor_pos_x + skip_space_mul_x;
+
+			if (*x_offset > 0)
+				*x_offset = 0;
+		}
+		else
+		if (is_past_right_border) {
+			*x_offset = (rect.x + rect.w) - (cursor_pos_x + rect_cursor.w) - skip_space_mul_x;
+		}
+
+		Text_Cursor_Flush(text_io);
+		return true;
+	}
+
+	return false;
+}
+
+/// returns true if data is invalid and need updating
+instant bool
+Text_Cursor_Move(
+	Text *text_io,
+	Rect rect_position,
+	u64 index_cursor,
+	u64 index_line_x,
+	Text_Line *text_line,
+	bool *found_cursor_start_out,
+	bool *found_cursor_end_out
+) {
+	Assert(text_io);
+	Assert(text_line);
+	Assert(found_cursor_start_out);
+	Assert(found_cursor_end_out);
+
+	Text_Cursor *cursor = &text_io->cursor;
+
+	switch (cursor->move_type) {
+		case CURSOR_MOVE_NONE:
+		case CURSOR_MOVE_X: {
+			*found_cursor_end_out = true;
+		} break;
+
+		case CURSOR_MOVE_Y: {
+			if (cursor->move_index_y == 0) {
+				*found_cursor_end_out = true;
+			}
+			else
+			if (cursor->move_index_y > 0) {
+				Point pt_line = {
+					rect_position.x,
+					rect_position.y + Font_GetLineHeight(text_io->font)
+				};
+
+				if (!cursor->is_selecting)
+					*found_cursor_start_out = false;
+
+				cursor->data.index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
+
+				Text_Cursor_Flush(text_io);
+			}
+			else {
+				Point pt_line = {
+					rect_position.x,
+					rect_position.y - Font_GetLineHeight(text_io->font)
+				};
+
+				cursor->data.index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
+
+				Text_Cursor_Flush(text_io);
+
+				return true;
+			}
+		} break;
+
+		case CURSOR_MOVE_LINE_BORDER: {
+			if (cursor->move_index_x == 0) {
+				*found_cursor_end_out = true;
+			}
+			else
+			if (cursor->move_index_x > 0) {
+				cursor->data.index_select_end -= index_line_x;
+				cursor->data.index_select_end += text_line->s_data.length;
+				cursor->data.index_select_end -= 1;
+
+				if (String_EndWith(&text_line->s_data, "\r\n"))
+					cursor->data.index_select_end -= 1;
+
+				if (cursor->data.index_select_end != index_cursor) {
+					if (!cursor->is_selecting)
+						*found_cursor_start_out = false;
+				}
+				else {
+					*found_cursor_end_out = true;
+				}
+
+				Text_Cursor_Flush(text_io);
+				cursor->move_type = CURSOR_MOVE_X;
+			}
+			else {
+				cursor->data.index_select_end -= index_line_x;
+
+				Text_Cursor_Flush(text_io);
+				cursor->move_type = CURSOR_MOVE_X;
+
+				return true;
+			}
+		} break;
+
+		case CURSOR_MOVE_PAGE: {
+			if (cursor->move_index_y == 0) {
+				*found_cursor_end_out = true;
+			}
+			else
+			if (cursor->move_index_y > 0) {
+				Point pt_line = {
+					rect_position.x,
+					rect_position.y + text_io->data.rect.h
+				};
+
+				if (!cursor->is_selecting)
+					*found_cursor_start_out = false;
+
+				cursor->data.index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
+
+				Text_Cursor_Flush(text_io);
+			}
+			else {
+				Point pt_line = {
+					rect_position.x,
+					rect_position.y - text_io->data.rect.h
+				};
+
+				cursor->data.index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
+
+				Text_Cursor_Flush(text_io);
+
+				return true;
+			}
+		} break;
+	}
+
+	return false;
+}
+
 instant void
 Text_Cursor_Update(
     Text *text_io
@@ -7932,8 +8125,10 @@ Text_Cursor_Update(
 		cursor->data.index_select_end += cursor->move_index_x;
 	}
 
+	Text_Line *text_line = 0;
+
 	FOR(text_io->a_text_lines.count, it_line) {
-		Text_Line *text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
+		text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
 
 		if (    cursor->data.index_select_start > cursor_index + text_line->s_data.length
 			AND cursor->data.index_select_end   > cursor_index + text_line->s_data.length
@@ -7965,82 +8160,23 @@ Text_Cursor_Update(
 
 			bool is_newline_char = (character == '\r' OR character == '\n');
 
-			if (cursor->data.index_select_start == cursor_index AND !found_start)
+			if (cursor->data.index_select_start == cursor_index AND !found_start) {
 				found_start = true;
+			}
 
-			if (cursor->data.index_select_end   == cursor_index AND !found_end) {
-				switch (cursor->move_type) {
-					case CURSOR_MOVE_NONE:
-					case CURSOR_MOVE_X: {
-						found_end = true;
-					} break;
+			if (cursor->data.index_select_end == cursor_index AND !found_end) {
+				bool is_invalid = Text_Cursor_Move(
+					text_io,
+					rect_position_it,
+					cursor_index,
+					it_data,
+					text_line,
+					&found_start,
+					&found_end
+				);
 
-					case CURSOR_MOVE_Y: {
-						if (cursor->move_index_y == 0) {
-							found_end = true;
-						}
-						else
-						if (cursor->move_index_y > 0) {
-							Point pt_line = {
-								rect_position_it.x,
-								rect_position_it.y + Font_GetLineHeight(text_io->font)
-							};
-
-							if (!cursor->is_selecting)
-								found_start = false;
-
-							cursor->data.index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
-
-							Text_Cursor_Flush(text_io);
-						}
-						else {
-							Point pt_line = {
-								rect_position_it.x,
-								rect_position_it.y - Font_GetLineHeight(text_io->font)
-							};
-
-							cursor->data.index_select_end = Text_Cursor_FindIndex(text_io, pt_line);
-
-							Text_Cursor_Flush(text_io);
-
-							return Text_Cursor_Update(text_io);
-						}
-					} break;
-
-					case CURSOR_MOVE_LINE_BORDER: {
-						if (cursor->move_index_x == 0) {
-							found_end = true;
-						}
-						else
-						if (cursor->move_index_x > 0) {
-							cursor->data.index_select_end -= it_data;
-							cursor->data.index_select_end += text_line->s_data.length;
-							cursor->data.index_select_end -= 1;
-
-							if (String_EndWith(&text_line->s_data, "\r\n"))
-								cursor->data.index_select_end -= 1;
-
-							if (cursor->data.index_select_end != cursor_index) {
-								if (!cursor->is_selecting)
-									found_start = false;
-							}
-							else {
-                                found_end = true;
-							}
-
-							Text_Cursor_Flush(text_io);
-							cursor->move_type = CURSOR_MOVE_X;
-						}
-						else {
-							cursor->data.index_select_end -= it_data;
-
-							Text_Cursor_Flush(text_io);
-							cursor->move_type = CURSOR_MOVE_X;
-
-							return Text_Cursor_Update(text_io);
-						}
-					} break;
-				}
+				if (is_invalid)
+					return Text_Cursor_Update(text_io);
 			}
 
 			if (XOR(found_start, found_end)) {
@@ -8071,52 +8207,10 @@ Text_Cursor_Update(
 					Rect rect_cursor = rect_position_it;
 					Text_Cursor_Render(text_io, rect_cursor, width_cursor);
 
-					float *x_offset = &text_io->offset_x;
-					float *y_offset = &text_io->offset_y;
+					bool has_scrolled = Text_Cursor_Scroll(text_io, rect_cursor, codepoint_space.advance);
 
-					/// exclude offsets
-					float cursor_pos_x         = rect_cursor.x - *x_offset;
-					float cursor_pos_y         = rect_cursor.y - *y_offset;
-
-					bool is_past_right_border  = (rect_cursor.x + rect_cursor.w > rect.x + rect.w);
-					bool is_past_left_border   = (rect_cursor.x < rect.x);
-
-					bool is_past_top_border    = (rect_cursor.y < rect.y);
-					bool is_past_bottom_border = (rect_cursor.y + rect_cursor.h > rect.y + rect.h);
-
-					if (cursor->move_type == CURSOR_MOVE_Y AND (is_past_top_border OR is_past_bottom_border)) {
-						*x_offset = 0;
-
-						if (is_past_top_border) {
-							*y_offset = rect.y - cursor_pos_y;
-						}
-						else
-						if (is_past_bottom_border) {
-							*y_offset = (rect.y + rect.h) - (cursor_pos_y + rect_cursor.h);
-						}
-
-						Text_Cursor_Flush(text_io);
+					if (has_scrolled)
 						return;
-					}
-
-					if (cursor->move_type == CURSOR_MOVE_X AND (is_past_right_border OR is_past_left_border)) {
-						/// skip to see which chars are coming in either direction
-						u32 skip_space_mul_x = codepoint_space.advance * 4;
-
-						if (is_past_left_border) {
-							*x_offset = rect.x - cursor_pos_x + skip_space_mul_x;
-
-							if (*x_offset > 0)
-								*x_offset = 0;
-						}
-						else
-						if (is_past_right_border) {
-							*x_offset = (rect.x + rect.w) - (cursor_pos_x + rect_cursor.w) - skip_space_mul_x;
-						}
-
-						Text_Cursor_Flush(text_io);
-						return;
-					}
 
 					found_end_once = true;
 
@@ -8158,14 +8252,25 @@ Text_Cursor_Update(
 	}
 
 	if (!found_end_once) {
-		Text_Cursor_Render(text_io, rect_position_it, width_cursor);
-	}
+		cursor->data.index_select_end = cursor_index;
 
-	/// upper boundary index check
-	if (!found_end_once AND cursor_index > text_io->s_data.length) {
-		cursor->data.index_select_end = cursor_index - 1;
-		Text_Cursor_Flush(text_io);
-		return Text_Cursor_Update(text_io);
+		if (text_line) {
+			bool is_invalid = Text_Cursor_Move(
+				text_io,
+				rect_position_it,
+				cursor_index,
+				text_line->s_data.length,
+				text_line,
+				&found_start,
+				&found_end
+			);
+
+			if (is_invalid)
+				return Text_Cursor_Update(text_io);
+		}
+
+		Text_Cursor_Render(text_io, rect_position_it, width_cursor);
+		Text_Cursor_Scroll(text_io, rect_position_it, codepoint_space.advance);
 	}
 
  	Text_Cursor_FlushFull(text_io);
@@ -8214,6 +8319,11 @@ Text_UpdateInput(
 									*move_type = CURSOR_MOVE_LINE_BORDER; }
 	if (keyboard->down[VK_END])   { offset_index_x =  1;
 									*move_type = CURSOR_MOVE_LINE_BORDER; }
+
+	if (keyboard->down[VK_PRIOR]) { offset_index_y = -1;
+									*move_type = CURSOR_MOVE_PAGE; }
+	if (keyboard->down[VK_NEXT])  { offset_index_y =  1;
+									*move_type = CURSOR_MOVE_PAGE; }
 
 	cursor->is_selecting = (keyboard->pressing[VK_SHIFT] AND !keyboard->is_key_sym);
 
