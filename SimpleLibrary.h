@@ -2,7 +2,7 @@
 
 #define DEBUG_ALWAYS_UPDATE		0
 #define DEBUG_EVENT_STATUS		0
-#define DEBUG_BENCHMARK			1
+#define DEBUG_BENCHMARK			0
 
 /// Compiler: g++ (6.3.0) (mingw)
 ///
@@ -936,7 +936,7 @@ _AssertMessage(
 		std::cout << "Measure [" << __FUNCTION__ << "]: " << _text << Time_Measure(&DEBUG_tmr_measure) << " ms" << std::endl;
 #else
 	#define MEASURE_START()
-	#define MEASURE_END()
+	#define MEASURE_END(_text)
 #endif
 
 /// ::: Utilities
@@ -7162,10 +7162,22 @@ Text_BuildLines(
 	u64 number_of_linebreaks,
 	Array<Text_Line> *a_text_line_out
 ) {
+	///@Note: number_of_linebreaks can be 0 when resizing
+	///       the text rect, since the words might have
+	///       already been processed and will not calc.
+	///       the number of static linebreaks again.
+	///       it is also not nessesary here (to remember
+	///       the amount of linebreaks), since it will
+	///       just be used to reserve an array buffer, which
+	///       would have already been adjusted when the words
+	///       have been processed and resulted in a value in
+	///       number_of_linebreaks which is >0.
+
 	Assert(text);
 	Assert(as_words);
  	Assert(a_text_line_out);
 
+ 	s32 line_height = Font_GetLineHeight(text->font);
 	s32 max_height = 0;
 
 	MEASURE_START();
@@ -7175,8 +7187,6 @@ Text_BuildLines(
 	/// convert to number of fixed line-breaks
 	if (!text->data.use_word_wrap) {
 		Array_Reserve(a_text_line_out, number_of_linebreaks + 1);
-
-		max_height = (number_of_linebreaks + 1) * Font_GetLineHeight(text->font);
 
 		u64 limit_prev = a_text_line_out->limit;
 
@@ -7188,6 +7198,8 @@ Text_BuildLines(
 		if (as_words->count) {
 			Array_AddEmpty(a_text_line_out, &text_line);
 			text_line->s_data.value = ts_data_it->value;
+
+			max_height += line_height;
 		}
 
 		u64 index_data = 0;
@@ -7202,6 +7214,8 @@ Text_BuildLines(
 			if (String_EndWith(ts_word, "\n", 1)) {
 				Array_AddEmpty(a_text_line_out, &text_line);
 				text_line->s_data.value = &ts_data_it->value[index_data];
+
+				max_height += line_height;
 			}
 		}
 
@@ -7239,8 +7253,8 @@ Text_BuildLines(
 		String *ts_data_it = &ARRAY_IT(*as_words, 0);
 
 		if (as_words->count) {
-			max_height += line_height;
 			Array_AddEmpty(a_text_line_out, &text_line);
+			max_height += line_height;
 			text_line->s_data.value = ts_data_it->value;
 		}
 
@@ -7264,14 +7278,13 @@ Text_BuildLines(
 				AND !text->data.use_no_linebreak
 			) {
 				Array_AddEmpty(a_text_line_out, &text_line);
+				max_height += line_height;
 				line_start = true;
 
 				text_line->s_data.value = &ts_data_it->value[index_data];
 
 				rect_line_current.x  = rect.x;
 				rect_line_current.y += line_height;
-
-				max_height += line_height;
 			}
 
 			text_line->s_data.length += ts_word->length;
@@ -7302,132 +7315,6 @@ Text_BuildLines(
 
 	return max_height;
 }
-
-/////@TODO: make this faster
-//instant s32
-//Text_BuildLines(
-//	Text *text,
-//	Array<String> *as_words,
-//	Array<Text_Line> *a_text_line_out,
-//	bool will_append_cursor_end
-//) {
-//	Assert(text);
-//	Assert(as_words);
-//	Assert(a_text_line_out);
-//
-//	MEASURE_START();
-//
-//	Font *font = text->font;
-//	Rect  rect = text->data.rect;
-//
-//	Rect_AddPadding(&rect, text->data.rect_padding);
-//
-//	/// clear existing lines
-//	FOR_ARRAY(*a_text_line_out, it_line) {
-//		Text_Line *t_text_line = &ARRAY_IT(*a_text_line_out, it_line);
-//		String_Destroy(&t_text_line->s_data);
-//		t_text_line->width_pixel = 0;
-//	}
-//	Array_ClearContainer(a_text_line_out);
-//
-//	s32 height_max  = 0;
-//
-//	Text_Line *t_text_line;
-//	Rect rect_line_current = {rect.x, rect.y, 0, 0};
-//	u64 advance_space = Codepoint_GetAdvance(font, ' ');
-//
-//	/// always add ' ' at the end
-//	if (as_words->count == 0) {
-//		if (will_append_cursor_end) {
-//			Array_AddEmpty(a_text_line_out, &t_text_line);
-//
-//			t_text_line->width_pixel += advance_space;
-//			String_Append(&t_text_line->s_data, " ", 1);
-//		}
-//		return height_max;
-//	}
-//
-//	Assert(a_text_line_out->count == 0);
-//
-//	s32 height_line = Font_GetLineHeight(font);
-//	bool line_start = true;
-//
-//	/// add first empty line to be filled
-//	if (as_words->count) {
-//		height_max += height_line;
-//		Array_AddEmpty(a_text_line_out, &t_text_line);
-//	}
-//
-//    FOR_ARRAY(*as_words, it_words) {
-//    	bool is_last_word = (it_words + 1 == as_words->count);
-//
-//		String *ts_word = &ARRAY_IT(*as_words, it_words);
-//
-//		u64 advance_word = Codepoint_GetStringAdvance(
-//								font,
-//								rect_line_current.x - rect.x,
-//								advance_space,
-//								ts_word
-//							);
-//
-//		/// word wrap
-//		if (    text->data.use_word_wrap
-//			AND !line_start
-//			AND rect.w > 0
-//			AND (rect_line_current.x - rect.x) + advance_word > rect.w
-//			AND !text->data.use_no_linebreak
-//		) {
-//			Array_AddEmpty(a_text_line_out, &t_text_line);
-//			line_start = true;
-//
-//			rect_line_current.x  = rect.x;
-//			rect_line_current.y += height_line;
-//
-//			height_max += height_line;
-//		}
-//
-//		if (   String_EndWith(ts_word, "\n")
-//			OR String_EndWith(ts_word, "\r")
-//		) {
-//			Assert(!text->data.use_no_linebreak);
-//
-//			t_text_line->width_pixel += advance_word;
-//			String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
-//
-//			Array_AddEmpty(a_text_line_out, &t_text_line);
-//			line_start = true;
-//
-//			rect_line_current.x  = rect.x;
-//			rect_line_current.y += height_line;
-//
-//			height_max += height_line;
-//
-//			/// append ' ' on the last line-break
-//			if (is_last_word AND will_append_cursor_end) {
-//				t_text_line->width_pixel += advance_space;
-//				String_Append(&t_text_line->s_data, " ", 1);
-//			}
-//
-//			continue;
-//		}
-//
-//		rect_line_current.x      += advance_word;
-//		t_text_line->width_pixel += advance_word;
-//		String_Append(&t_text_line->s_data, ts_word->value, ts_word->length);
-//
-//		/// append ' ' on the last word
-//		if (is_last_word AND will_append_cursor_end) {
-//			t_text_line->width_pixel += advance_space;
-//			String_Append(&t_text_line->s_data, " ", 1);
-//		}
-//
-//		line_start = false;
-//    }
-//
-//    MEASURE_END("");
-//
-//	return height_max;
-//}
 
 ///@Hint: line will NOT adjust, wenn word-wrap is disabled AND
 ///       the text-line is visibly longer, otherwise it would not
@@ -7632,7 +7519,6 @@ Text_Update(
 	number_of_lines = String_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
 #endif
 
-	/// put " " at the end of the text, when it's editable for text cursor
 	s32 text_height = Text_BuildLines(text_io, &text_io->as_words, number_of_lines, &text_io->a_text_lines);
 
 	if (text_io->data.rect.h) {
@@ -8209,18 +8095,11 @@ Text_Cursor_Update(
 
 					bool has_scrolled = Text_Cursor_Scroll(text_io, rect_cursor, codepoint_space.advance);
 
-					if (has_scrolled)
-						return;
-
-					found_end_once = true;
-
-					///@Performance: will not help with large file
-					///              while moving the cursor at the
-					///              lower section of that text
-					if (found_start) {
-						Text_Cursor_Flush(text_io);
+					if (has_scrolled) {
 						return;
 					}
+
+					found_end_once = true;
 				}
 				else {
 					/// to move to the start of the
