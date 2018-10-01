@@ -1295,25 +1295,24 @@ Clamp(
 instant void
 Rect_ClampY(
 	float *y_io,
-	s32 height,
-	s32 max_height
+	s32 content_height,
+	s32 visible_height
 ) {
 	Assert(y_io);
-
-	/// do not show negative space below the last visible
-	if (*y_io + height < max_height)
-		*y_io = max_height - height;
 
 	/// do not show negative space above the first visible
 	if (*y_io > 0)
 		*y_io = 0;
 
-	/// avoid scrolling, when all content is visible
-	if (height <= max_height)
+	/// do not show negative space below the last visible
+	if (*y_io + content_height < visible_height)
+		*y_io = visible_height - content_height;
+
+	/// avoid scrolling, when there is nothing to scroll
+	if (content_height <= visible_height)
 		*y_io = 0;
 }
 
-///@Obsolete
 instant void
 Rect_ClampY(
 	Rect *rect_io,
@@ -5979,9 +5978,10 @@ Rect_Render(
 	Assert(shader_set->window);
 	Assert(vertex);
 
-	Vertex_BindAttributes(shader_set, vertex);
-
-	Vertex_Render(shader_set, vertex);
+	if (vertex->a_attributes.count) {
+		Vertex_BindAttributes(shader_set, vertex);
+		Vertex_Render(shader_set, vertex);
+	}
 }
 
 /// ::: Mouse
@@ -7218,10 +7218,6 @@ Text_BuildLines(
 				max_height += line_height;
 			}
 		}
-
-		/// make sure reservation worked
-		Assert(    limit_prev == a_text_line_out->limit
-			   AND a_text_line_out->size == a_text_line_out->limit);
 
 		MEASURE_END("(static line-break) ");
 	}
@@ -9001,6 +8997,7 @@ struct Widget {
 	/// Rendering
 	Text   text;
 	Vertex vertex_rect;
+	Vertex vertex_rect_static;
 
 	/// Layout / Size
 	Layout_Data layout_data;
@@ -9350,11 +9347,26 @@ Widget_Redraw(
 		return;
 	}
 
-	Vertex *t_vertex = &widget_io->vertex_rect;
 	Rect    rect_box =  widget_io->layout_data.settings.rect;
 
-	if (!t_vertex->array_id) Vertex_Create(t_vertex);
-	else                     Vertex_ClearAttributes(t_vertex);
+	/// static rect init
+	/// -----------------------------------------------------------------------
+	Vertex *t_vertex_static = &widget_io->vertex_rect_static;
+
+	if (!t_vertex_static->array_id)
+		Vertex_Create(t_vertex_static);
+	else
+		Vertex_ClearAttributes(t_vertex_static);
+
+	/// dynamic rect init
+	/// -----------------------------------------------------------------------
+	Vertex *t_vertex_dynamic = &widget_io->vertex_rect;
+
+	if (!t_vertex_dynamic->array_id)
+		Vertex_Create(t_vertex_dynamic);
+	else
+		Vertex_ClearAttributes(t_vertex_dynamic);
+	/// -----------------------------------------------------------------------
 
 	switch (widget_io->type) {
 		case WIDGET_SPREADER: {
@@ -9363,7 +9375,7 @@ Widget_Redraw(
 		case WIDGET_TEXTBOX: {
 			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
 
-			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
+			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 
 			Widget_Cursor_ResetBlinking(widget_io);
 		} break;
@@ -9405,36 +9417,36 @@ Widget_Redraw(
 
 		case WIDGET_LABEL: {
 			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
-			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
+			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 		} break;
 
 		case WIDGET_PICTUREBOX:
 		case WIDGET_LISTBOX: {
-			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
+			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 		} break;
 
 		case WIDGET_BUTTON: {
 			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
 
-			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
+			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 
 			if (widget_io->data.border_size) {
 				Rect_Resize(&rect_box, -1);
 
 				if (widget_io->data.has_focus)
-					Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_outline_selected);
+					Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_outline_selected);
 				else
-					Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_outline_inactive);
+					Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_outline_inactive);
 
 				Rect_Resize(&rect_box, -widget_io->data.border_size);
-				Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
+				Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 			}
 		} break;
 
 		case WIDGET_CHECKBOX: {
 			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
 
-			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
+			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 
 			s32 check_offset = 2;
 			s32 check_h = widget_io->text.font->size - (check_offset << 1);
@@ -9455,9 +9467,9 @@ Widget_Redraw(
 			};
 
 			if (widget_io->data.has_focus)
-				Vertex_AddRect32(t_vertex, rect_check, widget_io->data.color_outline_selected);
+				Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_outline_selected);
 			else
-				Vertex_AddRect32(t_vertex, rect_check, widget_io->data.color_outline_inactive);
+				Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_outline_inactive);
 
 			Assert(widget_io->data.border_size);
 			Assert(widget_io->data.border_size < 20);
@@ -9465,11 +9477,11 @@ Widget_Redraw(
 			widget_io->data.border_size = (widget_io->text.font->size / 10);
 
 			Rect_Resize(&rect_check, -widget_io->data.border_size);
-			Vertex_AddRect32(t_vertex, rect_check, widget_io->data.color_background);
+			Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_background);
 
 			if (widget_io->data.is_checked) {
 				Rect_Resize(&rect_check, -1);
-				Vertex_AddRect32(t_vertex, rect_check, widget_io->data.color_outline_selected);
+				Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_outline_selected);
 			}
 		} break;
 
@@ -9497,7 +9509,7 @@ Widget_Redraw(
 		case WIDGET_PROGRESSBAR: {
 			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
 
-			Vertex_AddRect32(t_vertex, rect_box, widget_io->data.color_background);
+			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 
 			Rect rect_progress = rect_box;
 			Widget_Slide *slide = &widget_io->slide;
@@ -9506,7 +9518,7 @@ Widget_Redraw(
 
 			rect_progress.w *= percent;
 
-			Vertex_AddRect32(t_vertex, rect_progress, widget_io->data.color_progress);
+			Vertex_AddRect32(t_vertex_static, rect_progress, widget_io->data.color_progress);
 		} break;
 
 		default:
@@ -9564,6 +9576,11 @@ Widget_Render(
 			Widget_InvalidateBackground(widget_io);
 		}
 
+		if (widget_io->vertex_rect_static.a_attributes.count) {
+			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
+			Rect_Render(shader_set, &widget_io->vertex_rect_static);
+		}
+
 		if (widget_io->vertex_rect.a_attributes.count) {
 			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
 			Rect_Render(shader_set, &widget_io->vertex_rect);
@@ -9591,6 +9608,8 @@ Widget_Render(
 		Text_Render(&widget_io->text);
 	}
 	else {
+		Text *text = &widget_io->text;
+
 		/// do not draw a list widget,
 		/// if it should not be rendered as a popout
 		if (widget_io->data.is_floating AND (!widget_io->data.is_popout OR !render_overlay)) {
@@ -9603,17 +9622,15 @@ Widget_Render(
 			Vertex_ClearAttributes(&widget_io->vertex_rect);
 			Widget_InvalidateBackground(widget_io);
 
-			Text *t_text = &widget_io->text;
+			Text_Clear(text);
 
-			Text_Clear(t_text);
-
-			t_text->data.rect = widget_io->layout_data.settings.rect;
-			Rect *rect_text   = &t_text->data.rect;
+			text->data.rect = widget_io->layout_data.settings.rect;
+			Rect *rect_text = &text->data.rect;
 
 			s32 pad_left = 2;
 
-			rect_text->x += t_text->offset_x + pad_left;
-			rect_text->y += t_text->offset_y;
+			rect_text->x += text->offset_x + pad_left;
+			rect_text->y += text->offset_y;
 
 			widget_io->rect_content.h = 0;
 
@@ -9623,47 +9640,58 @@ Widget_Render(
 			FOR_ARRAY(*as_target, it_row) {
 				String *ts_data = &ARRAY_IT(*as_target, it_row);
 
-				u64 number_of_lines = String_SplitWordsBuffer(ts_data, &t_text->as_words);
-				rect_text->h = Text_BuildLines(t_text, &t_text->as_words, number_of_lines, &t_text->a_text_lines);
+				u64 number_of_lines = String_SplitWordsBuffer(ts_data, &text->as_words);
+				rect_text->h = Text_BuildLines(text, &text->as_words, number_of_lines, &text->a_text_lines);
 
-				if (Rect_IsIntersecting(rect_text, &widget_io->layout_data.settings.rect)) {
-					Color32 t_color_rect = widget_io->data.color_outline;
+				Color32 t_color_rect = widget_io->data.color_outline;
 
-					if (widget_io->data.active_row_id == it_row) {
-						if (widget_io->data.has_focus)
-							t_color_rect = widget_io->data.color_outline_selected;
-						else
-							t_color_rect = widget_io->data.color_outline_inactive;
-					}
-
-					Rect rect_box = *rect_text;
-					rect_box.x -= pad_left;
-
-					Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
-
-					Text_AddLines(t_text, false);
+				if (widget_io->data.active_row_id == it_row) {
+					if (widget_io->data.has_focus)
+						t_color_rect = widget_io->data.color_outline_selected;
+					else
+						t_color_rect = widget_io->data.color_outline_inactive;
 				}
 
+				Rect rect_box = *rect_text;
+				rect_box.x -= pad_left;
+
+				rect_box.x -= text->offset_x;
+				rect_box.y -= text->offset_y;
+
+				Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
+
+				Text_AddLines(text, false);
+
 				s32 height_row_step = rect_text->h + widget_io->data.spacing;
-				rect_text->y           += height_row_step;
+				rect_text->y += height_row_step;
 				widget_io->rect_content.h += height_row_step;
 
 				ts_data->changed = false;
 			}
 
+			if (widget_io->rect_content.h) {
+				widget_io->rect_content.h -= widget_io->data.spacing;
+			}
+
 			/// revert for scissor
 			*rect_text = widget_io->layout_data.settings.rect;
 
-			t_text->data_prev = t_text->data;
+			text->data_prev = text->data;
 		}
 
 		OpenGL_Scissor(shader_set->window, widget_io->layout_data.settings.rect);
 
-		/// render rectangles + background
-		if (widget_io->vertex_rect.a_attributes.count) {
-			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
-			Rect_Render(shader_set, &widget_io->vertex_rect);
-		}
+		///@Note: using a shader will reset uniform offsets to 0
+
+		/// static rects
+		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
+		Rect_Render(shader_set, &widget_io->vertex_rect_static);
+
+		/// dynamic rects
+		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
+		Shader_SetValue(text->shader_set, "x_offset", text->offset_x);
+		Shader_SetValue(text->shader_set, "y_offset", text->offset_y);
+		Rect_Render(shader_set, &widget_io->vertex_rect);
 
 		Text_Render(&widget_io->text);
 
@@ -9720,6 +9748,7 @@ Widget_Destroy(
 
 	Text_Destroy(&widget_out->text);
 	Vertex_Destroy(&widget_out->vertex_rect);
+	Vertex_Destroy(&widget_out->vertex_rect_static);
 }
 
 instant void
@@ -9733,6 +9762,7 @@ Widget_Destroy(
 
 		Text_Destroy(&t_widget->text);
 		Vertex_Destroy(&t_widget->vertex_rect);
+		Vertex_Destroy(&t_widget->vertex_rect_static);
     }
 }
 
@@ -10568,7 +10598,7 @@ Widget_RedrawNumberPickerButton(
 ) {
 	Assert(widget_io);
 
-	Vertex *t_vertex = &widget_io->vertex_rect;
+	Vertex *t_vertex = &widget_io->vertex_rect_static;
 	Rect    rect_box =  widget_io->layout_data.settings.rect;
 
 	if (!t_vertex->array_id) Vertex_Create(t_vertex);
