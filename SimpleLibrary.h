@@ -6805,6 +6805,7 @@ Codepoint_GetData(
 	*entry_out = *t_entry;
 }
 
+///@TODO: tab-width for text is somewhat wrong, fix it!
 instant s32
 Codepoint_GetTabWidth(
 	float x,
@@ -6813,7 +6814,7 @@ Codepoint_GetTabWidth(
 ) {
 	s32 tab_width = (advance_space * (tab_space_count));
 
-	s32 tab_width_remaining = tab_width - (s32)x % tab_width;
+  	s32 tab_width_remaining = tab_width - (s32)x % tab_width;
 
 	/// extend max. tab width for compatability with other editors
 	if (tab_width_remaining < advance_space)
@@ -6837,30 +6838,6 @@ Codepoint_GetDataConditional(
 
 	if (entry_out->codepoint == '\t')
 		entry_out->advance = Codepoint_GetTabWidth(x, advance_space);
-}
-
-instant void
-Codepoint_GetPositionNext(
-	Codepoint *codepoint,
-	RectF *rect_io
-) {
-	Assert(codepoint);
-	Assert(codepoint->font);
-	Assert(rect_io);
-
-	/// rect_x: starting position for each line
-	///         to reset -> set 0 or x-offset
-	/// rect_h: lower end baseline for text drawing
-	///         increasing it will skip to the next line
-	///         has to get the value from itself, or it
-	///         will reset to 0
-	/// rect_w: store advance of prev codepoint to
-	///         set the correct start position for the
-	///         next codepoint
-
-	rect_io->x = rect_io->x + rect_io->w + codepoint->left_side_bearing;
-	rect_io->y = rect_io->h + codepoint->rect_subpixel.y + codepoint->font->size + codepoint->font->descent;
-	rect_io->w = (float)codepoint->advance - codepoint->left_side_bearing;
 }
 
 instant s32
@@ -6900,20 +6877,6 @@ Codepoint_GetStringAdvance(
 	}
 
 	return advance_word;
-}
-
-instant void
-Codepoint_SetNewline(
-	Font *font,
-	RectF *rect_position_io,
-	float x_offset_start = 0
-) {
-	Assert(font);
-	Assert(rect_position_io);
-
-	rect_position_io->h += Font_GetLineHeight(font);
-	rect_position_io->x = x_offset_start;
-	rect_position_io->w = 0;
 }
 
 instant void
@@ -7373,7 +7336,7 @@ Text_AddLines(
 
 	float x_line_start = rect.x;
 
-	RectF rect_position = {	x_line_start, 0, 0, rect.y};
+	RectF rect_position = {	x_line_start, rect.y, 0, 0 };
 
 	if (include_offsets) {
 		rect_position.x += text->offset_x;
@@ -7401,7 +7364,7 @@ Text_AddLines(
 
 			s8 ch = text_line->s_data.value[it_data];
 
-			Codepoint_GetDataConditional(
+ 			Codepoint_GetDataConditional(
 				text->font,
 				ch,
 				&codepoint,
@@ -7409,12 +7372,18 @@ Text_AddLines(
 				codepoint_space.advance
 			);
 
-			Codepoint_GetPositionNext(&codepoint, &rect_position);
+			rect_position.x += codepoint.left_side_bearing;
+			rect_position.y  =
+					rect.y
+				+ 	codepoint.rect_subpixel.y
+				+ 	Font_GetLineHeight(text->font)
+				+ 	codepoint.font->descent
+			;
 
 			u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, text_line);
 
 			/// for unavailable characters like ' '
-			if (!Texture_IsEmpty(&codepoint.texture)) {
+			if (!Texture_IsEmpty(&codepoint.texture) AND codepoint.codepoint > 32) {
 				Vertex *t_vertex;
 				Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex);
 
@@ -7439,10 +7408,13 @@ Text_AddLines(
 				}
 			}
 
+			rect_position.x += codepoint.advance - codepoint.left_side_bearing;
+
 			++it_data;
 		}
 
-		Codepoint_SetNewline(text->font, &rect_position, x_line_start);
+		rect_position.x  = x_line_start;
+		rect.y          += Font_GetLineHeight(text->font);
 	}
 }
 
@@ -7517,7 +7489,6 @@ Text_Update(
 
 	u64 number_of_lines = 0;
 
-/// asdf
 #if !DEBUG_ALWAYS_UPDATE
 	if (text_io->s_data.changed)
 		number_of_lines = String_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
@@ -7631,8 +7602,6 @@ Text_Cursor_FindIndex(
 				rect_position_it.x - x_pos_start,
 				codepoint_space.advance
 			);
-
-			rect_position_it.w = codepoint.advance;
 
 			bool is_newline_char = (character == '\r' OR character == '\n');
 
@@ -7781,9 +7750,7 @@ Text_Cursor_Scroll(
 	bool is_past_top_border    = (rect_cursor.y < rect.y);
 	bool is_past_bottom_border = (rect_cursor.y + rect_cursor.h > rect.y + rect.h);
 
-	if (    (cursor->move_type == CURSOR_MOVE_Y OR cursor->move_type == CURSOR_MOVE_PAGE)
-		AND (is_past_top_border OR is_past_bottom_border)
-	) {
+	if (is_past_top_border OR is_past_bottom_border) {
 		*x_offset = 0;
 
 		if (is_past_top_border) {
@@ -7798,7 +7765,7 @@ Text_Cursor_Scroll(
 		return true;
 	}
 
-	if (cursor->move_type == CURSOR_MOVE_X AND (is_past_right_border OR is_past_left_border)) {
+	if (is_past_right_border OR is_past_left_border) {
 		/// skip to see which chars are coming in either direction
 		u32 skip_space_mul_x = advance_space * 4;
 
