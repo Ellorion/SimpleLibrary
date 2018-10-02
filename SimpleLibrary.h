@@ -1395,8 +1395,14 @@ _Memory_Resize(
 
 	mem = (char *)mem - sizeof(Memory_Header);
 
+	void *mem_old = mem;
+
 	///@Info: will NOT keep the same (virtual) memory address!!!
 	mem = realloc(mem, size + sizeof(Memory_Header));
+
+	if (mem != mem_old)
+		LOG_WARNING("Memory resizing resulted in a new base pointer.");
+
 	((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
 
 	mem = (char *)mem + sizeof(Memory_Header);
@@ -2595,7 +2601,7 @@ Array_Add(
 
 	if (array_io->size + sizeof(T) * length > array_io->limit) {
 		array_io->limit += sizeof(T) * length;
-		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->limit);;
+		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->limit);
 	}
 
 	u64 target = array_io->size / sizeof(T);
@@ -2608,6 +2614,10 @@ Array_Add(
 	return &array_io->memory[target];
 }
 
+///@Hint: only use the output immediately after using this fuction
+///       otherwise another call to this function could invalid
+///       the prev. output because the base memory pointer could
+///       have changed after resizing
 template <typename T>
 instant u64
 Array_AddEmpty(
@@ -8419,6 +8429,7 @@ struct Layout_Block {
 	s32 expand_index = -1;
 	u32 padding = LAYOUT_BLOCK_PADDING;
 	u32 spacing = LAYOUT_BLOCK_SPACING;
+	bool is_visible = true;
 	Array<Layout_Data *> ap_layout_data;
 };
 
@@ -8477,13 +8488,12 @@ Layout_Create(
 	Layout_Create(layout_out, rect_area, fill_last_block);
 }
 
-instant void
+instant u64
 Layout_CreateBlock(
 	Layout *layout_io,
 	LAYOUT_TYPE type,
 	LAYOUT_DOCK_TYPE dock_direction,
-	s32 expand_index = -1,
-	Layout_Block **layout_block_out = 0
+	s32 expand_index = -1
 ) {
 	Assert(layout_io);
 
@@ -8495,8 +8505,7 @@ Layout_CreateBlock(
 	t_block->dock = dock_direction;
 	t_block->expand_index = expand_index;
 
-	if (layout_block_out)
-		*layout_block_out = t_block;
+	return layout_io->a_layout_blocks.count - 1;
 }
 
 instant bool
@@ -8516,6 +8525,25 @@ Layout_GetLastBlock(
 	return true;
 }
 
+instant bool
+Layout_GetBlock(
+	Layout *layout,
+	u64 index,
+	Layout_Block **layout_block_out
+) {
+	Assert(layout);
+
+	if (!layout->a_layout_blocks.count) {
+		LOG_WARNING("GetLastBlock: No blocks in layout found.");
+		return false;
+	}
+
+	Assert(index < layout->a_layout_blocks.count);
+	*layout_block_out = &ARRAY_IT(layout->a_layout_blocks, index);
+
+	return true;
+}
+
 struct Widget;
 
 instant void Layout_Add(Layout *layout_io, Widget *widget);
@@ -8530,11 +8558,7 @@ Layout_Add(
 
 	Layout_Block *current_block;
 
-	if(!Layout_GetLastBlock(layout_io, &current_block)) {
-		LOG_WARNING("Using default layout block: top-left - vertival align (y-axis).");
-		Layout_CreateBlock(layout_io, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT, -1, &current_block);
-	}
-
+	Layout_GetLastBlock(layout_io, &current_block);
 	Array_Add(&current_block->ap_layout_data, layout_data);
 }
 
@@ -8830,12 +8854,15 @@ Layout_Arrange(
 	if (layout_io->padding % 2 != 0) ++layout_io->padding;
 
 	Rect_AddPadding(&layout_io->rect_remaining, {(float)layout_io->padding,
-                                              (float)layout_io->padding,
-												(s32)layout_io->padding,
-                                                (s32)layout_io->padding});
+                                                 (float)layout_io->padding,
+                                                 (s32)layout_io->padding,
+                                                 (s32)layout_io->padding});
 
 	FOR_ARRAY(layout_io->a_layout_blocks, it) {
 		Layout_Block *t_block = &ARRAY_IT(layout_io->a_layout_blocks, it);
+
+		if (!t_block->is_visible)
+			continue;
 
 		if (t_block->type == LAYOUT_TYPE_X)
 			Layout_ArrangeBlockX(layout_io, t_block);
@@ -8873,6 +8900,9 @@ Layout_Rearrange(
 	Layout_Rearrange(layout_io, {0, 0, window->width, window->height});
 }
 
+///@Note: do not use this when tab-order is important.
+///       instead create an own array which will be
+///       in the tab-stop order
 instant Array<Widget *>
 Layout_GetWidgetArray(
 	Layout *layout
@@ -9399,16 +9429,25 @@ Widget_Redraw(
 			Layout_Create(&layout, &widget_io->layout_data, false);
 			layout.padding = 0;
 
-			Layout_Block *t_layout_block = 0;
+			Layout_Block *t_block;
+			u64 index_block = 0;
 
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0, &t_layout_block);
-			t_layout_block->padding = 0;
+			index_block = Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
+
+			if (!Layout_GetBlock(&layout, index_block, &t_block))
+				Assert(false);
+
+			t_block->padding = 0;
 
 			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_TEXT));
 			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_TOGGLE));
 
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0, &t_layout_block);
-			t_layout_block->padding = 0;
+			index_block = Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
+
+			if (!Layout_GetBlock(&layout, index_block, &t_block))
+				Assert(false);
+
+			t_block->padding = 0;
 
 			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_LIST));
 
@@ -9490,10 +9529,14 @@ Widget_Redraw(
 			Layout_Create(&layout, &widget_io->layout_data, false);
 			layout.padding = 0;
 
-			Layout_Block *current_block;
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0, &current_block);
-			current_block->padding = 0;
-			current_block->spacing = 2;
+			Layout_Block *t_block;
+			u64 index_block = Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
+
+			if (!Layout_GetBlock(&layout, index_block, &t_block))
+				Assert(false);
+
+			t_block->padding = 0;
+			t_block->spacing = 2;
 
 			/// label
 			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, 0));
@@ -10134,6 +10177,12 @@ Widget_UpdateInput(
 					widget_io->events.on_list_change_index = true;
 				}
 			}
+
+			if (    widget_io->data.as_row_data.count
+				AND (is_key_return OR is_key_space)
+			) {
+				widget_io->events.on_list_change_final = true;
+			}
 		}
 
 		bool has_text_changed;
@@ -10207,6 +10256,23 @@ Widget_GetSelectedRowBuffer(
 	String_Append(s_row_data_out, ts_row_data->value, ts_row_data->length);
 }
 
+instant void
+Widget_GetSelectedRow(
+	Widget *widget,
+	String *s_data_out
+) {
+	Assert(widget);
+	Assert(s_data_out);
+	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
+
+	String_Clear(s_data_out);
+
+	if (!widget->data.as_row_data.count)
+		return;
+
+	*s_data_out = ARRAY_IT(widget->data.as_row_data, widget->data.active_row_id);
+}
+
 instant String
 Widget_GetSelectedRow(
 	Widget *widget
@@ -10215,14 +10281,7 @@ Widget_GetSelectedRow(
 	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
 
 	String s_result = {};
-
-	if (!widget->data.as_row_data.count) {
-		return s_result;
-	}
-
-	String *ts_row_data = &ARRAY_IT(widget->data.as_row_data, widget->data.active_row_id);
-
-	String_Append(&s_result, ts_row_data->value, ts_row_data->length);
+	Widget_GetSelectedRow(widget, &s_result);
 
 	return s_result;
 }
