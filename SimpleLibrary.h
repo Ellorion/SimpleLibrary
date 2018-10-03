@@ -6805,7 +6805,6 @@ Codepoint_GetData(
 	*entry_out = *t_entry;
 }
 
-///@TODO: tab-width for text is somewhat wrong, fix it!
 instant s32
 Codepoint_GetTabWidth(
 	float x,
@@ -7315,8 +7314,7 @@ instant void
 Text_AddLines(
 	Text *text,
 	Array<Vertex>    *a_vertex_chars_io,
-	Array<Text_Line> *a_text_lines,
-	bool include_offsets = true
+	Array<Text_Line> *a_text_lines
 ) {
 	Assert(a_text_lines);
 
@@ -7337,12 +7335,6 @@ Text_AddLines(
 	float x_line_start = rect.x;
 
 	RectF rect_position = {	x_line_start, rect.y, 0, 0 };
-
-	if (include_offsets) {
-		rect_position.x += text->offset_x;
-		rect_position.h += text->offset_y;
-		x_line_start    += text->offset_x;
-	}
 
 	bool has_cursor = text->data.is_editable;
 
@@ -7389,15 +7381,11 @@ Text_AddLines(
 
 				Vertex_Buffer<float> *t_attribute;
 
-				/// exclude offsets
-				float x_pos = rect_position.x - text->offset_x;
-				float y_pos = rect_position.y - text->offset_y;
-
 				{
 					Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
 					Array_ReserveAdd(&t_attribute->a_buffer, 2);
-					Array_Add(&t_attribute->a_buffer, x_pos + x_align_offset);
-					Array_Add(&t_attribute->a_buffer, y_pos);
+					Array_Add(&t_attribute->a_buffer, rect_position.x + x_align_offset);
+					Array_Add(&t_attribute->a_buffer, rect_position.y);
 				}
 				{
 					Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
@@ -7420,14 +7408,13 @@ Text_AddLines(
 
 instant void
 Text_AddLines(
-	Text *text_io,
-	bool include_offsets = true
+	Text *text_io
 ) {
 	Assert(text_io);
 
 	MEASURE_START();
 
-	Text_AddLines(text_io, &text_io->a_vertex_chars, &text_io->a_text_lines, include_offsets);
+	Text_AddLines(text_io, &text_io->a_vertex_chars, &text_io->a_text_lines);
 
 	MEASURE_END("");
 }
@@ -7517,7 +7504,7 @@ Text_Update(
 	}
 
 	Text_Clear(text_io);
-	Text_AddLines(text_io, true);
+	Text_AddLines(text_io);
 
 	Text_Cursor_Update(text_io);
 
@@ -8038,7 +8025,7 @@ Text_Cursor_Update(
 					return Text_Cursor_Update(text_io);
 			}
 
-			if (XOR(found_start, found_end)) {
+			if (text_io->cursor.is_selecting AND XOR(found_start, found_end)) {
 				/// do not show multible ' ' in case of '\r\n'
 				/// or selection would look strechted
 				if (is_newline_char)
@@ -8124,6 +8111,7 @@ Text_Cursor_Update(
 		Text_Cursor_Render(text_io, rect_position_it, width_cursor);
 		Text_Cursor_Scroll(text_io, rect_position_it, codepoint_space.advance);
 	}
+
 
  	Text_Cursor_FlushFull(text_io);
 }
@@ -9264,7 +9252,7 @@ Widget_Update(
 	if (!Widget_IsListType(widget_io))
 		Text_Update(&widget_io->text);
 
-	if (widget_io->trigger_autosize){
+ 	if (widget_io->trigger_autosize){
 		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
 		Text_Data *settings = &widget_io->text.data;
 
@@ -9670,7 +9658,7 @@ Widget_Render(
 
 				Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
 
-				Text_AddLines(text, false);
+				Text_AddLines(text);
 
 				s32 height_row_step = rect_text->h + widget_io->data.spacing;
 				rect_text->y += height_row_step;
