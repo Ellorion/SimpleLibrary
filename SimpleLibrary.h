@@ -7564,7 +7564,8 @@ Text_Cursor_FindIndex(
 	FOR(text->a_text_lines.count, it_line) {
 		Text_Line *text_line = &ARRAY_IT(text->a_text_lines, it_line);
 
-		if (rect_position_it.y + rect_position_it.h < point.y) {
+		/// skip to the target line
+		if (rect_position_it.y + rect_position_it.h <= point.y) {
 			cursor_index += text_line->s_data.length;
 			rect_position_it.y += rect_position_it.h;
 			continue;
@@ -7590,55 +7591,24 @@ Text_Cursor_FindIndex(
 				codepoint_space.advance
 			);
 
+			rect_position_it.w = codepoint.advance;
+
 			bool is_newline_char = (character == '\r' OR character == '\n');
 
-			/// makes end-of-line chars selectable
-			/// by including the remaining width of a line in the last char
-			/// when using line-breaks or word-wrap
-			/// - newline char can happen before the last char,
-			///   if '\r\n' is used
 			if (is_newline_char OR is_last_char)
-				rect_position_it.w = width_max - (rect_position_it.w - rect_position_it.x);
-			else
-				rect_position_it.w = codepoint.advance;
-
-			if (it_data == 0) {
-				/// check the "free" space in front of the first char too,
-				/// to make it target the first char
-				/// -> same as with the last char
-				Rect rect_position_start = rect_position_it;
-
-				float pos_w = rect_position_start.x + rect_position_start.w;
-				rect_position_start.x = x_pos_start;
-				rect_position_start.w = pos_w - rect_position_start.x;
-
-				if (Rect_IsIntersectingBorderless(&point, &rect_position_start)) {
-					found_index = true;
-					return cursor_index;
-				}
-			}
-			else
-			if (Rect_IsIntersectingBorderless(&point, &rect_position_it)) {
-				found_index = true;
 				return cursor_index;
-			}
 
-			if (!found_index) {
-				++cursor_index;
-				rect_position_it.x += rect_position_it.w;
-			}
+			if (point.x < rect_position_it.x + rect_position_it.w)
+				return cursor_index;
 
-			if (is_newline_char) {
-				rect_position_it.w = codepoint.advance;
-			}
+			++cursor_index;
+			rect_position_it.x += rect_position_it.w;
 		}
 
-		rect_position_it.x  = x_pos_start;
-		rect_position_it.y += rect_position_it.h;
+		/// if the point is somewhere in a line,
+		/// it should have already been found
+		Assert(false);
 	}
-
-	if (!found_index AND cursor_index)
-		--cursor_index;
 
 	return cursor_index;
 }
