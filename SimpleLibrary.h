@@ -925,6 +925,7 @@ _AssertMessage(
 
 #define LOG_DEBUG(text) std::cout << /*"Frame [" << global_frame_count << "]: " <<*/ text << std::endl;
 
+#define LOG_INFO(_text)    std::cout << "Info: "    << _text << std::endl;
 #define LOG_WARNING(_text) std::cout << "Warning: " << _text << std::endl;
 
 #if DEBUG_BENCHMARK
@@ -2510,6 +2511,26 @@ String_Encode64(
 	}
 
 	return encoded;
+}
+
+instant s32
+String_GetCodepoint(
+	String *s_data,
+	u64 index
+) {
+	Assert(s_data);
+
+	if (s_data->length == 0) {
+		LOG_WARNING("No string available to read codepoint from.");
+		return 0;
+	}
+
+	if (index >= s_data->length) {
+		LOG_WARNING("Index out of range. Can not read codepoint from string.");
+		return -1;
+	}
+
+	return s_data->value[index];
 }
 
 bool
@@ -6888,6 +6909,25 @@ Codepoint_Destroy(
 	Texture_Destroy(&codepoint_out->texture);
 }
 
+enum CODEPOINT_TYPE {
+	CODEPOINT_CONTROL,
+	CODEPOINT_PUNCTUATION,
+	CODEPOINT_ALPHANUMERIC
+};
+
+instant CODEPOINT_TYPE
+Codepoint_GetType(
+	s32 codepoint
+) {
+	if (codepoint <  32                    )  return CODEPOINT_CONTROL;
+	if (codepoint >  31 AND codepoint <  48)  return CODEPOINT_PUNCTUATION;
+	if (codepoint >  57 AND codepoint <  64)  return CODEPOINT_PUNCTUATION;
+	if (codepoint >  90 AND codepoint <  97)  return CODEPOINT_PUNCTUATION;
+	if (codepoint > 122 AND codepoint < 127)  return CODEPOINT_PUNCTUATION;
+
+	return CODEPOINT_ALPHANUMERIC;
+}
+
 /// ::: Text (OpenGL rendering)
 /// ===========================================================================
 enum TEXT_ALIGN_X_TYPE {
@@ -7456,7 +7496,7 @@ Text_Update(
 
 	if (!text_io->font) {
 		if (text_io->s_data.length)
-			LOG_WARNING("No font is set, while text is available.");
+			LOG_INFO("No font is set, while text is available.");
 
 		return false;
 	}
@@ -7939,6 +7979,12 @@ Text_Cursor_Update(
 			cursor->data.index_select_start += cursor->move_index_x;
 
 		cursor->data.index_select_end += cursor->move_index_x;
+
+		if (cursor->data.index_select_start > text_io->s_data.length)
+			cursor->data.index_select_start = text_io->s_data.length;
+
+		if (cursor->data.index_select_end > text_io->s_data.length)
+			cursor->data.index_select_end = text_io->s_data.length;
 	}
 
 	Text_Line *text_line = 0;
@@ -8139,8 +8185,8 @@ Text_UpdateInput(
 
 	bool was_selecting = (cursor->data.index_select_start != cursor->data.index_select_end);
 
-	/// when selection turns off, seek selection start / end select position,
-	/// depending on the x-direction cursor movement
+	/// move the cursor to the start or end of the selection,
+	/// when selection ended and the cursor was moved
 	if (was_selecting AND !cursor->is_selecting AND offset_index_x != 0) {
 		if (offset_index_x < 0)
 			cursor->data.index_select_start = MIN(cursor->data.index_select_start, cursor->data.index_select_end);
@@ -8157,6 +8203,44 @@ Text_UpdateInput(
 	if (offset_index_x != 0 OR offset_index_y != 0) {
 		if (!cursor->is_selecting)
 			cursor->data.index_select_start = cursor->data.index_select_end;
+
+		/// character block selection
+		if (    keyboard->pressing[VK_CONTROL]
+			AND offset_index_x != 0
+		) {
+			u64 cursor_index = cursor->data.index_select_end;
+
+            if (offset_index_x > 0) {
+				if (cursor_index < text_io->s_data.length) {
+					s32  codepoint = String_GetCodepoint(&text_io->s_data, cursor_index);
+					CODEPOINT_TYPE cp_type = Codepoint_GetType(codepoint);
+
+					while(    cp_type == Codepoint_GetType(codepoint)
+						  AND cursor_index < text_io->s_data.length
+					) {
+						codepoint = String_GetCodepoint(&text_io->s_data, ++cursor_index);
+					}
+
+					if (cursor_index > 0)
+						cursor->data.index_select_end = cursor_index - 1;
+				}
+            }
+            else {
+				if (cursor_index) {
+					s32 codepoint = String_GetCodepoint(&text_io->s_data, cursor_index - 1);
+					CODEPOINT_TYPE cp_type = Codepoint_GetType(codepoint);
+
+					do {
+						codepoint = String_GetCodepoint(&text_io->s_data, --cursor_index - 1);
+					} while(
+							cp_type == Codepoint_GetType(codepoint)
+						AND cursor_index > 0
+					);
+
+					cursor->data.index_select_end = cursor_index + 1;
+				}
+            }
+		}
 
 		cursor->move_index_x += offset_index_x;
 		cursor->move_index_y += offset_index_y;
@@ -8441,7 +8525,7 @@ Layout_GetLastBlock(
 	Assert(layout);
 
 	if (!layout->a_layout_blocks.count) {
-		LOG_WARNING("GetLastBlock: No blocks in layout found.");
+		LOG_INFO("GetLastBlock: No blocks in layout found.");
 		return false;
 	}
 
@@ -8459,7 +8543,7 @@ Layout_GetBlock(
 	Assert(layout);
 
 	if (!layout->a_layout_blocks.count) {
-		LOG_WARNING("GetLastBlock: No blocks in layout found.");
+		LOG_INFO("GetLastBlock: No blocks in layout found.");
 		return false;
 	}
 
@@ -8972,12 +9056,12 @@ Widget_GetSubWidget(
 	Assert(widget);
 
 	if (!widget->a_subwidgets.count) {
-		LOG_WARNING("Subwidget does not exists. Default back to main widget.");
+		LOG_INFO("Subwidget does not exists. Default back to main widget.");
 		return widget;
 	}
 
 	if (index >= widget->a_subwidgets.count) {
-		LOG_WARNING("Subwidget index out of bounds. Default back to main widget.");
+		LOG_INFO("Subwidget index out of bounds. Default back to main widget.");
 		return widget;
 	}
 
