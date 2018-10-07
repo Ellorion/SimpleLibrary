@@ -8565,7 +8565,7 @@ Layout_Add(
 	Assert(layout_io);
 	Assert(layout_data);
 
-	Layout_Block *current_block;
+	Layout_Block *current_block = 0;
 
 	Layout_GetLastBlock(layout_io, &current_block);
 	Array_Add(&current_block->ap_layout_data, layout_data);
@@ -9047,6 +9047,22 @@ struct Widget {
 };
 
 Widget *Widget::widget_focus_current = 0;
+
+instant void
+Widget_AddRenderTabStop(
+	Array<Widget *> *ap_widgets,
+	Widget *widget
+) {
+	Assert(ap_widgets);
+	Assert(widget);
+
+	Array_Add(ap_widgets, widget);
+
+	FOR_ARRAY(widget->a_subwidgets, it_sub) {
+		Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
+		Array_Add(ap_widgets, t_subwidget);
+	}
+}
 
 instant Widget *
 Widget_GetSubWidget(
@@ -9970,18 +9986,19 @@ Widget_CalcActiveRowRect(
     widget->text.s_data = ts_data_backup;
 }
 
-instant u64
+instant bool
 Widget_CalcActiveRowID(
 	Widget *widget,
-	Mouse *mouse
+	Mouse *mouse,
+	u64 *active_row_id_out
 ) {
     Assert(widget);
     Assert(mouse);
 
-    if (!Mouse_IsHovering(widget, mouse))
-		return widget->data.active_row_id;
+    bool result = false;
 
-    u64 active_row_id = 0;
+    if (!Mouse_IsHovering(widget, mouse))
+		return false;
 
     String ts_data_backup = widget->text.s_data;
 
@@ -10000,7 +10017,10 @@ Widget_CalcActiveRowID(
 		rect_item.h = height;
 
 		if (Rect_IsIntersecting(&mouse->point, &rect_item)) {
-			active_row_id = it_row;
+			if (active_row_id_out)
+				*active_row_id_out = it_row;
+
+			result = true;
 			break;
 		}
 
@@ -10009,7 +10029,7 @@ Widget_CalcActiveRowID(
 
     widget->text.s_data = ts_data_backup;
 
-    return active_row_id;
+    return result;
 }
 
 instant void
@@ -10091,14 +10111,16 @@ Widget_UpdateInput(
 
 			/// listbox entry selection
 			if (is_scrollable_list) {
-				u64 new_active_row_id = Widget_CalcActiveRowID(widget_io, mouse);
+				u64 new_active_row_id;
 
-				if (new_active_row_id != widget_io->data.active_row_id) {
-					widget_io->data.active_row_id = new_active_row_id;
-					widget_io->events.on_list_change_index = true;
-				}
-				else {
-					widget_io->events.on_list_change_final = true;
+				if (Widget_CalcActiveRowID(widget_io, mouse, &new_active_row_id)) {
+					if (new_active_row_id != widget_io->data.active_row_id) {
+						widget_io->data.active_row_id = new_active_row_id;
+						widget_io->events.on_list_change_index = true;
+					}
+					else {
+						widget_io->events.on_list_change_final = true;
+					}
 				}
 			}
 
@@ -10506,7 +10528,7 @@ Widget_CreateButton(
 }
 
 instant Widget
-Widget_CreateListbox(
+Widget_CreateListBox(
 	Window *window,
 	Font *font,
 	Rect rect_box
@@ -10946,7 +10968,7 @@ Widget_CreateComboBox(
 
 	Widget wg_text   = Widget_CreateTextBox(window, font, {});
 	Widget wg_button = Widget_CreateButton( window, font, {}, "+");
-	Widget wg_list   = Widget_CreateListbox(window, font, {0, 0, 0, combo_height});
+	Widget wg_list   = Widget_CreateListBox(window, font, {0, 0, 0, combo_height});
 
 	wg_text.UpdateCustomInputs   = Widget_UpdateInputComboBox;
 	wg_button.UpdateCustomInputs = Widget_UpdateInputComboBox;
