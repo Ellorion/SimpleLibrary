@@ -7004,6 +7004,8 @@ struct Text {
 	Font *font = 0;
 	String s_data = {};
 
+	bool allow_tab_input = false;
+
 	/// always update with shader uniform
 	float offset_x = 0.0f;
 	float offset_y = 0.0f;
@@ -8294,12 +8296,13 @@ Text_UpdateInput(
 			was_selection_removed = true;
 		}
 
-		/// tab-char is not supported for now
-		if (    key != '\t'
-			AND (   !was_selection_removed
-				 OR (    was_selection_removed
-					 AND key != '\b'))
-		) {
+		bool is_char_valid = (    key != '\t'
+							  OR (key == '\t' AND text_io->allow_tab_input));
+
+		bool can_insert_char = (   !was_selection_removed
+                                OR (was_selection_removed AND key != '\b'));
+
+		if (is_char_valid AND can_insert_char) {
 			cursor->move_index_x = String_Insert(
 										&text_io->s_data,
 										cursor->data.index_select_end,
@@ -9048,21 +9051,21 @@ struct Widget {
 
 Widget *Widget::widget_focus_current = 0;
 
-instant void
-Widget_AddRenderTabStop(
-	Array<Widget *> *ap_widgets,
-	Widget *widget
-) {
-	Assert(ap_widgets);
-	Assert(widget);
-
-	Array_Add(ap_widgets, widget);
-
-	FOR_ARRAY(widget->a_subwidgets, it_sub) {
-		Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
-		Array_Add(ap_widgets, t_subwidget);
-	}
-}
+//instant void
+//Widget_AddRenderTabStop(
+//	Array<Widget *> *ap_widgets,
+//	Widget *widget
+//) {
+//	Assert(ap_widgets);
+//	Assert(widget);
+//
+//	Array_Add(ap_widgets, widget);
+//
+//	FOR_ARRAY(widget->a_subwidgets, it_sub) {
+//		Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
+//		Array_Add(ap_widgets, t_subwidget);
+//	}
+//}
 
 instant Widget *
 Widget_GetSubWidget(
@@ -9721,11 +9724,9 @@ Widget_Render(
 
 				Rect rect_box = *rect_text;
 				rect_box.x -= pad_left;
-
 				rect_box.x -= text->offset_x;
 
 				Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
-
 
 				Text_AddLines(text);
 
@@ -9901,6 +9902,12 @@ Widget_UpdateFocus(
 		bool is_visible = (   !t_widget->data.is_floating
 		                   OR  t_widget->data.is_popout);
 
+		/// if the next possible widget is supposed to get
+		/// focus, check here if the widget is still coming
+		/// in the list.
+		/// if it is not in the list, check from the beginning
+		/// of the widget list again (check section below this
+		/// loop) so a possible target can be chosen
 		if (    focus_set_next
 			AND is_visible
 			AND t_widget->data.is_focusable
@@ -9909,10 +9916,18 @@ Widget_UpdateFocus(
 			focus_set_next = false;
 		}
 		else {
-			if (IF_USE(keyboard).up[VK_TAB]) {
-				if (t_widget->data.has_focus) {
-					t_widget->data.has_focus = false;
-					focus_set_next = true;
+			if (t_widget->data.has_focus) {
+				if (IF_USE(keyboard).up[VK_TAB]) {
+					if (t_widget->text.allow_tab_input) {
+						if (keyboard->pressing[VK_CONTROL]) {
+							t_widget->data.has_focus = false;
+							focus_set_next = true;
+						}
+					}
+					else {
+						t_widget->data.has_focus = false;
+						focus_set_next = true;
+					}
 				}
 			}
 		}
@@ -10785,10 +10800,12 @@ Widget_CreateTextBox(
 	t_widget.layout_data.settings.auto_height = true;
 	t_widget.layout_data.settings.auto_width  = true;
 
-	t_widget.text.font  = font;
+	t_widget.text.font = font;
 
 	t_widget.text.data.rect = rect_box;
 	t_widget.text.data.is_editable = true;
+
+	t_widget.text.allow_tab_input = true;
 
 	return t_widget;
 }
