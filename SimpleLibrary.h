@@ -9698,7 +9698,6 @@ Widget_Render(
 			s32 pad_left = 2;
 
 			rect_text->x += text->offset_x + pad_left;
-			rect_text->y += text->offset_y;
 
 			widget_io->rect_content.h = 0;
 
@@ -9724,9 +9723,9 @@ Widget_Render(
 				rect_box.x -= pad_left;
 
 				rect_box.x -= text->offset_x;
-				rect_box.y -= text->offset_y;
 
 				Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
+
 
 				Text_AddLines(text);
 
