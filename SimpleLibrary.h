@@ -3875,7 +3875,7 @@ File_GetExtension(
 	return s_result;
 }
 
-/// ::: Windows (OpenGL)
+/// ::: Windows (System + OpenGL Window)
 /// ===========================================================================
 #define Windows_Main 	\
 	APIENTRY			\
@@ -3958,6 +3958,28 @@ Dialog_OpenDirectory(
 	}
 
     return result;
+}
+
+instant String
+Clipboard_GetText(
+) {
+	String s_result;
+
+	if (OpenClipboard(0)) {
+        HANDLE handle_clipboard = GetClipboardData(CF_TEXT);
+
+		AssertMessage(handle_clipboard, "Could not get clipboard data.");
+
+		char *c_data = (char*)GlobalLock(handle_clipboard);
+
+		s_result = String_Copy(c_data);
+
+		GlobalUnlock(handle_clipboard);
+
+		CloseClipboard();
+	}
+
+	return s_result;
 }
 
 static const char *class_name = "OpenGL";
@@ -8296,20 +8318,37 @@ Text_UpdateInput(
 			was_selection_removed = true;
 		}
 
-		bool is_char_valid = (    key != '\t'
-							  OR (key == '\t' AND text_io->allow_tab_input));
+		/// control + v
+		/// - insert clipboard text
+		if (key == 22) {
+			String s_clipboard = Clipboard_GetText();
 
-		bool can_insert_char = (   !was_selection_removed
-                                OR (was_selection_removed AND key != '\b'));
-
-		if (is_char_valid AND can_insert_char) {
-			cursor->move_index_x = String_Insert(
+			cursor->move_index_x = 	String_Insert(
 										&text_io->s_data,
 										cursor->data.index_select_end,
-										key
+										s_clipboard.value, s_clipboard.length
 									);
 
+			String_Destroy(&s_clipboard);
+
 			if (cursor_changed_out)  *cursor_changed_out = true;
+		}
+		else {
+			bool is_char_valid = (    key != '\t'
+								  OR (key == '\t' AND text_io->allow_tab_input));
+
+			bool can_insert_char = (   !was_selection_removed
+									OR (was_selection_removed AND key != '\b'));
+
+			if (is_char_valid AND can_insert_char) {
+				cursor->move_index_x = String_Insert(
+											&text_io->s_data,
+											cursor->data.index_select_end,
+											key
+										);
+
+				if (cursor_changed_out)  *cursor_changed_out = true;
+			}
 		}
 	}
 
