@@ -7156,6 +7156,7 @@ Text_CalcLineCount(
 	Font *font = text->font;
 	Rect  rect = text->data.rect;
 
+	Rect_AddPadding(&rect, text->data.rect_margin);
 	Rect_AddPadding(&rect, text->data.rect_padding);
 
 	Rect rect_line_current = {rect.x, rect.y, 0, 0};
@@ -7381,12 +7382,24 @@ instant u64
 Text_GetAlignOffsetX(
 	Text *text,
 	u64 max_width,
+	s32 advance_space,
 	Text_Line *text_line
 ) {
 	Assert(text);
 	Assert(text_line);
 
 	u64 x_align_offset = 0;
+
+	if (    text->data.align_x != TEXT_ALIGN_X_LEFT
+		AND text_line->width_pixel == 0
+	) {
+		text_line->width_pixel = Codepoint_GetStringAdvance(
+									text->font,
+									0.0f,
+									advance_space,
+									&text_line->s_data
+								);
+	}
 
 	if (max_width > text_line->width_pixel) {
 		if (text->data.align_x == TEXT_ALIGN_X_MIDDLE)
@@ -7461,7 +7474,7 @@ Text_AddLines(
 				+ 	codepoint.font->descent
 			;
 
-			u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, text_line);
+			u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, codepoint_space.advance, text_line);
 
 			/// for unavailable characters like ' '
 			if (!Texture_IsEmpty(&codepoint.texture) AND codepoint.codepoint > 32) {
@@ -7660,7 +7673,7 @@ Text_Cursor_FindIndex(
 			continue;
 		}
 
-		u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, text_line);
+		u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, codepoint_space.advance, text_line);
 		rect_position_it.x += x_align_offset;
 
 		bool is_newline_char_once = false;
@@ -7684,8 +7697,11 @@ Text_Cursor_FindIndex(
 
 			bool is_newline_char = (character == '\r' OR character == '\n');
 
-			if (is_newline_char OR is_last_char)
+			if (is_newline_char)
 				return cursor_index;
+
+			if (is_last_char)
+				return (cursor_index + 1);
 
 			if (point.x < rect_position_it.x + rect_position_it.w)
 				return cursor_index;
@@ -7693,10 +7709,6 @@ Text_Cursor_FindIndex(
 			++cursor_index;
 			rect_position_it.x += rect_position_it.w;
 		}
-
-		/// if the point is somewhere in a line,
-		/// it should have already been found
-		Assert(false);
 	}
 
 	return cursor_index;
@@ -8051,7 +8063,7 @@ Text_Cursor_Update(
 			continue;
 		}
 
-		u64 x_align_offset = Text_GetAlignOffsetX(text_io, width_max, text_line);
+		u64 x_align_offset = Text_GetAlignOffsetX(text_io, width_max, codepoint_space.advance, text_line);
 		rect_position_it.x += x_align_offset;
 
 		bool is_newline_char_once = false;
@@ -8363,9 +8375,9 @@ Text_UpdateInput(
 
 		char key = LOWORD(keyboard->key_sym);
 
-		bool is_linebreak = (key == '\n' OR key == '\r');
+		bool key_is_linebreak = (key == '\n' OR key == '\r');
 
-		if (text_io->data.use_no_linebreak AND is_linebreak)
+		if (text_io->data.use_no_linebreak AND key_is_linebreak)
 			return;
 
 		switch (key) {
@@ -8434,6 +8446,20 @@ Text_UpdateInput(
 										OR (was_selection_removed AND key != '\b'));
 
 				if (is_char_valid AND can_insert_char) {
+					if (cursor->data.index_select_end + 1 < text_io->s_data.length) {
+						s32 codepoint_current = String_GetCodepoint(&text_io->s_data, cursor->data.index_select_end);
+						s32 codepoint_next    = String_GetCodepoint(&text_io->s_data, cursor->data.index_select_end + 1);
+
+						/// do not insert a newline seperator between '\r' and '\n'
+						/// in case windows linebreaks would have been used
+						if (    key_is_linebreak
+							AND codepoint_current == '\r'
+							AND codepoint_next    != '\n'
+						) {
+							++cursor->data.index_select_end;
+						}
+					}
+
 					cursor->move_index_x = String_Insert(
 												&text_io->s_data,
 												cursor->data.index_select_end,
@@ -8442,7 +8468,7 @@ Text_UpdateInput(
 
 					IF_SET(cursor_changed_out) = true;
 
-					Text_Cursor_Update(text_io);
+					Text_Update(text_io);
 				}
 			}
 		}
