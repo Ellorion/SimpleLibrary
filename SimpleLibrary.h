@@ -3982,6 +3982,31 @@ Clipboard_GetText(
 	return s_result;
 }
 
+instant void
+Clipboard_SetText(
+	String *s_data
+) {
+	Assert(s_data);
+
+	if (OpenClipboard(0)) {
+		EmptyClipboard();
+
+		HGLOBAL handle_global = GlobalAlloc(GHND, s_data->length + 1 * sizeof(char));
+
+		AssertMessage(handle_global, "Could not allocate clipboard data.");
+
+		char *c_data = (char*)GlobalLock(handle_global);
+		String_Copy(c_data, s_data->value, s_data->length);
+		GlobalUnlock(handle_global);
+
+		SetClipboardData(CF_TEXT, handle_global);
+
+		GlobalFree(handle_global);
+
+		CloseClipboard();
+	}
+}
+
 static const char *class_name = "OpenGL";
 
 struct Mouse;
@@ -7872,7 +7897,9 @@ Text_Cursor_Move(
 			if (cursor->move_index_x > 0) {
 				cursor->data.index_select_end -= index_line_x;
 				cursor->data.index_select_end += text_line->s_data.length;
-				cursor->data.index_select_end -= 1;
+
+				if (cursor->data.index_select_end < text_io->s_data.length)
+					cursor->data.index_select_end -= 1;
 
 				if (String_EndWith(&text_line->s_data, "\r\n"))
 					cursor->data.index_select_end -= 1;
@@ -8156,22 +8183,77 @@ Text_Cursor_Update(
  	Text_Cursor_FlushFull(text_io);
 }
 
-///@TODO: clipboard support(?)
-///@TODO: add support for '\t' input by locking widget
-///       and preventing it to switch to another widget
-///       unless another key is also pressed.
+instant bool
+Text_GetSelection(
+	Text *text,
+	String *s_data_out
+) {
+	Assert(text);
+	Assert(s_data_out);
+
+	String_Clear(s_data_out);
+
+	Text_Cursor *cursor = &text->cursor;
+
+	if (cursor->data.index_select_start > cursor->data.index_select_end)
+		Swap(&cursor->data.index_select_start, &cursor->data.index_select_end);
+
+	u64 length = cursor->data.index_select_end - cursor->data.index_select_start;
+
+	/// nothing selected
+	if (!length)
+		return false;
+
+	s_data_out->value   = text->s_data.value + cursor->data.index_select_start;
+	s_data_out->length  = length;
+	s_data_out->changed = true;
+
+	return true;
+}
+
+instant bool
+Text_RemoveSelection(
+	Text *text_io
+) {
+	Text_Cursor *cursor = &text_io->cursor;
+
+	bool was_selection_removed = false;
+
+	/// overwrite selected text
+	if (cursor->data.index_select_start != cursor->data.index_select_end) {
+		String_Remove(
+			&text_io->s_data,
+			cursor->data.index_select_start,
+			cursor->data.index_select_end
+		);
+
+		/// cursor and selection bounds will start at the
+		/// beginning of the selection
+		if (cursor->data.index_select_end > cursor->data.index_select_start)
+			cursor->data.index_select_end   = cursor->data.index_select_start;
+		else
+			cursor->data.index_select_start = cursor->data.index_select_end;
+
+		was_selection_removed = true;
+	}
+
+	return was_selection_removed;
+}
+
 instant void
 Text_UpdateInput(
     Text *text_io,
     Keyboard *keyboard,
-    bool *text_changed_out = 0,
+    bool *text_changed_out   = 0,
     bool *cursor_changed_out = 0
 ) {
 	Assert(text_io);
 	Assert(keyboard);
 
-	if (text_changed_out)    *text_changed_out   = false;
-	if (cursor_changed_out)  *cursor_changed_out = false;
+	IF_SET(text_changed_out)   = false;
+
+	///@TODO: use (prev_)data to retrieve this info
+	IF_SET(cursor_changed_out) = false;
 
 	if (!text_io->data.is_editable)
 		return;
@@ -8269,13 +8351,16 @@ Text_UpdateInput(
 		cursor->move_index_x += offset_index_x;
 		cursor->move_index_y += offset_index_y;
 
+		IF_SET(cursor_changed_out) = true;
+
 		Text_Cursor_Update(text_io);
 
-		if (cursor_changed_out)  *cursor_changed_out = true;
+		return;
 	}
 
-
 	if (keyboard->is_key_sym AND keyboard->is_down) {
+		String s_selection;
+
 		char key = LOWORD(keyboard->key_sym);
 
 		bool is_linebreak = (key == '\n' OR key == '\r');
@@ -8283,77 +8368,88 @@ Text_UpdateInput(
 		if (text_io->data.use_no_linebreak AND is_linebreak)
 			return;
 
-		/// control + a
-		/// - select all text
-		if (key == 1) {
-			cursor->data.index_select_start = 0;
-			cursor->data.index_select_end = text_io->s_data.length;
-			cursor->is_selecting = true;
+		switch (key) {
+			/// control + a
+			/// - select all text
+			case 1: {
+				cursor->data.index_select_start = 0;
+				cursor->data.index_select_end = text_io->s_data.length;
+				cursor->is_selecting = true;
 
-			if (cursor_changed_out)  *cursor_changed_out = true;
+				IF_SET(cursor_changed_out) = true;
 
-			Text_Cursor_Update(text_io);
-			return;
-		}
+				Text_Cursor_Update(text_io);
+			} break;
 
-		*move_type = CURSOR_MOVE_X;
+			/// control + c
+			/// - copy to clipboard text
+			case 3: {
+				if (Text_GetSelection(text_io, &s_selection)) {
+					Clipboard_SetText(&s_selection);
+				}
+			} break;
 
-		bool was_selection_removed = false;
+			/// control + v
+			/// - insert clipboard text
+			case 22: {
+				*move_type = CURSOR_MOVE_X;
+				bool was_selection_removed = Text_RemoveSelection(text_io);
 
-		/// overwrite selected text
-		if (cursor->data.index_select_start != cursor->data.index_select_end) {
-			String_Remove(
-				&text_io->s_data,
-				cursor->data.index_select_start,
-				cursor->data.index_select_end
-			);
+				String s_clipboard = Clipboard_GetText();
 
-			/// cursor and selection bounds will start at the
-			/// beginning of the selection
-			if (cursor->data.index_select_end > cursor->data.index_select_start)
-				cursor->data.index_select_end   = cursor->data.index_select_start;
-			else
-				cursor->data.index_select_start = cursor->data.index_select_end;
-
-			was_selection_removed = true;
-		}
-
-		/// control + v
-		/// - insert clipboard text
-		if (key == 22) {
-			String s_clipboard = Clipboard_GetText();
-
-			cursor->move_index_x = 	String_Insert(
-										&text_io->s_data,
-										cursor->data.index_select_end,
-										s_clipboard.value, s_clipboard.length
-									);
-
-			String_Destroy(&s_clipboard);
-
-			if (cursor_changed_out)  *cursor_changed_out = true;
-		}
-		else {
-			bool is_char_valid = (    key != '\t'
-								  OR (key == '\t' AND text_io->allow_tab_input));
-
-			bool can_insert_char = (   !was_selection_removed
-									OR (was_selection_removed AND key != '\b'));
-
-			if (is_char_valid AND can_insert_char) {
-				cursor->move_index_x = String_Insert(
+				cursor->move_index_x = 	String_Insert(
 											&text_io->s_data,
 											cursor->data.index_select_end,
-											key
+											s_clipboard.value, s_clipboard.length
 										);
 
-				if (cursor_changed_out)  *cursor_changed_out = true;
+				String_Destroy(&s_clipboard);
+
+				IF_SET(cursor_changed_out) = true;
+
+				Text_Cursor_Update(text_io);
+			} break;
+
+			/// control + x
+			/// - copy to clipboard and remove selection
+			case 24: {
+				if (Text_GetSelection(text_io, &s_selection)) {
+					Clipboard_SetText(&s_selection);
+
+					Text_RemoveSelection(text_io);
+					Text_Cursor_Update(text_io);
+
+					Assert(text_io->s_data.changed);
+				}
+			} break;
+
+			default: {
+				*move_type = CURSOR_MOVE_X;
+				bool was_selection_removed = Text_RemoveSelection(text_io);
+
+				bool is_char_valid = (      key != '\t'
+                                        OR (key == '\t' AND text_io->allow_tab_input));
+
+				bool can_insert_char = (   !was_selection_removed
+										OR (was_selection_removed AND key != '\b'));
+
+				if (is_char_valid AND can_insert_char) {
+					cursor->move_index_x = String_Insert(
+												&text_io->s_data,
+												cursor->data.index_select_end,
+												key
+											);
+
+					IF_SET(cursor_changed_out) = true;
+
+					Text_Cursor_Update(text_io);
+				}
 			}
 		}
 	}
 
 	/// string could have been appended, removed or cleared
-	if (text_changed_out)  *text_changed_out = text_io->s_data.changed;;
+	IF_SET(text_changed_out) = text_io->s_data.changed;
 }
 
 instant bool
