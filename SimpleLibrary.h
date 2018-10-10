@@ -7042,7 +7042,7 @@ struct Text_Data {
 	s32 content_height = 0;
 
 	bool is_editable      = false;
-	bool use_word_wrap    = true;
+	bool use_word_wrap    = false;
 	bool use_no_linebreak = false;
 };
 
@@ -8596,6 +8596,8 @@ struct Layout_Data {
 	Layout_Data_Settings settings_prev;
 };
 
+struct Widget;
+
 struct Layout_Block {
 	LAYOUT_TYPE type;
 	LAYOUT_DOCK_TYPE dock;
@@ -8604,9 +8606,11 @@ struct Layout_Block {
 	u32 spacing = LAYOUT_BLOCK_SPACING;
 	bool is_visible = true;
 	Array<Layout_Data *> ap_layout_data;
-};
 
-struct Widget;
+	/// convenience
+	/// - to change widgets data inside a block
+	Array<Widget *> ap_widgets;
+};
 
 struct Layout {
 	Rect rect_full;
@@ -9173,6 +9177,8 @@ struct Widget {
 	Widget_Data data_prev;
 	Widget_Slide slide;
 
+	bool visible = true;
+
 	/// On Demand
 	static Widget *widget_focus_current;
 	Widget *widget_focus_on_popout = 0;
@@ -9212,6 +9218,47 @@ struct Widget {
 
 Widget *Widget::widget_focus_current = 0;
 
+instant void
+Layout_Block_SetVisibility (
+	Layout *layout,
+	u64 index_block,
+	bool set_visible
+) {
+	Assert(layout);
+
+	Layout_Block *layout_block = 0;
+	bool got_block = Layout_GetBlock(layout, index_block, &layout_block);
+	Assert(got_block);
+
+	layout_block->is_visible = set_visible;
+
+	FOR_ARRAY(layout_block->ap_widgets, it) {
+		Widget *widget = ARRAY_IT(layout_block->ap_widgets, it);
+		widget->visible = set_visible;
+	}
+}
+
+instant bool
+Layout_Block_GetVisibility (
+	Layout *layout,
+	u64 index_block
+) {
+	Assert(layout);
+
+	Layout_Block *layout_block = 0;
+	bool got_block = Layout_GetBlock(layout, index_block, &layout_block);
+	Assert(got_block);
+
+	return layout_block->is_visible;
+}
+
+///@Depricated
+/// simply create an array of parent widgets
+///
+/// Widget_UpdateFocus will automatically take
+/// care of the child widgets, since those
+/// tab-orders are decided upon the parent widget
+/// creation anyway (if done correctly)
 //instant void
 //Widget_AddRenderTabStop(
 //	Array<Widget *> *ap_widgets,
@@ -9795,6 +9842,9 @@ Widget_Render(
 ) {
 	Assert(shader_set);
 	Assert(widget_io);
+
+	if (!widget_io->visible)
+		return 0;
 
 	widget_io->text.shader_set = shader_set;
 
@@ -10551,6 +10601,11 @@ Layout_Add(
 
 	/// convinence
 	Array_Add(&layout_io->ap_widgets, widget);
+
+	Layout_Block *last_block = 0;
+	Layout_GetLastBlock(layout_io, &last_block);
+
+	Array_Add(&last_block->ap_widgets, widget);
 }
 
 instant void
