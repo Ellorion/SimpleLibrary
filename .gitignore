@@ -23,6 +23,7 @@
 *.dat
 *.ttf
 *.ini
+*.bat
 
 # Object directory
 obj/

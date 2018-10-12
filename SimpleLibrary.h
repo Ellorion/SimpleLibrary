@@ -3564,24 +3564,61 @@ File_Size(
 	if (!file->fp)
 		return 0;
 
-	fseek (file->fp, 0 ,SEEK_END);
+	fseek (file->fp, 0, SEEK_END);
 	u64 size = ftell(file->fp);
 	rewind(file->fp);
 
 	return size;
 }
 
-instant void
+//instant void
+//File_Execute(
+//	String *s_filename
+//) {
+//	Assert(s_filename);
+//
+//	char *c_filename = String_CreateCBufferCopy(s_filename);
+//
+//	ShellExecute(GetDesktopWindow(), "open", c_filename, 0, 0, SW_SHOWNORMAL);
+//
+//	Memory_Free(c_filename);
+//}
+
+instant String
 File_Execute(
-	String *s_filename
+	const char *c_command,
+	u64 c_length = 0
 ) {
-	Assert(s_filename);
+	String s_result;
 
-	char *c_filename = String_CreateCBufferCopy(s_filename);
+	if (!c_length)
+		c_length = String_Length(c_command);
 
-	ShellExecute(GetDesktopWindow(), "open", c_filename, 0, 0, SW_SHOWNORMAL);
+	char *tc_command = String_CreateCBufferCopy(c_command, c_length);
 
-	Memory_Free(c_filename);
+	FILE *pipe = popen(tc_command, "r");
+
+	/// without the delay, the pipe operations most likely will fail!
+	/// and the assert is unable to check that...
+	Sleep(30);
+
+	if (!pipe)
+		Assert(false);
+
+	fseek (pipe, 0, SEEK_END);
+	u64 length = ftell(pipe);
+	rewind(pipe);
+
+	s_result.value  = Memory_Resize(s_result.value, char, length);
+	s_result.length = length;
+	fread(s_result.value, sizeof(char), sizeof(char) * length, pipe);
+
+	s_result.changed = true;
+
+	pclose(pipe);
+	Memory_Free(tc_command);
+
+	return s_result;
 }
 
 instant void
