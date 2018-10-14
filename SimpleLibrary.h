@@ -3571,19 +3571,6 @@ File_Size(
 	return size;
 }
 
-//instant void
-//File_Execute(
-//	String *s_filename
-//) {
-//	Assert(s_filename);
-//
-//	char *c_filename = String_CreateCBufferCopy(s_filename);
-//
-//	ShellExecute(GetDesktopWindow(), "open", c_filename, 0, 0, SW_SHOWNORMAL);
-//
-//	Memory_Free(c_filename);
-//}
-
 instant String
 File_Execute(
 	const char *c_command,
@@ -5742,6 +5729,22 @@ operator == (
 	return String_IsEqual(b1.name, b2.name);
 }
 
+instant bool
+Vertex_IsEmpty(
+	Vertex *vertex
+) {
+	Assert(vertex);
+
+	bool result = (vertex->a_attributes.count == 0);
+
+	/// "vertex_position"
+	Vertex_Buffer<float> *t_attribute = &ARRAY_IT(vertex->a_attributes, 0);
+
+	result |= (t_attribute->a_buffer.count == 0);
+
+	return result;
+}
+
 instant void
 Vertex_GetTextureSize(
 	Vertex *vertex,
@@ -7276,8 +7279,10 @@ Text_BuildLines(
 	Assert(as_words);
  	Assert(a_text_line_out);
 
- 	s32 line_height = Font_GetLineHeight(text->font);
-	s32 max_height = 0;
+	Text_Line *text_line = 0;
+
+ 	s32 line_height    = Font_GetLineHeight(text->font);
+	s32 current_height = 0;
 
 	MEASURE_START();
 
@@ -7287,21 +7292,16 @@ Text_BuildLines(
 	if (!text->data.use_word_wrap) {
 		Array_Reserve(a_text_line_out, number_of_linebreaks + 1);
 
-		u64 limit_prev = a_text_line_out->limit;
-
-		Text_Line *text_line = 0;
-
 		/// words will be in sequential order in memory!
+		u64 index_data = 0;
 		String *ts_data_it = &ARRAY_IT(*as_words, 0);
 
 		if (as_words->count) {
 			Array_AddEmpty(a_text_line_out, &text_line);
-			text_line->s_data.value = ts_data_it->value;
+			text_line->s_data.value = &ts_data_it->value[index_data];
 
-			max_height += line_height;
+			current_height += line_height;
 		}
-
-		u64 index_data = 0;
 
 		FOR_ARRAY(*as_words, it_word) {
 			String *ts_word = &ARRAY_IT(*as_words, it_word);
@@ -7314,7 +7314,8 @@ Text_BuildLines(
 				Array_AddEmpty(a_text_line_out, &text_line);
 				text_line->s_data.value = &ts_data_it->value[index_data];
 
-				max_height += line_height;
+				/// height for the next (empty) line
+				current_height += line_height;
 			}
 		}
 
@@ -7349,7 +7350,7 @@ Text_BuildLines(
 
 		if (as_words->count) {
 			Array_AddEmpty(a_text_line_out, &text_line);
-			max_height += line_height;
+			current_height += line_height;
 			text_line->s_data.value = ts_data_it->value;
 		}
 
@@ -7373,7 +7374,7 @@ Text_BuildLines(
 				AND !text->data.use_no_linebreak
 			) {
 				Array_AddEmpty(a_text_line_out, &text_line);
-				max_height += line_height;
+				current_height += line_height;
 				line_start = true;
 
 				text_line->s_data.value = &ts_data_it->value[index_data];
@@ -7395,7 +7396,7 @@ Text_BuildLines(
 				rect_line_current.x  = rect.x;
 				rect_line_current.y += line_height;
 
-				max_height += line_height;
+				current_height += line_height;
 
 				continue;
 			}
@@ -7408,7 +7409,7 @@ Text_BuildLines(
 		MEASURE_END("(word-wrap) ");
 	}
 
-	return max_height;
+	return current_height;
 }
 
 ///@Hint: line will NOT adjust, wenn word-wrap is disabled AND
@@ -8515,22 +8516,6 @@ Text_UpdateInput(
 	IF_SET(text_changed_out) = text_io->s_data.changed;
 }
 
-instant bool
-Vertex_IsEmpty(
-	Vertex *vertex
-) {
-	Assert(vertex);
-
-	bool result = (vertex->a_attributes.count == 0);
-
-	/// "vertex_position"
-	Vertex_Buffer<float> *t_attribute = &ARRAY_IT(vertex->a_attributes, 0);
-
-	result |= (t_attribute->a_buffer.count == 0);
-
-	return result;
-}
-
 instant void
 Text_Render(
 	Text *text_io
@@ -8603,6 +8588,25 @@ Text_GetSize(
 	}
 
 	IF_SET(width_out)  = text->data.rect.w;
+}
+
+instant void
+Text_ScrollVerticalEnd(
+	Text *text_io
+) {
+	Assert(text_io);
+
+	Text_Update(text_io);
+
+	s32 rect_height    = text_io->data.rect.h;
+	s32 content_height = text_io->data.content_height;
+
+	text_io->offset_x = 0;
+
+	if (content_height > rect_height)
+		text_io->offset_y = -(content_height - rect_height);
+	else
+		text_io->offset_y = 0;
 }
 
 /// ::: LAYOUT
