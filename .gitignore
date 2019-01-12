@@ -18,6 +18,9 @@
 *.save
 *.cbp
 
+# Test-Application
+main.cpp
+
 # Others
 *.txt
 *.dat
