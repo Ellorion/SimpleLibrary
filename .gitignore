@@ -33,6 +33,3 @@ obj/
 
 # Binary directory
 bin/
-
-# Other directories
-test/
