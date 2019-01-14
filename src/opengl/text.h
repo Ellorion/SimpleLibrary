@@ -39,16 +39,20 @@ operator == (
 
 instant Font
 Font_Load(
-	String *s_file,
-	u32 size
+	const char *c_file,
+	u32 size,
+	u64 c_length = 0
 ) {
-	Assert(s_file);
+	Assert(c_file);
+
+	if (!c_length)
+		c_length = String_GetLength(c_file);
 
     Font font = {};
-    String s_font_data = File_ReadAll(s_file->value, s_file->length, true);
+    String s_font_data = File_ReadAll(c_file, c_length, true);
 
     if (!s_font_data.length) {
-		char *c_filename = String_CreateCBufferCopy(s_file->value, s_file->length);
+		char *c_filename = String_CreateCBufferCopy(c_file, c_length);
 
 		LOG_ERROR("Font \"" << c_filename << "\" does not exists.");
     }
@@ -379,7 +383,7 @@ instant Text
 Text_Create(
 	ShaderSet *shader_set,
 	Font *font,
-	String *s_data,
+	String *s_data_opt,
 	Rect rect,
 	TEXT_ALIGN_X_TYPE align_x
 ) {
@@ -394,8 +398,8 @@ Text_Create(
 	text.data.rect		= rect;
 	text.data.align_x	= align_x;
 
-	if (s_data)
-		String_Append(&text.s_data, s_data->value, s_data->length);
+	if (s_data_opt)
+		String_Append(&text.s_data, s_data_opt->value, s_data_opt->length);
 
 	return text;
 }
@@ -882,16 +886,16 @@ Text_Update(
 		String_Replace(&text_io->s_data, "\r", "");
 	}
 
-	u64 number_of_lines = 0;
+	u64 number_of_line_breaks = 0;
 
 #if !DEBUG_ALWAYS_UPDATE
 	if (text_io->s_data.changed)
-		number_of_lines = Array_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
+		number_of_line_breaks = Array_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
 #else
-	number_of_lines = Array_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
+	number_of_line_breaks = Array_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
 #endif
 
-	s32 text_height = Text_BuildLines(text_io, &text_io->as_words, number_of_lines, &text_io->a_text_lines);
+	s32 text_height = Text_BuildLines(text_io, &text_io->as_words, number_of_line_breaks, &text_io->a_text_lines);
 
 	if (text_io->data.rect.h) {
 		s32 pad_height = text_io->data.rect_padding.y + text_io->data.rect_padding.h;

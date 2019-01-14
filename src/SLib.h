@@ -36,6 +36,8 @@
 ///               will be cleared / overwritten
 ///       _io  -> will read an input and generate an output
 ///               based on it
+///       _opt -> can be 0 (pointer), but does not set it as
+///               optional default value
 ///     otherwise, the pointer will only be used for reading
 ///
 ///     Function names that end with "Buffer" have a byRef return parameter

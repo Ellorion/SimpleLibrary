@@ -193,9 +193,9 @@ R"(
 							0,
 							1);
 
-		o_Vertex.proj_matrix = proj_matrix;
+		o_Vertex.proj_matrix  = proj_matrix;
 		o_Vertex.scale_matrix = scale_matrix;
-		o_Vertex.text_color  = text_color;
+		o_Vertex.text_color   = text_color;
 	}
 )",
 

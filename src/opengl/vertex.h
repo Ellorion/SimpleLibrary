@@ -294,7 +294,7 @@ Vertex_Render(
 	Shader_SetValue(shader_set, "scale_x", vertex->settings.scale_x);
 	Shader_SetValue(shader_set, "scale_y", vertex->settings.scale_y);
 
-	glDrawArrays(GL_POINTS, 0, a_positions->a_buffer.count * sizeof(GLfloat) / a_positions->group_count);
+	glDrawArrays(GL_POINTS, 0, a_positions->a_buffer.count / a_positions->group_count);
 }
 
 instant void

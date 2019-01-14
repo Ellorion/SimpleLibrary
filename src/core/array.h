@@ -130,17 +130,17 @@ Array_Reserve(
 ) {
 	Assert(array_io);
 
-	u64 old_limit = array_io->max;
-	u64 new_limit = (array_io->count + count) * sizeof(T);
+	u64 old_max = array_io->max;
+	u64 new_max = array_io->count + count;
 
-	if (new_limit > array_io->max) {
-		array_io->max = new_limit;
-		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->max);
+	if (new_max > old_max) {
+		array_io->max = new_max;
+		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->max  * sizeof(T));
 	}
 
 	if (clear_zero) {
 		/// only clear new reserved data
-		Memory_Set(array_io->memory + array_io->count, 0, array_io->max - old_limit);
+		Memory_Set(array_io->memory + array_io->count, 0, (new_max - old_max) * sizeof(T));
 	}
 }
 
