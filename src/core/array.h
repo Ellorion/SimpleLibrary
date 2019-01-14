@@ -20,10 +20,9 @@
 
 template <typename T>
 struct Array {
-	T    *memory   = 0;
-	u64   size     = 0;
-	u64   limit    = 0; /// in bytes
-	u64   count    = 0;
+	T    *memory = 0;
+	u64   count  = 0;
+	u64   max    = 0;
 
 	/// for string chunks for now
 	bool  by_reference = false;
@@ -45,17 +44,15 @@ Array_Add(
 
 	constexpr u64 length = 1;
 
-	if (array_io->size + sizeof(T) * length > array_io->limit) {
-		array_io->limit += sizeof(T) * length;
-		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->limit);
+	if (array_io->count + length > array_io->max) {
+		array_io->max += length;
+		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->max * sizeof(T));
 	}
 
-	u64 target = array_io->size / sizeof(T);
+	array_io->count += length;
+	u64 target = array_io->count - 1; /// convert to index
 
 	array_io->memory[target] = element;
-	array_io->size += sizeof(T) * length;
-
-	++array_io->count;
 
 	return &array_io->memory[target];
 }
@@ -87,7 +84,6 @@ Array_ClearContainer(
 ) {
 	Assert(array_out);
 
-	array_out->size = 0;
 	array_out->count = 0;
 }
 
@@ -112,16 +108,16 @@ Array_ReserveAdd(
 ) {
 	Assert(array_io);
 
-	u64 old_limit = array_io->limit;
+	u64 old_limit = array_io->max;
 
-	if (array_io->size + sizeof(T) * count_delta > array_io->limit) {
-		array_io->limit += sizeof(T) * count_delta;
-		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->limit);
+	if (array_io->count + count_delta > array_io->max) {
+		array_io->max += count_delta;
+		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->max * sizeof(T));
 	}
 
 	if (clear_zero) {
 		/// only clear new reserved data
-		Memory_Set(array_io->memory + array_io->count, 0, array_io->limit - old_limit);
+		Memory_Set(array_io->memory + array_io->count, 0, (array_io->max - old_limit) * sizeof(T));
 	}
 }
 
@@ -134,17 +130,17 @@ Array_Reserve(
 ) {
 	Assert(array_io);
 
-	u64 old_limit = array_io->limit;
-	u64 new_limit = array_io->size + sizeof(T) * count;
+	u64 old_limit = array_io->max;
+	u64 new_limit = (array_io->count + count) * sizeof(T);
 
-	if (new_limit > array_io->limit) {
-		array_io->limit = new_limit;
-		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->limit);
+	if (new_limit > array_io->max) {
+		array_io->max = new_limit;
+		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->max);
 	}
 
 	if (clear_zero) {
 		/// only clear new reserved data
-		Memory_Set(array_io->memory + array_io->count, 0, array_io->limit - old_limit);
+		Memory_Set(array_io->memory + array_io->count, 0, array_io->max - old_limit);
 	}
 }
 
@@ -214,7 +210,6 @@ Array_Remove(
 	}
 
 	array_io->count -= 1;
-	array_io->size  -= sizeof(T);
 
 	return result;
 }
@@ -317,7 +312,7 @@ Array_CreateBuffer(
 	Array<T> a_buffer;
 	Array_ReserveAdd(&a_buffer, count, true);
 	a_buffer.count = count;
-	a_buffer.size = a_buffer.limit;
+	a_buffer.size = a_buffer.max;
 
 	return a_buffer;
 }

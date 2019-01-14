@@ -29,7 +29,7 @@ Window_HandleEvents(Window *window) {
 					running = false;
 			}
 			else if (keyboard->is_down) {
-				Keyboard_Insert(keyboard, &s_keyboard);
+				Keyboard_AppendKey(keyboard, &s_keyboard);
 				char *c_buffer = String_CreateCBufferCopy(	s_keyboard.value,
 															s_keyboard.length);
 				LOG_DEBUG(c_buffer);

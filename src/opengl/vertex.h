@@ -234,7 +234,7 @@ Vertex_BindAttributes(
 			glGenBuffers(1, &t_buffer->id);
 
 		glBindBuffer(GL_ARRAY_BUFFER, t_buffer->id);
-		glBufferData(GL_ARRAY_BUFFER, t_buffer->a_buffer.size, t_buffer->a_buffer.memory, GL_DYNAMIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, t_buffer->a_buffer.count * sizeof(float), t_buffer->a_buffer.memory, GL_DYNAMIC_DRAW);
 	}
 
 	Vertex_Load(shader_set, vertex);
@@ -294,7 +294,7 @@ Vertex_Render(
 	Shader_SetValue(shader_set, "scale_x", vertex->settings.scale_x);
 	Shader_SetValue(shader_set, "scale_y", vertex->settings.scale_y);
 
-	glDrawArrays(GL_POINTS, 0, a_positions->a_buffer.size / sizeof(GLfloat) / a_positions->group_count);
+	glDrawArrays(GL_POINTS, 0, a_positions->a_buffer.count * sizeof(GLfloat) / a_positions->group_count);
 }
 
 instant void

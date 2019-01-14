@@ -175,7 +175,7 @@ Keyboard_Update(
 }
 
 instant void
-Keyboard_Insert(
+Keyboard_AppendKey(
 	Keyboard *keyboard,
 	String *s_data_io
 ) {

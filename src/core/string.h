@@ -297,31 +297,6 @@ String_Copy(
 	return s_result;
 }
 
-//instant void
-//String_Copy(
-//	char *dest_out,
-//	const char *src,
-//	u32 length = 0
-//) {
-//	if (!src)
-//		return;
-//
-//	char *result = dest_out;
-//
-//	if (!length)
-//		length = String_Length(src);
-//
-//	/// for '0'-terminator
-//	++length;
-//
-//	while (*src AND --length > 0)
-//		*dest_out++ = *src++;
-//
-//	*dest_out = '\0';
-//
-//	dest_out = result;
-//}
-
 instant char *
 String_CreateCBufferCopy(
 	const char *c_source,
@@ -333,7 +308,6 @@ String_CreateCBufferCopy(
 		c_length = String_GetLength(c_source);
 
 	char *c_buffer = Memory_Create(char, c_length + 1);
-//	String_Copy(c_buffer, c_source, c_length);
 	Memory_Copy(c_buffer, c_source, c_length);
 
 	return c_buffer;
@@ -823,6 +797,37 @@ String_CalcWordCount(
 		++count_words;
 
 	return count_words;
+}
+
+/// 5 true:  12345+6=6
+/// 5 false: 12345+6=23456
+instant bool
+String_AppendCircle(
+	String *s_data_io,
+	const char *c_data,
+	u32 c_data_len,
+	u32 buffer_limit,
+	bool reset_full_buffer
+) {
+	Assert(s_data_io);
+
+	if (!c_data)        return false;
+	if (!c_data_len)    return false;
+	if (!buffer_limit)  return false;
+
+	if (s_data_io->length + c_data_len > buffer_limit) {
+		if (reset_full_buffer) {
+			String_Clear(s_data_io);
+		}
+		else {
+			u32 diff = (s_data_io->length + c_data_len) - buffer_limit;
+			String_Remove(s_data_io, 0, diff);
+		}
+	}
+
+	String_Append(s_data_io, c_data, c_data_len);
+
+	return (s_data_io->length == buffer_limit);
 }
 
 bool

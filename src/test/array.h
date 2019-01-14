@@ -16,9 +16,7 @@ Test_Arrays(
 		}
 
 		Array_ClearContainer(&as_test);
-		AssertMessage(		as_test.size  == 0
-						AND as_test.count == 0
-						AND as_test.limit == sizeof(String)
+		AssertMessage(      as_test.count == 0
 						AND as_test.memory > 0, "Clearing array failed.");
 
 		/// Memory ownership in local scope and not in array
@@ -70,10 +68,10 @@ Test_Arrays(
 		String s_data;
 		String_Append(&s_data, "demo");
 		Array_Add(&as_data, s_data);
-		AssertMessage(as_data.limit == sizeof(String), "Data size missmatch.");
+		AssertMessage(as_data.max == 1, "Data size missmatch.");
 		/// Will result in 1 (existing) + 3 (new empty) slots
 		Array_ReserveAdd(&as_data, 3, true);
-		AssertMessage(as_data.limit == (sizeof(String) * 4) AND as_data.count == 1, "Array reservation failed.");
+		AssertMessage(as_data.max == 4 AND as_data.count == 1, "Array reservation failed.");
 
 		/// non-generic array_destroy will free the string
 		Array_Destroy(&as_data);

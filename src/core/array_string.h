@@ -1,7 +1,11 @@
 #pragma once
 
-/// ::: String
-/// ===========================================================================
+#define String_SplitRefBuffer	Array_SplitRefBuffer
+#define String_SplitRef			Array_SplitRef
+
+#define String_SplitBuffer		Array_SplitBuffer
+#define String_Split			Array_Split
+
 instant void
 Array_Destroy(
 	Array<String> *array_out
@@ -199,7 +203,7 @@ Array_SplitWordsBuffer(
 
 	MEASURE_START();
 
-	if (as_words_out->limit) {
+	if (as_words_out->max) {
 		Array_Clear(as_words_out);
 	}
 	else {
