@@ -99,7 +99,7 @@ OpenGL_AdjustScaleViewport(
 		glViewport(x, y, new_width, new_height);
 		window_io->scale_x = 1.0f;
 		window_io->scale_y = 1.0f;
-		window_io->width = new_width;
+		window_io->width  = new_width;
 		window_io->height = new_height;
 
 		return result;

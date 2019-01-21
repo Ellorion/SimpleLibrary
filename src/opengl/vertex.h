@@ -179,7 +179,9 @@ Vertex_Load(
 	Assert(shader_set);
 	Assert(vertex);
 
+	AssertMessage(shader_set->active_id >= 0, "No Shader initialized.");
 	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
+
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
 
 	FOR_ARRAY(vertex->a_attributes, it) {

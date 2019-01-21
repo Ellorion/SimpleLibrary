@@ -397,6 +397,7 @@ Text_Create(
 
 	text.data.rect		= rect;
 	text.data.align_x	= align_x;
+	text.data.color		= {1, 1, 1, 1};
 
 	if (s_data_opt)
 		String_Append(&text.s_data, s_data_opt->value, s_data_opt->length);
@@ -1879,4 +1880,15 @@ Text_ScrollVerticalEnd(
 		text_io->offset_y = -(content_height - rect_height);
 	else
 		text_io->offset_y = 0;
+}
+
+instant void
+Text_GetString(
+	Text *text,
+	String **s_data
+) {
+	Assert(text);
+	Assert(s_data);
+
+	*s_data = &text->s_data;
 }

@@ -250,6 +250,7 @@ Clamp(
 /// hierarchical dependencies (including independent)
 #include "core/cpu.h"
 #include "core/array_string.h"
+#include "core/tree.h"	// array + array_string (if needed)
 #include "core/files.h"
 #include "core/image.h"
 
