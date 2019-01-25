@@ -6,7 +6,9 @@ int main() {
 	Tree<int> *myBranch;
 	Tree<int> *myLeaf;
 
-	Tree_AddBranch(&myTree, &myBranch);
+	myTree.is_expanded = true;
+
+	Tree_AddBranch(&myTree, &myBranch, "- branch 01 -");
 	Tree_AddLeaf(myBranch, &myLeaf);
 	myLeaf->data = 1;
 	Tree_AddLeaf(myBranch, &myLeaf);
@@ -14,7 +16,9 @@ int main() {
 	Tree_AddLeaf(myBranch, &myLeaf);
 	myLeaf->data = 3;
 
-	Tree_AddBranch(&myTree, &myBranch);
+	myBranch->is_expanded = true;
+
+	Tree_AddBranch(&myTree, &myBranch, "- branch 02 -");
 	Tree_AddLeaf(myBranch, &myLeaf);
 	myLeaf->data = 4;
 	Tree_AddLeaf(myBranch, &myLeaf);
@@ -22,13 +26,27 @@ int main() {
 	Tree_AddLeaf(myBranch, &myLeaf);
 	myLeaf->data = 6;
 
-	Tree_AddBranch(myBranch, &myBranch);
+	myBranch->is_expanded = true;
+
+	Tree_AddBranch(&myTree, &myBranch, "- branch 03 -");
 	Tree_AddLeaf(myBranch, &myLeaf);
-	myLeaf->data = 7;
+	myLeaf->data = 10;
 	Tree_AddLeaf(myBranch, &myLeaf);
-	myLeaf->data = 8;
+	myLeaf->data = 11;
 	Tree_AddLeaf(myBranch, &myLeaf);
-	myLeaf->data = 9;
+	myLeaf->data = 12;
+
+	if (Tree_Find(&myTree, &myBranch, "- branch 02 -")) {
+		Tree_AddBranch(myBranch, &myBranch, "- branch 02.1 -");
+		Tree_AddLeaf(myBranch, &myLeaf);
+		myLeaf->data = 7;
+		Tree_AddLeaf(myBranch, &myLeaf);
+		myLeaf->data = 8;
+		Tree_AddLeaf(myBranch, &myLeaf);
+		myLeaf->data = 9;
+
+		myBranch->is_expanded = true;
+	}
 
 	Tree_Print(&myTree);
 

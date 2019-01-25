@@ -144,6 +144,7 @@ Array_Reserve(
 	}
 }
 
+/// search availability or index
 template <typename T>
 instant bool
 Array_Find(
