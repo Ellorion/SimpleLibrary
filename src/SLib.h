@@ -1,5 +1,7 @@
 #pragma once
 
+#define SHOW_WARNING			0
+
 #define DEBUG_ALWAYS_UPDATE		0
 #define DEBUG_EVENT_STATUS		0
 #define DEBUG_BENCHMARK			0
@@ -137,15 +139,19 @@ _AssertMessage(
 /// ::: Messages
 /// ===========================================================================
 #if DEBUG_EVENT_STATUS
-	#define LOG_STATUS(_text) std::cout << _text;
+#	define LOG_STATUS(_text) std::cout << _text;
 #else
-	#define LOG_STATUS(_text)
+#	define LOG_STATUS(_text)
 #endif
 
 #define LOG_DEBUG(text) std::cout << text << std::endl;
+#define LOG_INFO(_text) std::cout << "Info: " << _text << std::endl;
 
-#define LOG_INFO(_text)    std::cout << "Info: "    << _text << std::endl;
-#define LOG_WARNING(_text) std::cout << "Warning: " << _text << std::endl;
+#if SHOW_WARNING
+#	define LOG_WARNING(_text) std::cout << "Warning: " << _text << std::endl;
+#else
+#	define LOG_WARNING(_text)
+#endif
 
 #if DEBUG_BENCHMARK
 	#define MEASURE_START() \

@@ -40,58 +40,31 @@ _Memory_Alloc_Empty(
 	return mem;
 }
 
-template <typename T>
-struct Array;
-
-template <typename T>
 instant void *
 _Memory_Resize(
 	void *mem,
 	u64 size
 ) {
-	if (!mem)  return _Memory_Alloc_Empty(size);
+	if (!mem)
+		return _Memory_Alloc_Empty(size);
 
 	Memory_Header mem_header;
 	Memory_GetHeader(&mem_header, mem);
 
-	if (mem_header.sig != MEMORY_SIGNATURE) {
+	if (mem_header.sig != MEMORY_SIGNATURE)
 		return _Memory_Alloc_Empty(size);
-	}
 
 	mem = (char *)mem - sizeof(Memory_Header);
 
 	void *mem_old = mem;
 
-	///@Info: will NOT keep the same (virtual) memory address!!!
+	///@Info: - will NOT keep the same (virtual) memory address!!!
+	///       - does NOT init to 0 (zero)
 	mem = realloc(mem, size + sizeof(Memory_Header));
 
 	if (mem != mem_old)
 		LOG_WARNING("Memory resizing resulted in a new base pointer.");
 
-	((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
-
-	mem = (char *)mem + sizeof(Memory_Header);
-
-	return mem;
-}
-
-instant void *
-_Memory_Resize(
-	void *mem,
-	u64 size
-) {
-	if (!mem)  return _Memory_Alloc_Empty(size);
-
-	Memory_Header mem_header;
-	Memory_GetHeader(&mem_header, mem);
-
-	if (mem_header.sig != MEMORY_SIGNATURE) {
-		return _Memory_Alloc_Empty(size);
-	}
-
-	mem = (char *)mem - sizeof(Memory_Header);
-
-	mem = realloc(mem, size + sizeof(Memory_Header));
 	((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
 
 	mem = (char *)mem + sizeof(Memory_Header);

@@ -216,6 +216,19 @@ Array_Remove(
 }
 
 template <typename T>
+instant Array<T>
+Array_CreateBuffer(
+	u64 count
+) {
+	Array<T> a_buffer;
+	Array_ReserveAdd(&a_buffer, count, true);
+	a_buffer.count = count;
+	a_buffer.size = a_buffer.max;
+
+	return a_buffer;
+}
+
+template <typename T>
 instant void
 Array_Sort_Quick_Ascending(
 	T *begin_io,
@@ -303,17 +316,4 @@ Array_Sort_Descending(
 	Assert(array_io->count);
 
 	Array_Sort_Quick_Descending(&array_io->memory[0], &array_io->memory[array_io->count - 1]);
-}
-
-template <typename T>
-instant Array<T>
-Array_CreateBuffer(
-	u64 count
-) {
-	Array<T> a_buffer;
-	Array_ReserveAdd(&a_buffer, count, true);
-	a_buffer.count = count;
-	a_buffer.size = a_buffer.max;
-
-	return a_buffer;
 }

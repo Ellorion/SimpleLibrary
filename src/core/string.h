@@ -19,6 +19,14 @@ String_Print(
 	}
 }
 
+instant void
+String_PrintNewLine(
+	String *s_data
+) {
+	String_Print(s_data);
+	std::cout << std::endl;
+}
+
 /// does NOT support UTF-8
 instant u64
 String_GetLength(
