@@ -20,7 +20,7 @@ String_Print(
 }
 
 instant void
-String_PrintNewLine(
+String_PrintLine(
 	String *s_data
 ) {
 	String_Print(s_data);

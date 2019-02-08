@@ -253,10 +253,11 @@ Clamp(
 #include "core/array.h"
 #include "core/rect.h"
 
-/// hierarchical dependencies (including independent)
+/// non-independent
+#include "core/parser.h"
 #include "core/cpu.h"
 #include "core/array_string.h"
-#include "core/tree.h"	// array + array_string (if needed)
+#include "core/tree.h"
 #include "core/files.h"
 #include "core/image.h"
 

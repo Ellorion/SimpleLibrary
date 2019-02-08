@@ -334,7 +334,6 @@ String_GetDelimiterSection(
 	return s_result;
 }
 
-template <typename String>
 instant String *
 Array_Add(
 	Array<String> *array_io,
