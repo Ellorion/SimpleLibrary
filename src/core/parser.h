@@ -8,6 +8,21 @@ struct Parser {
 };
 
 instant bool
+Parser_IsRunning(
+	Parser *parser
+) {
+	Assert(parser);
+
+	if (parser->has_error)
+		return false;
+
+	if (parser->s_data.length <= 0)
+		return false;
+
+	return true;
+}
+
+instant bool
 Parser_HasError(
 	Parser *parser
 ) {
@@ -37,7 +52,7 @@ Parser_SkipUntilToken(
 
     bool is_comment    = false;
 
-    while(parser_io->s_data.length) {
+    while(Parser_IsRunning(parser_io)) {
 		char ch = parser_io->s_data.value[0];
 
 		/// skip whitespaces
@@ -75,9 +90,7 @@ Parser_Destroy(
 ) {
 	Assert(parser_io);
 
-	/// do NOT destroy s_data, since that data
-	/// is used by reference when loading,
-	/// for pointer iteration
+	String_Destroy(&parser_io->s_data);
 	String_Destroy(&parser_io->s_error);
 	parser_io->has_error = false;
 }
@@ -94,9 +107,10 @@ Parser_Load(
 
 	Parser parser = {};
 
-	parser.s_data.value  = (char *)c_data;
-	parser.s_data.length = c_length;
+	parser.s_data.value   = (char *)c_data;
+	parser.s_data.length  = c_length;
 	parser.s_data.changed = true;
+	parser.s_data.is_reference = true;
 
 	Parser_SkipUntilToken(&parser);
 
@@ -167,6 +181,7 @@ Parser_GetStringRef(
 	s_data_out->value   = parser_io->s_data.value;
 	s_data_out->length  = index_found;
 	s_data_out->changed = true;
+	s_data_out->is_reference = true;
 
 	Parser_AddOffset(parser_io, index_found + c_length);
 
@@ -200,6 +215,7 @@ Parser_GetStringRef(
 		s_data_out->value   = parser_io->s_data.value;
 		s_data_out->length  = index_found;
 		s_data_out->changed = true;
+		s_data_out->is_reference = true;
 
 		Parser_AddOffset(parser_io, index_found + 1);
 		Parser_SkipUntilToken(parser_io);
@@ -210,8 +226,9 @@ Parser_GetStringRef(
 	s_data_out->value   = parser_io->s_data.value;
 	s_data_out->length  = 0;
 	s_data_out->changed = true;
+	s_data_out->is_reference = true;
 
-	while(parser_io->s_data.length) {
+	while(Parser_IsRunning(parser_io)) {
         char ch = parser_io->s_data.value[0];
 
 		bool is_word_ending = false;
@@ -278,12 +295,13 @@ Parser_GetNumber(
 
 	s_number_out->value   = parser_io->s_data.value;
 	s_number_out->length  = 0;
+	s_number_out->is_reference = true;
 
 	bool has_error = false;
 	bool found_dot = false;
 	u64 index_parsing = 0;
 
-	while(parser_io->s_data.length) {
+	while(Parser_IsRunning(parser_io)) {
         char ch = parser_io->s_data.value[0];
 
         if (!IsNumeric(ch)) {

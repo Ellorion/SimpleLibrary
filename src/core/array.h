@@ -18,6 +18,9 @@
 		_it < (_array).count;       			\
 		++_it)
 
+#define ARRAY_COUNT(_array) \
+	(sizeof(_array)/sizeof(_array[0]))
+
 template <typename T>
 struct Array {
 	T    *memory = 0;

@@ -27,6 +27,7 @@ main.cpp
 *.ttf
 *.ini
 *.bat
+*.cfg
 
 # Object directory
 obj/

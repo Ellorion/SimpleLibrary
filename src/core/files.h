@@ -256,10 +256,16 @@ File_Read(
 	u64 length = File_Size(file);
 
 	String s_data;
-
-	s_data.value  = Memory_Resize(s_data.value, char, length);
 	s_data.length = length;
-	fread(s_data.value, sizeof(char), sizeof(char) * length, file->fp);
+
+	if (!length) {
+		s_data.value = Memory_Resize(s_data.value, char, 1);
+		s_data.value[0] = '\0';
+	}
+	else {
+		s_data.value  = Memory_Resize(s_data.value, char, length);
+		fread(s_data.value, sizeof(char), sizeof(char) * length, file->fp);
+	}
 
 	s_data.changed = true;
 

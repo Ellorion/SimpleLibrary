@@ -3,7 +3,8 @@
 #define String_Split Array_Split
 
 struct String {
-	bool  changed = false;
+	bool  changed       = false;
+	bool  is_reference  = false;
 	u64   length  = 0;
 	char *value   = 0;
 };
@@ -49,7 +50,9 @@ String_Destroy(
 ) {
 	Assert(s_data_io);
 
-	Memory_Free(s_data_io->value);
+	if (!s_data_io->is_reference)
+		Memory_Free(s_data_io->value);
+
 	*s_data_io = {};
 
 	s_data_io->changed = true;
@@ -725,6 +728,18 @@ String_Cut(
 		else
 			break;
 	}
+}
+
+instant void
+String_AddOffset(
+	String *s_data_io,
+	s64 offset
+) {
+	Assert(s_data_io);
+	Assert(s_data_io->is_reference);
+
+	s_data_io->value  += offset;
+	s_data_io->length -= offset;
 }
 
 instant char *
