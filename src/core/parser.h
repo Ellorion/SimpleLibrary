@@ -7,6 +7,9 @@ struct Parser {
 	String s_error;
 };
 
+instant void
+Parser_SkipWhitespacesAndComments(Parser *parser_io);
+
 instant bool
 Parser_HasError(
 	Parser *parser
@@ -41,13 +44,47 @@ Parser_Destroy(
 }
 
 instant void
-Parser_SkipWhitespaces(
+Parser_IsLinebreak(
+	Parser *parser_io
+) {
+	Assert(parser_io);
+
+	if (Parser_HasError(parser_io))
+		return;
+
+	bool was_linebreak = false;
+
+	if (String_IsEqual(&parser_io->s_data, "\r")) {
+		Parser_AddOffset(parser_io, 1);
+		was_linebreak = true;
+	}
+
+	if (String_IsEqual(&parser_io->s_data, "\n")) {
+		Parser_AddOffset(parser_io, 1);
+		was_linebreak = true;
+	}
+
+	if (!was_linebreak) {
+		parser_io->has_error = true;
+		Assert(!parser_io->s_error.value);
+
+		String_Append(&parser_io->s_error, "Linebreak not found");
+
+		return;
+	}
+
+	Parser_SkipWhitespacesAndComments(parser_io);
+}
+
+instant void
+Parser_SkipWhitespacesAndComments(
 	Parser *parser_io
 ) {
     Assert(parser_io);
 
-    bool is_whitespace;
+    bool is_whitespace = false;
 
+    /// whitespaces
 	while(parser_io->s_data.length) {
 		char ch = parser_io->s_data.value[0];
 
@@ -59,6 +96,26 @@ Parser_SkipWhitespaces(
 			break;
 
 		Parser_AddOffset(parser_io, 1);
+	}
+
+	bool is_linebreak;
+
+	/// comments
+	if (String_StartWith(&parser_io->s_data, "#")) {
+		while(parser_io->s_data.length) {
+			char ch = parser_io->s_data.value[0];
+
+			is_linebreak = false;
+			is_linebreak |= (ch == '\r');
+			is_linebreak |= (ch == '\n');
+
+			if (is_linebreak)
+				break;
+
+			Parser_AddOffset(parser_io, 1);
+		}
+
+		Parser_IsLinebreak(parser_io);
 	}
 }
 
@@ -78,7 +135,7 @@ Parser_Load(
 	parser.s_data.length = c_length;
 	parser.s_data.changed = true;
 
-	Parser_SkipWhitespaces(&parser);
+	Parser_SkipWhitespacesAndComments(&parser);
 
 	return parser;
 }
@@ -112,40 +169,7 @@ Parser_IsString(
 	}
 
 	Parser_AddOffset(parser_io, c_length);
-	Parser_SkipWhitespaces(parser_io);
-}
-
-instant void
-Parser_IsLinebreak(
-	Parser *parser_io
-) {
-	Assert(parser_io);
-
-	if (Parser_HasError(parser_io))
-		return;
-
-	bool was_linebreak = false;
-
-	if (String_IsEqual(&parser_io->s_data, "\r")) {
-		Parser_AddOffset(parser_io, 1);
-		was_linebreak = true;
-	}
-
-	if (String_IsEqual(&parser_io->s_data, "\n")) {
-		Parser_AddOffset(parser_io, 1);
-		was_linebreak = true;
-	}
-
-	if (!was_linebreak) {
-		parser_io->has_error = true;
-		Assert(!parser_io->s_error.value);
-
-		String_Append(&parser_io->s_error, "Linebreak not found");
-
-		return;
-	}
-
-	Parser_SkipWhitespaces(parser_io);
+	Parser_SkipWhitespacesAndComments(parser_io);
 }
 
 instant void
@@ -183,7 +207,7 @@ Parser_GetStringRef(
 
 	Parser_AddOffset(parser_io, index_found + c_length);
 
-	Parser_SkipWhitespaces(parser_io);
+	Parser_SkipWhitespacesAndComments(parser_io);
 }
 
 instant void
@@ -215,7 +239,7 @@ Parser_GetStringRef(
 		s_data_out->changed = true;
 
 		Parser_AddOffset(parser_io, index_found + 1);
-		Parser_SkipWhitespaces(parser_io);
+		Parser_SkipWhitespacesAndComments(parser_io);
 
 		return;
 	}
@@ -240,7 +264,7 @@ Parser_GetStringRef(
 		Parser_AddOffset(parser_io, 1);
 	}
 
-	Parser_SkipWhitespaces(parser_io);
+	Parser_SkipWhitespacesAndComments(parser_io);
 }
 
 instant void
@@ -265,7 +289,7 @@ Parser_GetBoolean(
 	FOR(4, it) {
 		if (String_StartWith(&parser_io->s_data, values[it])) {
 			Parser_AddOffset(parser_io, String_GetLength(values[it]));
-			Parser_SkipWhitespaces(parser_io);
+			Parser_SkipWhitespacesAndComments(parser_io);
 
 			*is_true_out = (it == 2 OR it == 3);
 			return;
@@ -276,4 +300,71 @@ Parser_GetBoolean(
 	Assert(!parser_io->s_error.value);
 
 	String_Append(&parser_io->s_error, "No valid boolean value could be parsed");
+}
+
+instant void
+Parser_GetNumber(
+	Parser *parser_io,
+	String *s_number_out
+) {
+	Assert(parser_io);
+	Assert(s_number_out);
+
+	if (Parser_HasError(parser_io))
+		return;
+
+	s_number_out->value   = parser_io->s_data.value;
+	s_number_out->length  = 0;
+
+	bool has_error = false;
+	bool found_dot = false;
+	u64 index_parsing = 0;
+
+	while(parser_io->s_data.length) {
+        char ch = parser_io->s_data.value[0];
+
+        if (!IsNumeric(ch)) {
+			bool is_valid = false;
+
+        	if (index_parsing == 0 AND ch == '-')
+				is_valid = true;
+
+			if (ch == '.') {
+				if (!found_dot) {
+					is_valid  = true;
+					found_dot = true;
+				}
+				else {
+					has_error = true;
+				}
+			}
+
+			if (!is_valid)
+				break;
+        }
+
+		s_number_out->length += 1;
+		Parser_AddOffset(parser_io, 1);
+
+        index_parsing += 1;
+	}
+
+	has_error |= String_EndWith(s_number_out, ".", 1);
+	has_error |= (s_number_out->length == 0);
+
+	if (has_error) {
+		parser_io->has_error = true;
+		Assert(!parser_io->s_error.value);
+
+		String_Append(&parser_io->s_error, "No valid number could be parsed");
+
+		s_number_out->value  = 0;
+		s_number_out->length = 0;
+
+		Parser_AddOffset(parser_io, -index_parsing);
+
+		return;
+	}
+
+	Parser_SkipWhitespacesAndComments(parser_io);
 }

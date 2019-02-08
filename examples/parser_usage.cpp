@@ -5,12 +5,15 @@ int main() {
 	String s_option;
 	String s_path;
 	String s_word;
+	String s_number;
 	bool   is_true;
 
 	Parser parser = Parser_Load(
 		"   settings  \n"
 		"path: \"D:/temp folder/\" hello world\r\n"
-		"exit: true"
+		"#test comment\r\n"
+		"exit: true\r\n"
+		"12345 -67.89"
 	);
 
 	Parser_IsString(&parser, "settings");
@@ -33,6 +36,13 @@ int main() {
 	String_PrintLine(&s_option);
 
 	Parser_GetBoolean(&parser, &is_true);
+	Parser_IsLinebreak(&parser);
+
+	Parser_GetNumber(&parser, &s_number);
+	String_PrintLine(&s_number);
+
+	Parser_GetNumber(&parser, &s_number);
+	String_PrintLine(&s_number);
 
 	if (Parser_HasError(&parser))
 		String_PrintLine(&parser.s_error);

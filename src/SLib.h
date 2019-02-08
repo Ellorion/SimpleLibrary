@@ -246,6 +246,13 @@ Clamp(
 	if (*value_io > max)  *value_io = max;
 }
 
+instant bool
+IsNumeric(
+	char character
+) {
+	return (character >= '0' AND character <= '9');
+}
+
 /// independent
 #include "core/memory.h"
 #include "core/time.h"
