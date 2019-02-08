@@ -7,9 +7,6 @@ struct Parser {
 	String s_error;
 };
 
-instant void
-Parser_SkipWhitespacesAndComments(Parser *parser_io);
-
 instant bool
 Parser_HasError(
 	Parser *parser
@@ -30,6 +27,48 @@ Parser_AddOffset(
 	parser_io->s_data.length -= offset;
 }
 
+/// ignores whitespaces, linebreaks and
+/// comments starting with # until newline
+instant void
+Parser_SkipUntilToken(
+	Parser *parser_io
+) {
+    Assert(parser_io);
+
+    bool is_comment    = false;
+
+    while(parser_io->s_data.length) {
+		char ch = parser_io->s_data.value[0];
+
+		/// skip whitespaces
+		if (ch == ' ' OR ch == '\t') {
+			Parser_AddOffset(parser_io, 1);
+			continue;
+		}
+
+		/// skip comment
+		if (ch == '#' OR is_comment) {
+			is_comment = true;
+
+			if (!(ch == '\r' OR ch == '\n')) {
+				Parser_AddOffset(parser_io, 1);
+				continue;
+			}
+
+			/// until newline
+			is_comment = false;
+		}
+
+		/// skip newline
+		if (ch == '\r' OR ch == '\n') {
+			Parser_AddOffset(parser_io, 1);
+			continue;
+		}
+
+		break;
+    }
+}
+
 instant void
 Parser_Destroy(
 	Parser *parser_io
@@ -41,82 +80,6 @@ Parser_Destroy(
 	/// for pointer iteration
 	String_Destroy(&parser_io->s_error);
 	parser_io->has_error = false;
-}
-
-instant void
-Parser_IsLinebreak(
-	Parser *parser_io
-) {
-	Assert(parser_io);
-
-	if (Parser_HasError(parser_io))
-		return;
-
-	bool was_linebreak = false;
-
-	if (String_IsEqual(&parser_io->s_data, "\r")) {
-		Parser_AddOffset(parser_io, 1);
-		was_linebreak = true;
-	}
-
-	if (String_IsEqual(&parser_io->s_data, "\n")) {
-		Parser_AddOffset(parser_io, 1);
-		was_linebreak = true;
-	}
-
-	if (!was_linebreak) {
-		parser_io->has_error = true;
-		Assert(!parser_io->s_error.value);
-
-		String_Append(&parser_io->s_error, "Linebreak not found");
-
-		return;
-	}
-
-	Parser_SkipWhitespacesAndComments(parser_io);
-}
-
-instant void
-Parser_SkipWhitespacesAndComments(
-	Parser *parser_io
-) {
-    Assert(parser_io);
-
-    bool is_whitespace = false;
-
-    /// whitespaces
-	while(parser_io->s_data.length) {
-		char ch = parser_io->s_data.value[0];
-
-		is_whitespace = false;
-		is_whitespace |= (ch == ' ');
-		is_whitespace |= (ch == '\t');
-
-		if (!is_whitespace)
-			break;
-
-		Parser_AddOffset(parser_io, 1);
-	}
-
-	bool is_linebreak;
-
-	/// comments
-	if (String_StartWith(&parser_io->s_data, "#")) {
-		while(parser_io->s_data.length) {
-			char ch = parser_io->s_data.value[0];
-
-			is_linebreak = false;
-			is_linebreak |= (ch == '\r');
-			is_linebreak |= (ch == '\n');
-
-			if (is_linebreak)
-				break;
-
-			Parser_AddOffset(parser_io, 1);
-		}
-
-		Parser_IsLinebreak(parser_io);
-	}
 }
 
 instant Parser
@@ -135,7 +98,7 @@ Parser_Load(
 	parser.s_data.length = c_length;
 	parser.s_data.changed = true;
 
-	Parser_SkipWhitespacesAndComments(&parser);
+	Parser_SkipUntilToken(&parser);
 
 	return parser;
 }
@@ -169,7 +132,7 @@ Parser_IsString(
 	}
 
 	Parser_AddOffset(parser_io, c_length);
-	Parser_SkipWhitespacesAndComments(parser_io);
+	Parser_SkipUntilToken(parser_io);
 }
 
 instant void
@@ -207,7 +170,7 @@ Parser_GetStringRef(
 
 	Parser_AddOffset(parser_io, index_found + c_length);
 
-	Parser_SkipWhitespacesAndComments(parser_io);
+	Parser_SkipUntilToken(parser_io);
 }
 
 instant void
@@ -239,7 +202,7 @@ Parser_GetStringRef(
 		s_data_out->changed = true;
 
 		Parser_AddOffset(parser_io, index_found + 1);
-		Parser_SkipWhitespacesAndComments(parser_io);
+		Parser_SkipUntilToken(parser_io);
 
 		return;
 	}
@@ -264,7 +227,7 @@ Parser_GetStringRef(
 		Parser_AddOffset(parser_io, 1);
 	}
 
-	Parser_SkipWhitespacesAndComments(parser_io);
+	Parser_SkipUntilToken(parser_io);
 }
 
 instant void
@@ -289,7 +252,7 @@ Parser_GetBoolean(
 	FOR(4, it) {
 		if (String_StartWith(&parser_io->s_data, values[it])) {
 			Parser_AddOffset(parser_io, String_GetLength(values[it]));
-			Parser_SkipWhitespacesAndComments(parser_io);
+			Parser_SkipUntilToken(parser_io);
 
 			*is_true_out = (it == 2 OR it == 3);
 			return;
@@ -366,5 +329,5 @@ Parser_GetNumber(
 		return;
 	}
 
-	Parser_SkipWhitespacesAndComments(parser_io);
+	Parser_SkipUntilToken(parser_io);
 }
