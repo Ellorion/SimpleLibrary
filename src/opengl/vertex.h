@@ -426,4 +426,7 @@ Rect_Render(
 		Vertex_BindAttributes(shader_set, vertex);
 		Vertex_Render(shader_set, vertex);
 	}
+	else {
+		LOG_WARNING("No rectangle data to render set");
+	}
 }

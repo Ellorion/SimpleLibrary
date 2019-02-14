@@ -14,9 +14,7 @@ Window_HandleEvents(
 
 	Keyboard *keyboard = window->keyboard;
 
-	String s_font;
-	String_Append(&s_font, "default.ttf");
-	Font font = Font_Load(&s_font, 20);
+	Font font = Font_Load("default.ttf", 20);
 
 	Rect rect_box = {10, 20, 300, 200};
 

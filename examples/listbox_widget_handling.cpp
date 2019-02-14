@@ -20,9 +20,7 @@ Window_HandleEvents(
 
 	Keyboard *keyboard = window->keyboard;
 
-	String s_font;
-	String_Append(&s_font, "default.ttf");
-	Font font_20 = Font_Load(&s_font, 20);
+	Font font_20 = Font_Load("default.ttf", 20);
 
 	Widget widget_listbox  = Widget_CreateListBox(window, &font_20, { 10,  20, 300, 200});
 	Widget widget_click_me = Widget_CreateButton( window, &font_20, {320,  20, 100,  30}, "click me");

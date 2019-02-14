@@ -14,10 +14,7 @@ Window_HandleEvents(
 	Timer timer_fps_log;
 	Time_Reset(&timer_fps_log);
 
-	String s_font;
-	String_Append(&s_font, "default.ttf");
-
-	Font font = Font_Load(&s_font, 20);
+	Font font = Font_Load("default.ttf", 20);
 
 	ShaderSet shader_set = ShaderSet_Create(window);
 

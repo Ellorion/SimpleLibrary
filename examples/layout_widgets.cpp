@@ -14,9 +14,7 @@ Window_HandleEvents(
 
 	Keyboard *keyboard = window->keyboard;
 
-	String s_font;
-	String_Append(&s_font, "default.ttf");
-	Font font_20 = Font_Load(&s_font, 20);
+	Font font_20 = Font_Load("default.ttf", 20);
 
 	Widget w_button_menu_1   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "menu_1");
 	Widget w_button_menu_2   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "menu_2");

@@ -2,7 +2,6 @@
 
 #define SHOW_WARNING			0
 
-#define DEBUG_ALWAYS_UPDATE		0
 #define DEBUG_EVENT_STATUS		0
 #define DEBUG_BENCHMARK			0
 

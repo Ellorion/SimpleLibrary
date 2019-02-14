@@ -874,10 +874,8 @@ Text_Update(
 		return false;
 	}
 
-#if !DEBUG_ALWAYS_UPDATE
 	if (!Text_HasChanged(text_io, false))
 		return false;
-#endif
 
 	MEASURE_START();
 
@@ -889,12 +887,8 @@ Text_Update(
 
 	u64 number_of_line_breaks = 0;
 
-#if !DEBUG_ALWAYS_UPDATE
 	if (text_io->s_data.changed)
 		number_of_line_breaks = Array_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
-#else
-	number_of_line_breaks = Array_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
-#endif
 
 	s32 text_height = Text_BuildLines(text_io, &text_io->as_words, number_of_line_breaks, &text_io->a_text_lines);
 
