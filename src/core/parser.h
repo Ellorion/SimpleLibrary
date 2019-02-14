@@ -7,6 +7,11 @@ struct Parser {
 	String s_error;
 };
 
+enum PARSE_TYPE {
+	PARSE_SEEK,
+	PARSE_PEEK
+};
+
 instant bool
 Parser_IsRunning(
 	Parser *parser
@@ -154,7 +159,8 @@ Parser_GetStringRef(
 	Parser *parser_io,
 	String *s_data_out,
 	const char* c_until_match,
-	u64         c_length = 0
+	u64         c_length = 0,
+	PARSE_TYPE type = PARSE_SEEK
 ) {
 	Assert(parser_io);
 	Assert(s_data_out);
@@ -183,15 +189,17 @@ Parser_GetStringRef(
 	s_data_out->changed = true;
 	s_data_out->is_reference = true;
 
-	Parser_AddOffset(parser_io, index_found + c_length);
-
-	Parser_SkipUntilToken(parser_io);
+	if (type == PARSE_SEEK) {
+		Parser_AddOffset(parser_io, index_found + c_length);
+		Parser_SkipUntilToken(parser_io);
+	}
 }
 
 instant void
 Parser_GetStringRef(
 	Parser *parser_io,
-	String *s_data_out
+	String *s_data_out,
+	PARSE_TYPE type = PARSE_SEEK
 ) {
 	Assert(parser_io);
 	Assert(s_data_out);
@@ -217,8 +225,16 @@ Parser_GetStringRef(
 		s_data_out->changed = true;
 		s_data_out->is_reference = true;
 
-		Parser_AddOffset(parser_io, index_found + 1);
-		Parser_SkipUntilToken(parser_io);
+		if (type == PARSE_PEEK) {
+			/// reverse starting "\""
+			Parser_AddOffset(parser_io, -1);
+		}
+		else
+		if (type == PARSE_SEEK) {
+			/// include ending "\""
+			Parser_AddOffset(parser_io, index_found + 1);
+			Parser_SkipUntilToken(parser_io);
+		}
 
 		return;
 	}
@@ -241,10 +257,15 @@ Parser_GetStringRef(
 			break;
 
 		s_data_out->length += 1;
+
 		Parser_AddOffset(parser_io, 1);
 	}
 
-	Parser_SkipUntilToken(parser_io);
+	if (type == PARSE_PEEK)
+		Parser_AddOffset(parser_io, -s_data_out->length);
+	else
+	if (type == PARSE_SEEK)
+		Parser_SkipUntilToken(parser_io);
 }
 
 instant void

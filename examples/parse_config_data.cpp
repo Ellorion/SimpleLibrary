@@ -21,7 +21,8 @@ int main() {
 	const char *c_section_ident = "/:";
 
 	const char *cfg_section[] = {
-		"default"
+		"default",
+		"test"
 	};
 
 	while(Parser_IsRunning(&parser)) {
@@ -48,11 +49,18 @@ int main() {
 		switch (id_section) {
 			case 0: { /// /:default
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetStringRef(&parser, &s_option);
+					Parser_GetStringRef(&parser, &s_option, PARSE_PEEK);
 
 					/// section switch
 					if (String_StartWith(&s_option, c_section_ident))
 						break;
+
+#if 0
+					Parser_GetStringRef(&parser, &s_option);
+#else
+					Parser_AddOffset(&parser, s_option.length);
+					Parser_SkipUntilToken(&parser);
+#endif
 
 					/// section options
 					/// =======================================================
@@ -68,6 +76,10 @@ int main() {
 						String_PrintLine(&s_default_folder);
 					}
 				}
+			} break;
+
+			case 1: {
+				LOG_DEBUG("lala")
 			} break;
 		}
 
