@@ -1,5 +1,5 @@
 #include "src/SLib.h"
-#include "src/test/core.h"
+#include "test/core.h"
 
 int main() {
 	Parser parser = Parser_Load(R"(

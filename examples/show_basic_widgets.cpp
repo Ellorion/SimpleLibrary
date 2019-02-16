@@ -1,8 +1,5 @@
-/// Example: show basic click-able / tab-able widgets
-/// ===========================================================================
-
 #include "src/SLib.h"
-#include "src/test/core.h"
+#include "test/core.h"
 
 instant void
 Window_HandleEvents(

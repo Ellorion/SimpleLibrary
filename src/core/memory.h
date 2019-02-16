@@ -31,9 +31,6 @@ instant void *
 _Memory_Alloc_Empty(
 	u64 size
 ) {
-//	if (size == 0)
-//		return 0;
-
 	void *mem = calloc(1, size + sizeof(Memory_Header));
 	((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
 	mem = (char *)mem + sizeof(Memory_Header);
