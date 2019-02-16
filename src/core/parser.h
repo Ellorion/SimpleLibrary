@@ -7,9 +7,9 @@ struct Parser {
 	String s_error;
 };
 
-enum PARSE_TYPE {
-	PARSE_SEEK,
-	PARSE_PEEK
+enum PARSER_MODE_TYPE {
+	PARSER_MODE_SEEK,
+	PARSER_MODE_PEEK
 };
 
 instant bool
@@ -160,7 +160,7 @@ Parser_GetStringRef(
 	String *s_data_out,
 	const char* c_until_match,
 	u64         c_length = 0,
-	PARSE_TYPE type = PARSE_SEEK
+	PARSER_MODE_TYPE type = PARSER_MODE_SEEK
 ) {
 	Assert(parser_io);
 	Assert(s_data_out);
@@ -189,7 +189,7 @@ Parser_GetStringRef(
 	s_data_out->changed = true;
 	s_data_out->is_reference = true;
 
-	if (type == PARSE_SEEK) {
+	if (type == PARSER_MODE_SEEK) {
 		Parser_AddOffset(parser_io, index_found + c_length);
 		Parser_SkipUntilToken(parser_io);
 	}
@@ -199,7 +199,7 @@ instant void
 Parser_GetStringRef(
 	Parser *parser_io,
 	String *s_data_out,
-	PARSE_TYPE type = PARSE_SEEK
+	PARSER_MODE_TYPE type = PARSER_MODE_SEEK
 ) {
 	Assert(parser_io);
 	Assert(s_data_out);
@@ -225,12 +225,12 @@ Parser_GetStringRef(
 		s_data_out->changed = true;
 		s_data_out->is_reference = true;
 
-		if (type == PARSE_PEEK) {
+		if (type == PARSER_MODE_PEEK) {
 			/// reverse starting "\""
 			Parser_AddOffset(parser_io, -1);
 		}
 		else
-		if (type == PARSE_SEEK) {
+		if (type == PARSER_MODE_SEEK) {
 			/// include ending "\""
 			Parser_AddOffset(parser_io, index_found + 1);
 			Parser_SkipUntilToken(parser_io);
@@ -261,10 +261,10 @@ Parser_GetStringRef(
 		Parser_AddOffset(parser_io, 1);
 	}
 
-	if (type == PARSE_PEEK)
+	if (type == PARSER_MODE_PEEK)
 		Parser_AddOffset(parser_io, -s_data_out->length);
 	else
-	if (type == PARSE_SEEK)
+	if (type == PARSER_MODE_SEEK)
 		Parser_SkipUntilToken(parser_io);
 }
 
@@ -279,20 +279,32 @@ Parser_GetBoolean(
 	if (Parser_HasError(parser_io))
 		return;
 
-	/// has to stay in the defined order
-	const char *values[] = {
+	const char *values_false[] = {
 		"0",
-		"false",
+		"false"
+	};
+
+	FOR(ARRAY_COUNT(values_false), it) {
+		if (String_StartWith(&parser_io->s_data, values_false[it])) {
+			Parser_AddOffset(parser_io, String_GetLength(values_false[it]));
+			Parser_SkipUntilToken(parser_io);
+
+			*is_true_out = false;
+			return;
+		}
+	}
+
+	const char *values_true[] = {
 		"1",
 		"true"
 	};
 
-	FOR(4, it) {
-		if (String_StartWith(&parser_io->s_data, values[it])) {
-			Parser_AddOffset(parser_io, String_GetLength(values[it]));
+	FOR(ARRAY_COUNT(values_true), it) {
+		if (String_StartWith(&parser_io->s_data, values_true[it])) {
+			Parser_AddOffset(parser_io, String_GetLength(values_true[it]));
 			Parser_SkipUntilToken(parser_io);
 
-			*is_true_out = (it == 2 OR it == 3);
+			*is_true_out = true;
 			return;
 		}
 	}

@@ -59,7 +59,7 @@ Test_Parser(
 		switch (id_section) {
 			case 0: {	/// /:default
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetStringRef(&parser, &s_data, PARSE_PEEK);
+					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
 					if (String_StartWith(&s_data, c_section_ident))
@@ -71,27 +71,32 @@ Test_Parser(
 					/// =======================================================
 					if (String_IsEqual(&s_data, "text")) {
 						Parser_GetStringRef(&parser, &s_data);
-						AssertMessage(String_IsEqual(&s_data, "FooBar"), "Parsing error");
 						test_option_count += 1;
+
+						AssertMessage(	!parser.has_error
+										AND String_IsEqual(&s_data, "FooBar"), "Parsing error");
 					}
 
 					if (String_IsEqual(&s_data, "path")) {
 						Parser_GetStringRef(&parser, &s_data);
-						AssertMessage(String_IsEqual(&s_data, "X:/app folder/"), "Parsing error");
 						test_option_count += 1;
+
+						AssertMessage(	    !parser.has_error
+										AND String_IsEqual(&s_data, "X:/app folder/"), "Parsing error");
 					}
 
 					if (String_IsEqual(&s_data, "debug")) {
 						Parser_GetBoolean(&parser, &is_true);
-						AssertMessage(!is_true, "Parsing error");
 						test_option_count += 1;
+
+						AssertMessage(!parser.has_error, "Parsing error");
 					}
 				}
 			} break;
 
 			case 1: {	/// /:save
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetStringRef(&parser, &s_data, PARSE_PEEK);
+					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
 					if (String_StartWith(&s_data, c_section_ident))
@@ -103,21 +108,24 @@ Test_Parser(
 					/// =======================================================
 					if (String_IsEqual(&s_data, "path")) {
 						Parser_GetStringRef(&parser, &s_data);
-						AssertMessage(String_IsEqual(&s_data, "X:/app folder/saves"), "Parsing error");
 						test_option_count += 1;
+
+						AssertMessage(	    !parser.has_error
+										AND String_IsEqual(&s_data, "X:/app folder/saves"), "Parsing error");
 					}
 
 					if (String_IsEqual(&s_data, "auto")) {
 						Parser_GetBoolean(&parser, &is_true);
-						AssertMessage(is_true, "Parsing error");
 						test_option_count += 1;
+
+						AssertMessage(!parser.has_error, "Parsing error");
 					}
 				}
 			} break;
 
 			case 2: {	/// /:music
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetStringRef(&parser, &s_data, PARSE_PEEK);
+					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
 					if (String_StartWith(&s_data, c_section_ident))
@@ -129,14 +137,17 @@ Test_Parser(
 					/// =======================================================
 					if (String_IsEqual(&s_data, "enabled")) {
 						Parser_GetBoolean(&parser, &is_true);
-						AssertMessage(!is_true, "Parsing error");
 						test_option_count += 1;
+
+						AssertMessage(!parser.has_error, "Parsing error");
 					}
 
 					if (String_IsEqual(&s_data, "volume")) {
 						Parser_GetNumber(&parser, &s_data);
-						AssertMessage(String_IsEqual(&s_data, "97.5"), "Parsing error");
 						test_option_count += 1;
+
+						AssertMessage(	    !parser.has_error
+										AND String_IsEqual(&s_data, "97.5"), "Parsing error");
 					}
 
 				}
