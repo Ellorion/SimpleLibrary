@@ -266,6 +266,7 @@ IsNumeric(
 #include "core/tree.h"
 #include "core/files.h"
 #include "core/image.h"
+#include "core/map.h"
 
 /// interlocking dependencies
 #include "windows/windows.h"

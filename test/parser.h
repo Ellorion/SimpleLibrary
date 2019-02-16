@@ -74,7 +74,7 @@ Test_Parser(
 						test_option_count += 1;
 
 						AssertMessage(	!parser.has_error
-										AND String_IsEqual(&s_data, "FooBar"), "Parsing error");
+										AND String_IsEqual(&s_data, "FooBar"), "[Test] Parsing error");
 					}
 
 					if (String_IsEqual(&s_data, "path")) {
@@ -82,14 +82,14 @@ Test_Parser(
 						test_option_count += 1;
 
 						AssertMessage(	    !parser.has_error
-										AND String_IsEqual(&s_data, "X:/app folder/"), "Parsing error");
+										AND String_IsEqual(&s_data, "X:/app folder/"), "[Test] Parsing error");
 					}
 
 					if (String_IsEqual(&s_data, "debug")) {
 						Parser_GetBoolean(&parser, &is_true);
 						test_option_count += 1;
 
-						AssertMessage(!parser.has_error, "Parsing error");
+						AssertMessage(!parser.has_error, "[Test] Parsing error");
 					}
 				}
 			} break;
@@ -111,14 +111,14 @@ Test_Parser(
 						test_option_count += 1;
 
 						AssertMessage(	    !parser.has_error
-										AND String_IsEqual(&s_data, "X:/app folder/saves"), "Parsing error");
+										AND String_IsEqual(&s_data, "X:/app folder/saves"), "[Test] Parsing error");
 					}
 
 					if (String_IsEqual(&s_data, "auto")) {
 						Parser_GetBoolean(&parser, &is_true);
 						test_option_count += 1;
 
-						AssertMessage(!parser.has_error, "Parsing error");
+						AssertMessage(!parser.has_error, "[Test] Parsing error");
 					}
 				}
 			} break;
@@ -139,7 +139,7 @@ Test_Parser(
 						Parser_GetBoolean(&parser, &is_true);
 						test_option_count += 1;
 
-						AssertMessage(!parser.has_error, "Parsing error");
+						AssertMessage(!parser.has_error, "[Test] Parsing error");
 					}
 
 					if (String_IsEqual(&s_data, "volume")) {
@@ -147,7 +147,7 @@ Test_Parser(
 						test_option_count += 1;
 
 						AssertMessage(	    !parser.has_error
-										AND String_IsEqual(&s_data, "97.5"), "Parsing error");
+										AND String_IsEqual(&s_data, "97.5"), "[Test] Parsing error");
 					}
 
 				}
@@ -155,5 +155,5 @@ Test_Parser(
 		}
 	}
 
-	AssertMessage(test_option_count == 7, "Section options were not parsed");
+	AssertMessage(test_option_count == 7, "[Test] Section options were not parsed");
 }

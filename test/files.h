@@ -10,7 +10,7 @@ Test_Files(
     	String_Append(&s_extension, ".cpp|.h");
 
         bool has_ext = File_HasExtension(&s_file, &s_extension);
-        AssertMessage(has_ext, "File extension finding failed (1).");
+        AssertMessage(has_ext, "[Test] File extension finding failed (1).");
 
         String_Destroy(&s_file);
         String_Destroy(&s_extension);
@@ -23,7 +23,7 @@ Test_Files(
     	String_Append(&s_extension, ".cp|.h");
 
         bool has_ext = File_HasExtension(&s_file, &s_extension);
-        AssertMessage(!has_ext, "File extension finding failed (2).");
+        AssertMessage(!has_ext, "[Test] File extension finding failed (2).");
 
         String_Destroy(&s_file);
         String_Destroy(&s_extension);
@@ -46,7 +46,7 @@ Test_Files(
 			s_file.length = s_pathfile.length - pos_found - 1;
 
 			bool file_exists = File_Exists(&s_path, &s_file);
-			AssertMessage(file_exists, "File existence check failed.");
+			AssertMessage(file_exists, "[Test] File existence check failed.");
 		}
 
 		String_Destroy(&s_pathfile);
@@ -57,15 +57,15 @@ Test_Files(
     	String_Append(&s_filename, __FILE__);
 
 		File file = File_Open(s_filename.value, "r", s_filename.length);
-		AssertMessage(file.fp          , "File could not be opened.");
-		AssertMessage(File_Size(&file) , "Could not read file size.");
+		AssertMessage(file.fp          , "[Test] File could not be opened.");
+		AssertMessage(File_Size(&file) , "[Test] Could not read file size.");
 
 		String s_data = File_Read(&file);
-		AssertMessage(s_data.length    , "Could not read file content.");
+		AssertMessage(s_data.length    , "[Test] Could not read file content.");
 
 		String_Destroy(&s_data);
 
-		AssertMessage(File_Close(&file), "File could not be closed.");
+		AssertMessage(File_Close(&file), "[Test] File could not be closed.");
     }
 
 //    {
@@ -78,7 +78,7 @@ Test_Files(
 //
 //		if (String_FindRev(&s_pathfile, "\\", &pos_found)) {
 //			File_ReadDirectory(&as_files, s_pathfile.value, 0, pos_found);
-//			AssertMessage(as_files.count, "Reading directory listing failed.");
+//			AssertMessage(as_files.count, "[Test] Reading directory listing failed.");
 //			Array_Destroy(&as_files);
 //		}
 //

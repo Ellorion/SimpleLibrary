@@ -159,7 +159,9 @@ Array_Find(
 
 	FOR_ARRAY(*array, it) {
 		if (ARRAY_IT(*array, it) == find) {
-			if (index)  *index = it;
+			if (index)
+				*index = it;
+
 			return true;
 		}
 	}

@@ -93,7 +93,7 @@ Clipboard_GetText(
 	if (OpenClipboard(0)) {
         HANDLE handle_clipboard = GetClipboardData(CF_TEXT);
 
-		AssertMessage(handle_clipboard, "Could not get clipboard data.");
+		AssertMessage(handle_clipboard, "[Clipboard] Could not get clipboard data.");
 
 		char *c_data = (char*)GlobalLock(handle_clipboard);
 
@@ -118,7 +118,7 @@ Clipboard_SetText(
 
 		HGLOBAL handle_global = GlobalAlloc(GHND, s_data->length + 1 * sizeof(char));
 
-		AssertMessage(handle_global, "Could not allocate clipboard data.");
+		AssertMessage(handle_global, "[Clipboard] Could not allocate clipboard data.");
 
 		char *c_data = (char*)GlobalLock(handle_global);
 		Memory_Copy(c_data, s_data->value, s_data->length);

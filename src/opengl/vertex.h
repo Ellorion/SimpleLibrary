@@ -179,7 +179,7 @@ Vertex_Load(
 	Assert(shader_set);
 	Assert(vertex);
 
-	AssertMessage(shader_set->active_id >= 0, "No Shader initialized.");
+	AssertMessage(shader_set->active_id >= 0, "[Vertex] No Shader initialized.");
 	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
 
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
@@ -190,7 +190,7 @@ Vertex_Load(
 
 		if (attrib_position < 0) {
 			String s_error;
-			String_Append(&s_error, "Shader and attributes mismatch.\n    Missing: ");
+			String_Append(&s_error, "[Vertex] Shader and attributes mismatch.\n    Missing: ");
 			String_Append(&s_error, entry->name);
 
 			char *c_error_msg = String_CreateCBufferCopy(s_error.value, s_error.length);
@@ -285,10 +285,10 @@ Vertex_Render(
 	Assert(String_IsEqual(a_positions->name, "vertex_position"));
 
 	AssertMessage(	vertex->array_id,
-					"Vertex has not been created. Forgot to call Vertex_Create?");
+					"[Vertex] Vertex has not been created. Forgot to call Vertex_Create?");
 
 	AssertMessage(	a_positions->id,
-					"No Attributes found.\n    Forgot to bind the attributes?");
+					"[Vertex] No Attributes found. Forgot to bind the attributes?");
 
 	Assert(a_positions->group_count);
 

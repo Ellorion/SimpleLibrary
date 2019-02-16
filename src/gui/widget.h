@@ -711,7 +711,7 @@ Widget_Redraw(
 
 		default:
 			AssertMessage(	false,
-							"Redrawing: Unhandled widget background drawing.");
+							"[Widget] Redrawing: Unhandled widget background drawing.");
 	}
 }
 
@@ -1390,7 +1390,7 @@ Widget_UpdateInput(
 			}
 			else {
 				AssertMessage(	false,
-								"Unhandled widget scroll type.");
+								"[Widget] Unhandled widget scroll type.");
 			}
 		}
 

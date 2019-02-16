@@ -1813,7 +1813,7 @@ Text_Render(
 		}
 
 		if (text_io->cursor.is_blink_on) {
-			AssertMessage(!Vertex_IsEmpty(&text_io->cursor.vertex_cursor), "Cursor vertex data does not exists.");
+			AssertMessage(!Vertex_IsEmpty(&text_io->cursor.vertex_cursor), "[Text] Cursor vertex data does not exists.");
 
 			ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
 			Shader_SetValue(text_io->shader_set, "x_offset", text_io->offset_x);

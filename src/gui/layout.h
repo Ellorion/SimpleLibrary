@@ -61,7 +61,7 @@ Layout_Create(
 	bool fill_last_block
 ) {
 	Assert(layout_out);
-	AssertMessage(!layout_out->a_layout_blocks.count, "Layout already created.");
+	AssertMessage(!layout_out->a_layout_blocks.count, "[Layout] Layout already created.");
 
 	*layout_out = {};
 	layout_out->rect_full       = rect_area;

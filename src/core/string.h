@@ -893,6 +893,21 @@ operator > (
 	return false;
 }
 
+/// (temporary) string conversion
+instant String
+S(
+	const char *c_data
+) {
+	String s_data;
+	s_data.is_reference = true;
+	s_data.changed      = true;
+
+	s_data.value  = (char *)c_data;
+	s_data.length = String_GetLength(c_data);
+
+	return s_data;
+}
+
 /// ::: Dependencies
 /// ===========================================================================
 /// - String_GetDelimiterSection -> Array

@@ -64,7 +64,7 @@ ShaderSet_Add(
 	u64 array_id = Array_AddEmpty(&shader_set_io->a_shaders, &shader_prog);
 
 	AssertMessage(	array_id == shader->type,
-					"Shader added out of SHADER_PROG_TYPE order.");
+					"[ShaderSet] Shader added out of SHADER_PROG_TYPE order.");
 
 	if (shader->code[0])  ShaderProgram_Add(shader_prog, GL_VERTEX_SHADER  , shader->code[0]);
 	if (shader->code[1])  ShaderProgram_Add(shader_prog, GL_GEOMETRY_SHADER, shader->code[1]);
@@ -110,7 +110,7 @@ ShaderSet_Create(
 	ShaderSet_Add(&t_shader_set, &shader_texture_size);
 
 	AssertMessage(	t_shader_set.a_shaders.count == SHADER_PROG_COUNT,
-					"Shader missing compared to SHADER_PROG_TYPE count.");
+					"[ShaderSet] Shader missing compared to SHADER_PROG_TYPE count.");
 
 	return t_shader_set;
 }
@@ -272,7 +272,7 @@ ShaderSet_Use(
 
 		default: {
 			AssertMessage(	false,
-							"Unhandled Shader-Program type.");
+							"[ShaderSet] Unhandled Shader-Program type.");
 		} break;
 	}
 
