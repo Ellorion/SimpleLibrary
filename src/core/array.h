@@ -49,7 +49,8 @@ Array_Add(
 
 	if (array_io->count + length > array_io->max) {
 		array_io->max += length;
-		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->max * sizeof(T));
+		array_io->memory = (T *)_Memory_Resize( array_io->memory,
+												array_io->max * sizeof(T));
 	}
 
 	array_io->count += length;
@@ -115,12 +116,15 @@ Array_ReserveAdd(
 
 	if (array_io->count + count_delta > array_io->max) {
 		array_io->max += count_delta;
-		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->max * sizeof(T));
+		array_io->memory = (T *)_Memory_Resize( array_io->memory,
+												array_io->max * sizeof(T));
 	}
 
 	if (clear_zero) {
 		/// only clear new reserved data
-		Memory_Set(array_io->memory + array_io->count, 0, (array_io->max - old_limit) * sizeof(T));
+		Memory_Set( array_io->memory + array_io->count,
+					0,
+					(array_io->max - old_limit) * sizeof(T));
 	}
 }
 
@@ -208,6 +212,7 @@ Array_Remove(
 
 	T result = ARRAY_IT(*array_io, index);
 
+	/// overwrite current entry with next
 	FOR_ARRAY_START(*array_io, index, it) {
 		if (it + 1 >= array_io->count)
 			break;
@@ -235,81 +240,15 @@ Array_CreateBuffer(
 
 template <typename T>
 instant void
-Array_Sort_Quick_Ascending(
-	T *begin_io,
-	T *end_io
-) {
-	Assert(begin_io);
-	Assert(end_io);
-
-	if (begin_io == end_io)
-		return;
-
-    T *pivot = begin_io;
-    T *next  = begin_io;
-	++next;
-
-	while(next <= end_io) {
-		if (*next < *pivot) {
-			Swap(next, pivot);
-
-			/// next will be past pivot in next loop
-			/// pivot will follow next, but never catches up
-			if (pivot < next) {
-                ++pivot;
-                continue;
-			}
-		}
-		++next;
-    }
-
-    if (begin_io < pivot)  Array_Sort_Quick_Ascending(begin_io	, pivot - 1	);
-	if (end_io   > pivot)  Array_Sort_Quick_Ascending(pivot + 1	, end_io	);
-}
-
-template <typename T>
-instant void
-Array_Sort_Quick_Descending(
-	T *begin_io,
-	T *end_io
-) {
-	Assert(begin_io);
-	Assert(end_io);
-
-	if (begin_io == end_io)
-		return;
-
-    T *pivot = begin_io;
-    T *next  = begin_io;
-	++next;
-
-	while(next <= end_io) {
-		if (*next > *pivot) {
-			Swap(next, pivot);
-
-			/// next will be past pivot in next loop
-			/// pivot will follow next, but never catches up
-			if (pivot < next) {
-                ++pivot;
-                continue;
-			}
-		}
-		++next;
-    }
-
-    if (begin_io < pivot)  Array_Sort_Quick_Descending(begin_io , pivot - 1	);
-	if (end_io   > pivot)  Array_Sort_Quick_Descending(pivot + 1, end_io	);
-}
-
-template <typename T>
-instant void
 Array_Sort_Ascending(
 	Array<T> *array_io
 ) {
 	Assert(array_io);
 	Assert(array_io->count);
 
-	Array_Sort_Quick_Ascending( &array_io->memory[0], &array_io->memory[array_io->count - 1]);
+	Sort_Quick( &array_io->memory[0],
+				&array_io->memory[array_io->count - 1],
+				SORT_ORDER_ASCENDING);
 }
 
 template <typename T>
@@ -320,5 +259,7 @@ Array_Sort_Descending(
 	Assert(array_io);
 	Assert(array_io->count);
 
-	Array_Sort_Quick_Descending(&array_io->memory[0], &array_io->memory[array_io->count - 1]);
+	Sort_Quick( &array_io->memory[0],
+				&array_io->memory[array_io->count - 1],
+				SORT_ORDER_DESCENDING);
 }

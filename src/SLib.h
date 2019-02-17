@@ -252,14 +252,12 @@ IsNumeric(
 	return (character >= '0' AND character <= '9');
 }
 
-/// independent
 #include "core/memory.h"
 #include "core/time.h"
+#include "core/sort.h"
 #include "core/string.h"
 #include "core/array.h"
 #include "core/rect.h"
-
-/// non-independent
 #include "core/parser.h"
 #include "core/cpu.h"
 #include "core/array_string.h"

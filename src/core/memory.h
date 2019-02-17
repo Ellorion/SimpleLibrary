@@ -95,7 +95,7 @@ _Memory_Free(
 		Assert(mem != data);
 	}
 	else {
-		LOG_DEBUG("Trying to free heap pointer(?).")
+		LOG_WARNING("Trying to free heap pointer(?).")
 	}
 
 	return 0;
@@ -130,13 +130,14 @@ Memory_Set(
 	int data,
 	u64 length
 ) {
-	if (dest_out == 0) return;
+	if (dest_out == 0)
+		return;
 
-	u8 *cDest = (u8*)dest_out;
-	u8  cData = data;
+	u8 *c_dest = (u8*)dest_out;
+	u8  c_data = data;
 
 	while (length-- > 0)
-		*cDest++ = cData;
+		*c_dest++ = c_data;
 }
 
 instant bool
