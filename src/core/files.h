@@ -7,63 +7,20 @@ struct File {
 instant bool
 File_HasExtension(
 	String *s_filename,
-	String *s_extension
+	String  s_extension
 ) {
 	Assert(s_filename);
-	Assert(s_extension);
 
 	bool result = false;
 
-	if (!s_extension->length)  return true;
+	if (!s_extension.length)  return true;
 
-	Array<String> as_extentions = Array_Split(s_extension, "|");
+	Array<String> as_extentions = Array_Split(&s_extension, S("|"));
 
     FOR_ARRAY(as_extentions, it) {
     	String s_data_it = ARRAY_IT(as_extentions, it);
 
-		if (String_EndWith(s_filename, s_data_it.value, s_data_it.length)) {
-			result = true;
-			break;
-		}
-    }
-
-    Array_Destroy(&as_extentions);
-
-	return result;
-}
-
-instant bool
-File_HasExtension(
-	const char *c_filename,
-	const char *c_extension,
-	u64 c_length_filename = 0,
-	u64 c_length_extension = 0
-) {
-	Assert(c_filename);
-	Assert(c_extension);
-
-	bool result = false;
-
-	if (!c_length_filename)
-		c_length_filename = String_GetLength(c_filename);
-
-	if (!c_length_extension)
-		c_length_extension = String_GetLength(c_extension);
-
-	String s_extension;
-	s_extension.value  = (char *)c_extension;
-	s_extension.length = c_length_extension;
-
-	String s_filename;
-	s_filename.value  = (char *)c_filename;
-	s_filename.length = c_length_filename;
-
-	Array<String> as_extentions = Array_Split(&s_extension, "|");
-
-    FOR_ARRAY(as_extentions, it) {
-    	String s_data_it = ARRAY_IT(as_extentions, it);
-
-		if (String_EndWith(&s_filename, s_data_it.value, s_data_it.length)) {
+		if (String_EndWith(s_filename, s_data_it)) {
 			result = true;
 			break;
 		}
@@ -76,14 +33,11 @@ File_HasExtension(
 
 instant bool
 File_Exists(
-	const char *c_filename,
-	u64 c_length = 0
+	String s_filename
 ) {
-	Assert(c_filename);
-
 	WIN32_FIND_DATA file_data;
 
-	char *c_search_file = String_CreateCBufferCopy(c_filename, c_length);
+	char *c_search_file = String_CreateCBufferCopy(s_filename);
 
 	bool result = false;
 
@@ -97,20 +51,17 @@ File_Exists(
 
 instant bool
 File_Exists(
-	String *s_path,
-	String *s_filename
+	String s_path,
+	String s_filename
 ) {
-	Assert(s_path);
-	Assert(s_filename);
-
 	WIN32_FIND_DATA file_data;
 
 	String ts_filename;
-	String_Append(&ts_filename, s_path->value, s_path->length);
-	String_Append(&ts_filename, "/", 1);
-	String_Append(&ts_filename, s_filename->value, s_filename->length);
+	String_Append(&ts_filename, s_path);
+	String_Append(&ts_filename, S("/"));
+	String_Append(&ts_filename, s_filename);
 
-	bool result = File_Exists(ts_filename.value, ts_filename.length);
+	bool result = File_Exists(ts_filename);
 
 	String_Destroy(&ts_filename);
 
@@ -119,22 +70,20 @@ File_Exists(
 
 instant bool
 File_CreateDirectory(
-	String *s_directory,
+	String s_directory,
 	bool make_path_relative = true
 ) {
-	Assert(s_directory);
-
-	if (!s_directory->length)  return false;
+	if (!s_directory.length)
+		return false;
 
 	String s_path_relative;
 
 	if (make_path_relative)
-		String_Append(&s_path_relative, "./", 2);
+		String_Append(&s_path_relative, S("./"));
 
-	String_Append(&s_path_relative, s_directory->value, s_directory->length);
+	String_Append(&s_path_relative, s_directory);
 
-	char *c_path_relative = String_CreateCBufferCopy(s_path_relative.value,
-													 s_path_relative.length);
+	char *c_path_relative = String_CreateCBufferCopy(s_path_relative);
 
 	bool success = (CreateDirectory(c_path_relative, 0) != 0);
 
@@ -152,16 +101,14 @@ File_CreateDirectory(
 
 instant File
 File_Open(
-	const char *c_filename,
-	const char *mode,
-	u64 c_length = 0
+	String s_filename,
+	const char *mode
 ) {
-	Assert(c_filename);
 	Assert(mode);
 
 	File file = {};
 
-	char *tc_filename = String_CreateCBufferCopy(c_filename, c_length);
+	char *tc_filename = String_CreateCBufferCopy(s_filename);
 
 	file.fp = fopen(tc_filename, mode);
 
@@ -198,15 +145,11 @@ File_Size(
 
 instant String
 File_Execute(
-	const char *c_command,
-	u64 c_length = 0
+	String s_command
 ) {
 	String s_result;
 
-	if (!c_length)
-		c_length = String_GetLength(c_command);
-
-	char *tc_command = String_CreateCBufferCopy(c_command, c_length);
+	char *tc_command = String_CreateCBufferCopy(s_command);
 
 	FILE *pipe = popen(tc_command, "r");
 
@@ -274,20 +217,17 @@ File_Read(
 
 instant String
 File_ReadAll(
-	const char *c_filename,
-	u64 c_length = 0,
+	String s_filename,
 	bool as_binary = true
 ) {
-    Assert(c_filename);
-
 	MEASURE_START();
 
     File file;
 
     if (as_binary)
-		file = File_Open(c_filename, "rb", c_length);
+		file = File_Open(s_filename, "rb");
 	else
-		file = File_Open(c_filename, "r" , c_length);
+		file = File_Open(s_filename, "r");
 
 	if (!file.fp)
 		LOG_WARNING("File \"" << c_filename << "\" does not exists.");
@@ -312,14 +252,13 @@ struct File_Watcher {
 instant void
 File_Watch(
 	File_Watcher *file_watcher_out,
-	const char *c_filename,
-	u64 c_length = 0
+	String s_filename
 ) {
 	Assert(file_watcher_out);
 
 	*file_watcher_out = {};
 
-	char *tc_filename = String_CreateCBufferCopy(c_filename, c_length);
+	char *tc_filename = String_CreateCBufferCopy(s_filename);
 
 	file_watcher_out->file = CreateFile(
 			tc_filename,
@@ -381,32 +320,27 @@ enum DIR_LIST_TYPE {
 instant void
 File_ReadDirectory(
 	Array<Directory_Entry> *a_entries,
-	const char *c_path,
+	String s_path,
 	const char *extension_filter = 0,
-	u64 c_length = 0,
 	bool prefix_path = true,
 	const char *name_filter = 0,
 	DIR_LIST_TYPE type = DIR_LIST_ONLY_FILES
 ) {
 	Assert(a_entries);
 
-	if (!c_length)
-		c_length = String_GetLength(c_path);
-
-	if (!c_length)   return;
+	if (!s_path.length)
+		return;
 
 	HANDLE id_directory;
 	WIN32_FIND_DATA file_data;
 
 	String s_search_path;
-	String_Append(&s_search_path, c_path, c_length);
-	String_Append(&s_search_path, "/*");
+	String_Append(&s_search_path, s_path);
+	String_Append(&s_search_path, S("/*"));
 
-	String s_extension_filter;
-	String_Append(&s_extension_filter, extension_filter);
+	String s_extension_filter = S(extension_filter);
 
-	char *c_search_path = String_CreateCBufferCopy(	s_search_path.value,
-													s_search_path.length);
+	char *c_search_path = String_CreateCBufferCopy(s_search_path);
 
 	if ((id_directory = FindFirstFile(c_search_path, &file_data)) != INVALID_HANDLE_VALUE) {
 		do {
@@ -426,30 +360,29 @@ File_ReadDirectory(
 					continue;
 			}
 
-			String s_filename;
-			String_Append(&s_filename, file_data.cFileName);
+			String s_filename = S(file_data.cFileName);
 
-			bool has_extension = File_HasExtension(&s_filename, &s_extension_filter);
+			bool has_extension = File_HasExtension(&s_filename, s_extension_filter);
 
 			bool found_name = true;
 
 			/// exclude if filter does not match
 			if (name_filter)
-				found_name = String_Find(&s_filename, name_filter);
+				found_name = String_Find(&s_filename, S(name_filter));
 
 			if (has_extension AND found_name) {
 				String ts_filename;
 
 				if (prefix_path) {
-					String_Append(&ts_filename, c_path, c_length);
-					if (!String_EndWith(&ts_filename, "/") AND !String_EndWith(&ts_filename, "\\"))
-						String_Append(&ts_filename, "\\");
+					String_Append(&ts_filename, s_path);
+					if (!String_EndWith(&ts_filename, S("/")) AND !String_EndWith(&ts_filename, S("\\")))
+						String_Append(&ts_filename, S("\\"));
 				}
 
-				String_Append(&ts_filename, file_data.cFileName);
+				String_Append(&ts_filename, S(file_data.cFileName));
 
 				Directory_Entry dir_entry;
-				String_Append(&dir_entry.s_name, ts_filename.value, ts_filename.length);
+				String_Append(&dir_entry.s_name, ts_filename);
 
 				if (is_directory)
 					dir_entry.type = DIR_ENTRY_DIR;
@@ -458,14 +391,10 @@ File_ReadDirectory(
 
 				Array_Add(a_entries, dir_entry);
 			}
-
-			String_Destroy(&s_filename);
 		} while (FindNextFile(id_directory, &file_data));
 
 		FindClose(id_directory);
 	}
-
-	String_Destroy(&s_extension_filter);
 
 	Memory_Free(c_search_path);
 	String_Destroy(&s_search_path);
@@ -475,42 +404,30 @@ File_ReadDirectory(
 ///       or it could leave a mess
 instant void
 File_Rename(
-	const char *c_path,
-	u64 c_length_path,
-	const char *c_filename_old,
-	u64 c_length_file_old,
-	const char *c_filename_new,
-	u64 c_length_file_new
+	String s_path,
+	String s_filename_old,
+	String s_filename_new
 ) {
-	if (!c_length_path)
-		c_length_path = String_GetLength(c_path);
-
-	if (!c_length_file_old)
-		c_length_file_old = String_GetLength(c_filename_old);
-
-	if (!c_length_file_new)
-		c_length_file_new = String_GetLength(c_filename_new);
-
 	String s_file_old;
-	String_Append(&s_file_old, c_path, c_length_path);
-	String_Append(&s_file_old, "/", 1);
-	String_Append(&s_file_old, c_filename_old, c_length_file_old);
+	String_Append(&s_file_old, s_path);
+	String_Append(&s_file_old, S("/"));
+	String_Append(&s_file_old, s_filename_old);
 
 	String s_file_new;
-	String_Append(&s_file_new, c_path, c_length_path);
-	String_Append(&s_file_new, "/", 1);
-	String_Append(&s_file_new, c_filename_new, c_length_file_new);
+	String_Append(&s_file_new, s_path);
+	String_Append(&s_file_new, S("/"), 1);
+	String_Append(&s_file_new, s_filename_new);
 
-	String_Destroy(&s_file_old);
-	String_Destroy(&s_file_new);
-
-	char *tc_file_old = String_CreateCBufferCopy(s_file_old.value, s_file_old.length);
-	char *tc_file_new = String_CreateCBufferCopy(s_file_new.value, s_file_new.length);
+	char *tc_file_old = String_CreateCBufferCopy(s_file_old);
+	char *tc_file_new = String_CreateCBufferCopy(s_file_new);
 
 	MoveFile(tc_file_old, tc_file_new);
 
 	Memory_Free(tc_file_old);
 	Memory_Free(tc_file_new);
+
+	String_Destroy(&s_file_old);
+	String_Destroy(&s_file_new);
 }
 
 instant String
@@ -519,7 +436,7 @@ File_GetExtension(
 ) {
 	String s_result;
 
-	s64 pos_ext = String_IndexOfRev(s_data, ".");
+	s64 pos_ext = String_IndexOfRev(s_data, S("."));
 
 	if (!pos_ext) {
 		return s_result;

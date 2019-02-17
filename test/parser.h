@@ -39,7 +39,7 @@ Test_Parser(
 		Parser_GetStringRef(&parser, &s_data);
 
 		/// require sections
-		if (!String_StartWith(&s_data, c_section_ident))
+		if (!String_StartWith(&s_data, S(c_section_ident)))
 			continue;
 
 		id_section = -1;
@@ -48,7 +48,7 @@ Test_Parser(
 		String_AddOffset(&s_data, String_GetLength(c_section_ident));
 
 		FOR(ARRAY_COUNT(cfg_section), it) {
-			if (String_IsEqual(&s_data, cfg_section[it])) {
+			if (String_IsEqual(s_data, S(cfg_section[it]))) {
 				id_section = it;
 				break;
 			}
@@ -62,30 +62,30 @@ Test_Parser(
 					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
-					if (String_StartWith(&s_data, c_section_ident))
+					if (String_StartWith(&s_data, S(c_section_ident)))
 						break;
 
 					Parser_GetStringRef(&parser, &s_data);
 
 					/// section options
 					/// =======================================================
-					if (String_IsEqual(&s_data, "text")) {
+					if (String_IsEqual(s_data, S("text"))) {
 						Parser_GetStringRef(&parser, &s_data);
 						test_option_count += 1;
 
 						AssertMessage(	!parser.has_error
-										AND String_IsEqual(&s_data, "FooBar"), "[Test] Parsing error");
+										AND String_IsEqual(s_data, S("FooBar")), "[Test] Parsing error");
 					}
 
-					if (String_IsEqual(&s_data, "path")) {
+					if (String_IsEqual(s_data, S("path"))) {
 						Parser_GetStringRef(&parser, &s_data);
 						test_option_count += 1;
 
 						AssertMessage(	    !parser.has_error
-										AND String_IsEqual(&s_data, "X:/app folder/"), "[Test] Parsing error");
+										AND String_IsEqual(s_data, S("X:/app folder/")), "[Test] Parsing error");
 					}
 
-					if (String_IsEqual(&s_data, "debug")) {
+					if (String_IsEqual(s_data, S("debug"))) {
 						Parser_GetBoolean(&parser, &is_true);
 						test_option_count += 1;
 
@@ -99,22 +99,22 @@ Test_Parser(
 					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
-					if (String_StartWith(&s_data, c_section_ident))
+					if (String_StartWith(&s_data, S(c_section_ident)))
 						break;
 
 					Parser_GetStringRef(&parser, &s_data);
 
 					/// section options
 					/// =======================================================
-					if (String_IsEqual(&s_data, "path")) {
+					if (String_IsEqual(s_data, S("path"))) {
 						Parser_GetStringRef(&parser, &s_data);
 						test_option_count += 1;
 
 						AssertMessage(	    !parser.has_error
-										AND String_IsEqual(&s_data, "X:/app folder/saves"), "[Test] Parsing error");
+										AND String_IsEqual(s_data, S("X:/app folder/saves")), "[Test] Parsing error");
 					}
 
-					if (String_IsEqual(&s_data, "auto")) {
+					if (String_IsEqual(s_data, S("auto"))) {
 						Parser_GetBoolean(&parser, &is_true);
 						test_option_count += 1;
 
@@ -128,26 +128,26 @@ Test_Parser(
 					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
-					if (String_StartWith(&s_data, c_section_ident))
+					if (String_StartWith(&s_data, S(c_section_ident)))
 						break;
 
 					Parser_GetStringRef(&parser, &s_data);
 
 					/// section options
 					/// =======================================================
-					if (String_IsEqual(&s_data, "enabled")) {
+					if (String_IsEqual(s_data, S("enabled"))) {
 						Parser_GetBoolean(&parser, &is_true);
 						test_option_count += 1;
 
 						AssertMessage(!parser.has_error, "[Test] Parsing error");
 					}
 
-					if (String_IsEqual(&s_data, "volume")) {
+					if (String_IsEqual(s_data, S("volume"))) {
 						Parser_GetNumber(&parser, &s_data);
 						test_option_count += 1;
 
 						AssertMessage(	    !parser.has_error
-										AND String_IsEqual(&s_data, "97.5"), "[Test] Parsing error");
+										AND String_IsEqual(s_data, S("97.5")), "[Test] Parsing error");
 					}
 
 				}

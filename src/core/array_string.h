@@ -52,8 +52,7 @@ instant void
 Array_SplitRefBuffer(
 	Array<String> *as_buffer_out,
 	String *s_data,
-	const char *c_delimiter,
-	u64 c_length,
+	String  s_delimiter,
 	DELIMITER_TYPE type
 ) {
 	Assert(s_data);
@@ -63,15 +62,12 @@ Array_SplitRefBuffer(
 
 	String s_data_it = *s_data;
 
-	if (!c_length)
-		c_length = String_GetLength(c_delimiter);
-
 	s64 index_found;
 
 	bool is_running = (s_data_it.length > 0);
 
 	while(is_running) {
-		if (!String_Find(&s_data_it, c_delimiter, c_length, &index_found)) {
+		if (!String_Find(&s_data_it, s_delimiter, &index_found)) {
 			/// add (the last or first) line without a delimiter
 			index_found = s_data_it.length;
 			type = DELIMITER_IGNORE;
@@ -88,32 +84,31 @@ Array_SplitRefBuffer(
 		Array_AddEmpty(as_buffer_out, &s_element);
 
 		if (type == DELIMITER_ADD_BACK OR index_found == 0)
-			s_element->length += c_length;
+			s_element->length += s_delimiter.length;
 
 		s_element->value   = s_data_it.value;
 		s_element->length += index_found;
 
 		if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count > 1) {
-			s_element->value  -= c_length;
-			s_element->length += c_length;
+			s_element->value  -= s_delimiter.length;
+			s_element->length += s_delimiter.length;
 		}
 
-		s_data_it.value  += index_found + c_length;
-		s_data_it.length -= index_found + c_length;
+		s_data_it.value  += index_found + s_delimiter.length;
+		s_data_it.length -= index_found + s_delimiter.length;
 	}
 }
 
 instant Array<String>
 Array_SplitRef(
 	String *s_data,
-	const char *c_delimiter,
-	u64 c_length = 0,
+	String  s_delimiter,
 	DELIMITER_TYPE type = DELIMITER_IGNORE
 
 ) {
 	Array<String> as_result;
 
-	Array_SplitRefBuffer(&as_result, s_data, c_delimiter, c_length, type);
+	Array_SplitRefBuffer(&as_result, s_data, s_delimiter, type);
 
 	return as_result;
 }
@@ -123,8 +118,7 @@ instant void
 Array_SplitBuffer(
 	Array<String> *as_buffer_out,
 	String *s_data,
-	const char *c_delimiter,
-	u64 c_length = 0,
+	String  s_delimiter,
 	DELIMITER_TYPE type = DELIMITER_IGNORE
 
 ) {
@@ -134,21 +128,20 @@ Array_SplitBuffer(
 	Array_Clear(as_buffer_out);
 
 	String s_data_it = *s_data;
-	u64 len_delim = String_GetLength(c_delimiter);
 
 	s64 pos_found;
-	while(String_Find(&s_data_it, c_delimiter, c_length, &pos_found)) {
+	while(String_Find(&s_data_it, s_delimiter, &pos_found)) {
 		if (pos_found) {
 			String s_element;
 
 			if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count) {
-				String_Append(&s_element, c_delimiter, len_delim);
+				String_Append(&s_element, s_delimiter);
 			}
 
-			String_Append(&s_element, s_data_it.value, pos_found);
+			String_Append(&s_element, s_data_it, pos_found);
 
 			if (type == DELIMITER_ADD_BACK) {
-				String_Append(&s_element, c_delimiter, len_delim);
+				String_Append(&s_element, s_delimiter);
 			}
 
 			Array_Add(as_buffer_out, s_element);
@@ -159,21 +152,21 @@ Array_SplitBuffer(
 			Array_AddEmpty(as_buffer_out, &s_element);
 
 			if (type == DELIMITER_ADD_BACK) {
-				String_Append(s_element, c_delimiter, len_delim);
+				String_Append(s_element, s_delimiter);
 			}
 		}
 
-		s_data_it.value  += pos_found + len_delim;
-		s_data_it.length -= pos_found + len_delim;
+		s_data_it.value  += pos_found + s_delimiter.length;
+		s_data_it.length -= pos_found + s_delimiter.length;
 	}
 
 	if (s_data_it.length > 0) {
 		String s_element;
 
 		if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count)
-			String_Append(&s_element, c_delimiter, len_delim);
+			String_Append(&s_element, s_delimiter);
 
-		String_Append(&s_element, s_data_it.value, s_data_it.length);
+		String_Append(&s_element, s_data_it);
 		Array_Add(as_buffer_out, s_element);
 	}
 }
@@ -181,13 +174,12 @@ Array_SplitBuffer(
 instant Array<String>
 Array_Split(
 	String *s_data,
-	const char *c_delimiter,
-	u64 c_length = 0,
+	String  s_delimiter,
 	DELIMITER_TYPE type = DELIMITER_IGNORE
 ) {
 	Array<String> as_result;
 
-	Array_SplitBuffer(&as_result, s_data, c_delimiter, c_length, type);
+	Array_SplitBuffer(&as_result, s_data, s_delimiter, type);
 
 	return as_result;
 }
@@ -277,7 +269,7 @@ Array_FindFirstString(
 
 	FOR_ARRAY(*as_find, it) {
 		String *ts_find = &ARRAY_IT(*as_find, it);
-		s64 t_index_found = String_IndexOf(s_data, ts_find->value, ts_find->length);
+		s64 t_index_found = String_IndexOf(s_data, *ts_find);
 
 		if (t_index_found >= 0) {
 			if (t_index_found < index_lowest) {
@@ -307,7 +299,7 @@ Array_FindFirstString(
 instant String
 String_GetDelimiterSection(
 	String *s_data,
-	const char *c_delimiter,
+	String  s_delimiter,
 	u64 index,
 	bool auto_trim = true
 ) {
@@ -316,13 +308,13 @@ String_GetDelimiterSection(
 	static Array<String> as_section;
 
 	Array_Clear(&as_section);
-	as_section = Array_Split(s_data, c_delimiter);
+	as_section = Array_Split(s_data, s_delimiter);
 
 	FOR_ARRAY(as_section, it) {
 		if (it == index) {
 			String *ts_entry = &ARRAY_IT(as_section, it);
 
-			String_Append(&s_result, ts_entry->value, ts_entry->length);
+			String_Append(&s_result, *ts_entry);
 
 			break;
 		}
@@ -332,28 +324,4 @@ String_GetDelimiterSection(
 	String_TrimRight(&s_result);
 
 	return s_result;
-}
-
-instant String *
-Array_Add(
-	Array<String> *array_io,
-	const char *c_element,
-	u64 c_length = 0
-) {
- 	Assert(array_io);
-
-	constexpr u64 length = 1;
-
-	if (array_io->count + length > array_io->max) {
-		array_io->max += length;
-		array_io->memory = (String *)_Memory_Resize(array_io->memory, array_io->max * sizeof(String));
-	}
-
-	array_io->count += length;
-	u64 target = array_io->count - 1; /// convert to index
-
-	array_io->memory[target] = {};
-	String_Append(&array_io->memory[target], c_element, c_length);
-
-	return &array_io->memory[target];
 }

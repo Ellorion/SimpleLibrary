@@ -44,6 +44,21 @@ String_GetLength(
 	return length;
 }
 
+/// (temporary) string conversion
+instant String
+S(
+	const char *c_data
+) {
+	String s_data;
+	s_data.is_reference = true;
+	s_data.changed      = true;
+
+	s_data.value  = (char *)c_data;
+	s_data.length = String_GetLength(c_data);
+
+	return s_data;
+}
+
 instant void
 String_Destroy(
 	String *s_data_io
@@ -68,70 +83,67 @@ String_Resize(
 	s_data_io->value = Memory_Resize(s_data_io->value, char, s_data_io->length + length_delta);
 }
 
+instant void
+String_AddOffset(
+	String *s_data_io,
+	s64 offset
+) {
+	Assert(s_data_io);
+	Assert(s_data_io->is_reference);
+
+	s_data_io->value  += offset;
+	s_data_io->length -= offset;
+}
+
 instant bool
 String_Append(
-	String *s_data_io,
-	const char *c_data,
+	String *s_dest_io,
+	String s_source,
 	u64 length_append = 0
 ) {
-    if (!s_data_io)
+    if (!s_dest_io)
 		return false;
 
-    if (length_append == 0)  length_append = String_GetLength(c_data);
-    if (length_append == 0)  return false;
+    if (length_append == 0)
+		length_append = s_source.length;
 
-	String_Resize(s_data_io, length_append);
-	Memory_Copy(s_data_io->value + s_data_io->length, (char *)c_data, length_append);
-	s_data_io->length += length_append;
+    if (length_append == 0)
+		return false;
 
-	s_data_io->changed = true;
+	Assert(length_append <= s_source.length);
+
+	String_Resize(s_dest_io, length_append);
+	Memory_Copy(s_dest_io->value + s_dest_io->length, s_source.value, length_append);
+	s_dest_io->length += length_append;
+
+	s_dest_io->changed = true;
 
 	return true;
 }
 
 instant u64
 String_Insert(
-	String *s_data_io,
-	u64 index_start,
-	const char *c_data,
-	u64 c_length = 0
+	String *s_dest_io,
+	String  s_source,
+	u64 index_start
 ) {
-	if (!s_data_io)  return 0;
-	if (!c_data)  return 0;
+	Assert(s_dest_io);
+	Assert(index_start <= s_dest_io->length);
 
-	if (!c_length)
-		c_length = String_GetLength(c_data);
+	String s_dest_io_it = *s_dest_io;
+	s_dest_io_it.is_reference = true;
 
-	Assert(index_start < s_data_io->length + c_length);
+	String s_buffer;
+	String_Append(&s_buffer, s_dest_io_it, index_start);
+	String_Append(&s_buffer, s_source);
 
-    s_data_io->value = Memory_Resize(s_data_io->value, char, s_data_io->length + c_length);
+	String_AddOffset(&s_dest_io_it, index_start);
+	String_Append(&s_buffer, s_dest_io_it);
 
-	Memory_Copy(s_data_io->value + index_start + c_length,
-				s_data_io->value + index_start,
-				s_data_io->length - index_start);
+	String_Destroy(s_dest_io);
+	*s_dest_io = s_buffer;
 
-	FOR_START(index_start, index_start + c_length, it) {
-		s_data_io->value[index_start + (it - index_start)] = *c_data++;
-	}
-
-	s_data_io->length += c_length;
-
-	s_data_io->changed = true;
-
-	return c_length;
-}
-
-instant String
-To_String(
-	const char *c_data,
-	u64 c_length = 0
-) {
-	Assert(c_data);
-
-	String s_result;
-	String_Append(&s_result, c_data, c_length);
-
-	return s_result;
+	return s_source.length;
 }
 
 instant void
@@ -143,8 +155,31 @@ To_StringBuffer(
 	Assert(s_data_out);
 	Assert(c_data);
 
-	String_Destroy(s_data_out);
-	String_Append(s_data_out, c_data, c_length);
+	if (!c_length)
+		c_length = String_GetLength(c_data);
+
+	String s_data;
+
+	s_data.is_reference = true;
+	s_data.changed      = true;
+
+	s_data.value  = (char *)c_data;
+	s_data.length = c_length;
+
+	String_Append(s_data_out, s_data);
+}
+
+instant String
+To_String(
+	const char *c_data,
+	u64 c_length = 0
+) {
+	Assert(c_data);
+
+	String s_result;
+	To_StringBuffer(&s_result, c_data, c_length);
+
+	return s_result;
 }
 
 instant void
@@ -156,21 +191,6 @@ String_Clear(
 	s_data_out->length = 0;
 
 	s_data_out->changed = true;
-}
-
-instant String
-To_StringTemp(
-	const char *c_data,
-	u64 c_length = 0
-) {
-	Assert(c_data);
-
-	static String s_data_storage;
-	String_Clear(&s_data_storage);
-
-	String_Append(&s_data_storage, c_data, c_length);
-
-	return s_data_storage;
 }
 
 /// does NOT add memory for '\0'
@@ -255,30 +275,28 @@ String_IsEqual(
 
 instant bool
 String_IsEqual(
-	String     *s_data,
-	const char *c_data,
+	String s_first,
+	String s_second,
 	u64 length = 0
 ) {
-	u64 c_len = String_GetLength(c_data);
+	if (!length) {
+		if (s_first.length != s_second.length)
+			return false;
 
-	if (!s_data OR (s_data AND !s_data->length)) {
-		if (!c_len)
-			return true;
+		length = s_first.length;
 	}
+	else {
+		if (length > s_first.length)
+			return false;
 
-	if (!length)
-		length = c_len;
-
-	if (!s_data AND length)
-		return false;
-
-	if (length > s_data->length)
-		return false;
+		if (length > s_second.length)
+			return false;
+	}
 
 	u64 it = 0;
 
 	while(it < length) {
-		if (s_data->value[it] != c_data[it])
+		if (s_first.value[it] != s_second.value[it])
 			return false;
 
 		++it;
@@ -303,23 +321,18 @@ String_Copy(
 	Memory_Copy(s_result.value, c_source, length);
 	s_result.length = length;
 
-	s_result.changed = true;
+	s_result.changed      = true;
+	s_result.is_reference = false;
 
 	return s_result;
 }
 
 instant char *
 String_CreateCBufferCopy(
-	const char *c_source,
-	u64 c_length = 0
+	String s_source
 ) {
-	Assert(c_source);
-
-	if (!c_length)
-		c_length = String_GetLength(c_source);
-
-	char *c_buffer = Memory_Create(char, c_length + 1);
-	Memory_Copy(c_buffer, c_source, c_length);
+	char *c_buffer = Memory_Create(char, s_source.length + 1);
+	Memory_Copy(c_buffer, s_source.value, s_source.length);
 
 	return c_buffer;
 }
@@ -327,19 +340,17 @@ String_CreateCBufferCopy(
 instant s64
 String_IndexOf(
 	String *s_data,
-	const char *c_key,
-	u64 c_length = 0,
+	String  s_key,
 	s64 index_start = 0
 ) {
+	Assert(s_data);
+
 	int result = -1;
 
 	if (!s_data OR !s_data->length)
 		return result;
 
-	if (!c_length)
-		c_length  = String_GetLength(c_key);
-
-	if (c_length == 0)
+	if (s_key.length == 0)
 		return result;
 
 	u64 length_data = s_data->length;
@@ -348,7 +359,7 @@ String_IndexOf(
 		index_start = 0;
 
 	FOR_START(index_start, length_data, index) {
-		if (String_IsEqual(s_data->value + index, c_key, c_length)) {
+		if (String_IsEqual(s_data->value + index, s_key.value, s_key.length)) {
 			return index;
 		}
 	}
@@ -359,8 +370,7 @@ String_IndexOf(
 instant s64
 String_IndexOfRev(
 	String *s_data,
-	const char *c_key,
-	u64 c_length = 0,
+	String  s_key,
 	s64 index_start = -1
 ) {
 	int result = -1;
@@ -368,17 +378,14 @@ String_IndexOfRev(
 	if (!s_data OR !s_data->length)
 		return result;
 
-	if (!c_length)
-		c_length  = String_GetLength(c_key);
-
-	if (c_length == 0)
+	if (s_key.length == 0)
 		return result;
 
 	if (index_start > (s64)s_data->length OR index_start < 0)
 		index_start = (s64)s_data->length;
 
 	for(s64 it = index_start; it >= 0; --it) {
-		if (String_IsEqual(s_data->value + it, c_key, c_length)) {
+		if (String_IsEqual(s_data->value + it, s_key.value, s_key.length)) {
 			return it;
 		}
 	}
@@ -389,25 +396,24 @@ String_IndexOfRev(
 instant bool
 String_StartWith(
 	String *s_data,
-	const char* start_with
+	String  s_startwith
 ) {
-	if (!start_with OR !s_data OR !s_data->length)
+	if (!s_startwith.length OR !s_data OR !s_data->length)
 		return false;
 
-	return String_IsEqual(s_data->value, start_with, String_GetLength(start_with));
+	return String_IsEqual(*s_data, s_startwith, s_startwith.length);
 }
 
 instant bool
 String_Find(
 	String *s_data,
-	const char *c_find,
-	u64 c_length = 0,
+	String  s_find,
 	s64 *index_found = 0,
 	s64  index_start = 0
 ) {
 	Assert(s_data);
 
-	s64 t_index_found = String_IndexOf(s_data, c_find, c_length, index_start);
+	s64 t_index_found = String_IndexOf(s_data, s_find, index_start);
 
 	if (t_index_found < 0) {
 		t_index_found = s_data->length - index_start;
@@ -427,14 +433,14 @@ String_Find(
 instant bool
 String_FindRev(
 	String *s_data,
-	const char *find,
+	String s_find,
 	s64 *pos_found = 0,
 	s64  pos_start = 0,
 	bool pos_after_find = false
 ) {
 	Assert(s_data);
 
-	s64 t_pos_found = String_IndexOfRev(s_data, find);
+	s64 t_pos_found = String_IndexOfRev(s_data, s_find);
 
 	if (t_pos_found < 0) {
 		if (pos_found) *pos_found = t_pos_found;
@@ -442,7 +448,7 @@ String_FindRev(
 	}
 
 	if (pos_after_find)
-		t_pos_found += String_GetLength(find);
+		t_pos_found += s_find.length;
 
 	if (pos_found) *pos_found = t_pos_found;
 
@@ -463,10 +469,11 @@ String_Cut(
 instant bool
 String_EndWith(
 	String *s_data,
-	const char *endwith,
+	String s_endwith,
 	u64 length = 0
 ) {
-	if (!length)  length = String_GetLength(endwith);
+	if (!length)
+		length = s_endwith.length;
 
 	if (length > s_data->length)
 		return false;
@@ -475,28 +482,7 @@ String_EndWith(
 	ts_data.value = ts_data.value + (ts_data.length - length);
 	ts_data.length = length;
 
-	return String_IsEqual(&ts_data, endwith, length);
-}
-
-instant bool
-String_EndWith(
-	const char *c_data,
-	const char *endwith,
-	u64 c_length = 0
-) {
-	if (!c_length)
-		c_length = String_GetLength(c_data);
-
-	String ts_data;
-	ts_data.value  = (char *)c_data;
-	ts_data.length = c_length;
-
-	u64 length_endwith = String_GetLength(endwith);
-
-	ts_data.value  = ts_data.value + (ts_data.length - length_endwith);
-	ts_data.length = length_endwith;
-
-	return String_IsEqual(&ts_data, endwith, length_endwith);
+	return String_IsEqual(ts_data, s_endwith, length);
 }
 
 instant void
@@ -629,41 +615,20 @@ String_Remove(
 
 instant void
 String_Replace(
-	String     *s_data_io,
-	const char *find,
-	const char *replace
+	String *s_data_io,
+	String  s_find,
+	String  s_replace
 ) {
 	Assert(s_data_io);
-	Assert(find);
-	Assert(replace);
 
 	s64 index_found = 0;
 	s64 index_start = 0;
-	s64 find_length     = String_GetLength(find);
-	s64 replace_length  = String_GetLength(replace);
 
-  	while(String_Find(s_data_io, find, 0, &index_found, index_start)) {
-		String_Remove(s_data_io, index_found, index_found + find_length);
-		String_Insert(s_data_io, index_found, replace);
-		index_start += index_found + replace_length;
+  	while(String_Find(s_data_io, s_find, &index_found, index_start)) {
+		String_Remove(s_data_io, index_found, index_found + s_find.length);
+		String_Insert(s_data_io, s_replace, index_found);
+		index_start += index_found + s_replace.length;
 	}
-
-	s_data_io->changed = true;
-}
-
-instant void
-String_Replace(
-	String     *s_data_io,
-	const char *find,
-	String     *s_replace
-) {
-	Assert(s_data_io);
-	Assert(find);
-	Assert(s_replace);
-
-	char *c_replace = String_CreateCBufferCopy(s_replace->value, s_replace->length);
-	String_Replace(s_data_io, find, c_replace);
-	Memory_Free(c_replace);
 
 	s_data_io->changed = true;
 }
@@ -671,8 +636,8 @@ String_Replace(
 instant s64
 String_Insert(
 	String *s_data_io,
-	u64 index_start,
-	const char c_data
+	const char c_data,
+	u64 index_start
 ) {
 	Assert(s_data_io);
 
@@ -691,12 +656,18 @@ String_Insert(
 	}
 	else
 	if (c_data == '\r' OR c_data == '\n') {
-		length = 1;
-		String_Insert(s_data_io, index_start, "\n", length);
+		String_Insert(s_data_io, S("\n"), index_start);
 	}
 	else {
 		length = 1;
-		String_Insert(s_data_io, index_start, &c_data, length);
+
+		String s_data;
+		s_data.value   = (char *)&c_data;
+		s_data.length  = length;
+		s_data.changed = true;
+		s_data.is_reference = true;
+
+		String_Insert(s_data_io, s_data, index_start);
 	}
 
 	s_data_io->changed = true;
@@ -707,39 +678,26 @@ String_Insert(
 instant void
 String_Cut(
 	String *s_data_io,
-	const char *c_start,
-	const char *c_end
+	String s_start,
+	String s_end
 ) {
 	Assert(s_data_io);
 
 	s64 start = 0, end = 0;
-	u64 len_end = String_GetLength(c_end);
 
 	while (true) {
-		start = String_IndexOf(s_data_io, c_start);
+		start = String_IndexOf(s_data_io, s_start);
 
 		if (start < 0)
 			break;
 
-		end = String_IndexOf(s_data_io, c_end, 0, start);
+		end = String_IndexOf(s_data_io, s_end, start);
 
 		if (end > start)
-			String_Remove(s_data_io, start, end + len_end);
+			String_Remove(s_data_io, start, end + s_end.length);
 		else
 			break;
 	}
-}
-
-instant void
-String_AddOffset(
-	String *s_data_io,
-	s64 offset
-) {
-	Assert(s_data_io);
-	Assert(s_data_io->is_reference);
-
-	s_data_io->value  += offset;
-	s_data_io->length -= offset;
 }
 
 instant char *
@@ -827,28 +785,27 @@ String_CalcWordCount(
 instant bool
 String_AppendCircle(
 	String *s_data_io,
-	const char *c_data,
-	u32 c_data_len,
+	String  s_data,
 	u32 buffer_limit,
 	bool reset_full_buffer
 ) {
 	Assert(s_data_io);
 
-	if (!c_data)        return false;
-	if (!c_data_len)    return false;
-	if (!buffer_limit)  return false;
+	if (!s_data.value)		return false;
+	if (!s_data.length)    return false;
+	if (!buffer_limit)  	return false;
 
-	if (s_data_io->length + c_data_len > buffer_limit) {
+	if (s_data_io->length + s_data.length > buffer_limit) {
 		if (reset_full_buffer) {
 			String_Clear(s_data_io);
 		}
 		else {
-			u32 diff = (s_data_io->length + c_data_len) - buffer_limit;
+			u32 diff = (s_data_io->length + s_data.length) - buffer_limit;
 			String_Remove(s_data_io, 0, diff);
 		}
 	}
 
-	String_Append(s_data_io, c_data, c_data_len);
+	String_Append(s_data_io, s_data);
 
 	return (s_data_io->length == buffer_limit);
 }
@@ -858,7 +815,7 @@ operator == (
 	String &s_data1,
 	String &s_data2
 ) {
-	return String_IsEqual(&s_data1, s_data2.value, s_data2.length);
+	return String_IsEqual(s_data1, s_data2);
 }
 
 bool
@@ -891,21 +848,6 @@ operator > (
 	}
 
 	return false;
-}
-
-/// (temporary) string conversion
-instant String
-S(
-	const char *c_data
-) {
-	String s_data;
-	s_data.is_reference = true;
-	s_data.changed      = true;
-
-	s_data.value  = (char *)c_data;
-	s_data.length = String_GetLength(c_data);
-
-	return s_data;
 }
 
 /// ::: Dependencies

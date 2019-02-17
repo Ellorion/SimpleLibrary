@@ -39,20 +39,14 @@ operator == (
 
 instant Font
 Font_Load(
-	const char *c_file,
-	u32 size,
-	u64 c_length = 0
+	String s_file,
+	u32 size
 ) {
-	Assert(c_file);
-
-	if (!c_length)
-		c_length = String_GetLength(c_file);
-
     Font font = {};
-    String s_font_data = File_ReadAll(c_file, c_length, true);
+    String s_font_data = File_ReadAll(s_file, true);
 
     if (!s_font_data.length) {
-		char *c_filename = String_CreateCBufferCopy(c_file, c_length);
+		char *c_filename = String_CreateCBufferCopy(s_file);
 
 		LOG_ERROR("Font \"" << c_filename << "\" does not exists.");
     }
@@ -400,7 +394,7 @@ Text_Create(
 	text.data.color		= {1, 1, 1, 1};
 
 	if (s_data_opt)
-		String_Append(&text.s_data, s_data_opt->value, s_data_opt->length);
+		String_Append(&text.s_data, *s_data_opt);
 
 	return text;
 }
@@ -511,7 +505,7 @@ Text_CalcLineCount(
 
 		index_data += ts_word->length;
 
-		if (String_EndWith(ts_word, "\n", 1)) {
+		if (String_EndWith(ts_word, S("\n"))) {
 			++count_lines;
 			line_start = true;
 
@@ -583,7 +577,7 @@ Text_BuildLines(
 
 			index_data += ts_word->length;
 
-			if (String_EndWith(ts_word, "\n", 1)) {
+			if (String_EndWith(ts_word, S("\n"))) {
 				Array_AddEmpty(a_text_line_out, &text_line);
 				text_line->s_data.value = &ts_data_it->value[index_data];
 
@@ -660,7 +654,7 @@ Text_BuildLines(
 
 			index_data += ts_word->length;
 
-			if (String_EndWith(ts_word, "\n", 1)) {
+			if (String_EndWith(ts_word, S("\n"))) {
 				Array_AddEmpty(a_text_line_out, &text_line);
 				line_start = true;
 
@@ -881,8 +875,8 @@ Text_Update(
 
 	/// redraw text
 	if (text_io->data.use_no_linebreak) {
-		String_Replace(&text_io->s_data, "\n", "");
-		String_Replace(&text_io->s_data, "\r", "");
+		String_Replace(&text_io->s_data, S("\n"), S(""));
+		String_Replace(&text_io->s_data, S("\r"), S(""));
 	}
 
 	u64 number_of_line_breaks = 0;
@@ -1218,7 +1212,7 @@ Text_Cursor_Move(
 				if (cursor->data.index_select_end < text_io->s_data.length)
 					cursor->data.index_select_end -= 1;
 
-				if (String_EndWith(&text_line->s_data, "\r\n"))
+				if (String_EndWith(&text_line->s_data, S("\r\n")))
 					cursor->data.index_select_end -= 1;
 
 				if (cursor->data.index_select_end != index_cursor) {
@@ -1716,8 +1710,8 @@ Text_UpdateInput(
 
 				cursor->move_index_x = 	String_Insert(
 											&text_io->s_data,
-											cursor->data.index_select_end,
-											s_clipboard.value, s_clipboard.length
+											s_clipboard,
+											cursor->data.index_select_end
 										);
 
 				String_Destroy(&s_clipboard);

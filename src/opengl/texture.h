@@ -103,16 +103,15 @@ Texture_Destroy(
 instant void
 Texture_Reload(
 	Texture *texture_io,
-	const char *c_filename,
-	u64 c_length = 0
+	String s_filename
 ) {
 	Assert(texture_io);
 
-	if (File_HasExtension(c_filename, ".bmp", c_length)) {
+	if (File_HasExtension(&s_filename, S(".bmp"))) {
 		u32 format_input;
 
 		/// 32-bit bmp only
-		Image image = Image_LoadBMP32(c_filename, c_length);
+		Image image = Image_LoadBMP32(s_filename);
 
 		if (image.flip_h)  format_input = GL_ABGR_EXT;
 		else               format_input = GL_RGBA;
@@ -126,8 +125,8 @@ Texture_Reload(
 		return;
 	}
 
-	if (File_HasExtension(c_filename, ".jpg|.png|.gif", c_length)) {
-		char *tc_filename = String_CreateCBufferCopy(c_filename, c_length);
+	if (File_HasExtension(&s_filename, S(".jpg|.png|.gif"))) {
+		char *tc_filename = String_CreateCBufferCopy(s_filename);
 
 		s32 width, height, bits;
 		u8 *c_data = stbi_load(tc_filename, &width, &height, &bits, 4);
@@ -143,12 +142,11 @@ Texture_Reload(
 
 instant Texture
 Texture_Load(
-	const char *c_filename,
-	u64 c_length = 0
+	String s_filename
 ) {
 	Texture result;
 
-	Texture_Reload(&result, c_filename, c_length);
+	Texture_Reload(&result, s_filename);
 
 	return result;
 }

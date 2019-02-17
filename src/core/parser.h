@@ -125,32 +125,27 @@ Parser_Load(
 instant void
 Parser_IsString(
 	Parser *parser_io,
-	const char *c_data,
-	u64         c_length = 0
+	String s_data
 ) {
 	Assert(parser_io);
-	Assert(c_data);
 
 	if (Parser_HasError(parser_io))
 		return;
 
-	if (!c_length)
-		c_length = String_GetLength(c_data);
-
-	bool is_equal = String_IsEqual(&parser_io->s_data, c_data, c_length);
+	bool is_equal = String_IsEqual(parser_io->s_data, s_data);
 
 	if (!is_equal) {
 		parser_io->has_error = true;
 		Assert(!parser_io->s_error.value);
 
-		String_Append(&parser_io->s_error, "String \"");
-		String_Append(&parser_io->s_error, c_data, c_length);
-		String_Append(&parser_io->s_error, "\" not found");
+		String_Append(&parser_io->s_error, S("String \""));
+		String_Append(&parser_io->s_error, s_data);
+		String_Append(&parser_io->s_error, S("\" not found"));
 
 		return;
 	}
 
-	Parser_AddOffset(parser_io, c_length);
+	Parser_AddOffset(parser_io, s_data.length);
 	Parser_SkipUntilToken(parser_io);
 }
 
@@ -158,28 +153,23 @@ instant void
 Parser_GetStringRef(
 	Parser *parser_io,
 	String *s_data_out,
-	const char* c_until_match,
-	u64         c_length = 0,
+	String  s_until_match,
 	PARSER_MODE_TYPE type = PARSER_MODE_SEEK
 ) {
 	Assert(parser_io);
 	Assert(s_data_out);
-	Assert(c_until_match);
 
 	if (Parser_HasError(parser_io))
 		return;
 
-	if (!c_length)
-		c_length = String_GetLength(c_until_match);
-
 	s64 index_found;
-	if (!String_Find(&parser_io->s_data, c_until_match, c_length, &index_found)) {
+	if (!String_Find(&parser_io->s_data, s_until_match, &index_found)) {
 		parser_io->has_error = true;
 		Assert(!parser_io->s_error.value);
 
-		String_Append(&parser_io->s_error, "Could not parse string. No \"");
-		String_Append(&parser_io->s_error, c_until_match, c_length);
-		String_Append(&parser_io->s_error, "\" was found.");
+		String_Append(&parser_io->s_error, S("Could not parse string. No \""));
+		String_Append(&parser_io->s_error, s_until_match);
+		String_Append(&parser_io->s_error, S("\" was found."));
 
 		return;
 	}
@@ -190,7 +180,7 @@ Parser_GetStringRef(
 	s_data_out->is_reference = true;
 
 	if (type == PARSER_MODE_SEEK) {
-		Parser_AddOffset(parser_io, index_found + c_length);
+		Parser_AddOffset(parser_io, index_found + s_until_match.length);
 		Parser_SkipUntilToken(parser_io);
 	}
 }
@@ -207,15 +197,15 @@ Parser_GetStringRef(
 	if (Parser_HasError(parser_io))
 		return;
 
-	if (String_StartWith(&parser_io->s_data, "\"")) {
+	if (String_StartWith(&parser_io->s_data, S("\""))) {
 		Parser_AddOffset(parser_io, 1);
 
 		s64 index_found;
-		if (!String_Find(&parser_io->s_data, "\"", 0, &index_found)) {
+		if (!String_Find(&parser_io->s_data, S("\""), &index_found)) {
 			parser_io->has_error = true;
 			Assert(!parser_io->s_error.value);
 
-			String_Append(&parser_io->s_error, "Could not parse string. No \" was found");
+			String_Append(&parser_io->s_error, S("Could not parse string. No \" was found"));
 
 			return;
 		}
@@ -285,8 +275,10 @@ Parser_GetBoolean(
 	};
 
 	FOR(ARRAY_COUNT(values_false), it) {
-		if (String_StartWith(&parser_io->s_data, values_false[it])) {
-			Parser_AddOffset(parser_io, String_GetLength(values_false[it]));
+		String ts_value = S(values_false[it]);
+
+		if (String_StartWith(&parser_io->s_data, ts_value)) {
+			Parser_AddOffset(parser_io, ts_value.length);
 			Parser_SkipUntilToken(parser_io);
 
 			*is_true_out = false;
@@ -300,8 +292,10 @@ Parser_GetBoolean(
 	};
 
 	FOR(ARRAY_COUNT(values_true), it) {
-		if (String_StartWith(&parser_io->s_data, values_true[it])) {
-			Parser_AddOffset(parser_io, String_GetLength(values_true[it]));
+		String ts_value = S(values_true[it]);
+
+		if (String_StartWith(&parser_io->s_data, ts_value)) {
+			Parser_AddOffset(parser_io, ts_value.length);
 			Parser_SkipUntilToken(parser_io);
 
 			*is_true_out = true;
@@ -312,7 +306,7 @@ Parser_GetBoolean(
 	parser_io->has_error = true;
 	Assert(!parser_io->s_error.value);
 
-	String_Append(&parser_io->s_error, "No valid boolean value could be parsed");
+	String_Append(&parser_io->s_error, S("No valid boolean value could be parsed"));
 }
 
 instant void
@@ -363,14 +357,14 @@ Parser_GetNumber(
         index_parsing += 1;
 	}
 
-	has_error |= String_EndWith(s_number_out, ".", 1);
+	has_error |= String_EndWith(s_number_out, S("."));
 	has_error |= (s_number_out->length == 0);
 
 	if (has_error) {
 		parser_io->has_error = true;
 		Assert(!parser_io->s_error.value);
 
-		String_Append(&parser_io->s_error, "No valid number could be parsed");
+		String_Append(&parser_io->s_error, S("No valid number could be parsed"));
 
 		s_number_out->value  = 0;
 		s_number_out->length = 0;

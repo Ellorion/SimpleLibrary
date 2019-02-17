@@ -308,7 +308,7 @@ Widget_HasChanged(
 
 	bool result = false;
 
-	///@Note: updating text changed will happen
+	///@Note: updating text changed status will happen
 	///       in a Text_Update
 	result = Text_HasChanged(&widget_io->text, false);
 
@@ -495,8 +495,7 @@ Widget_Update(
 				String *ts_data = &ARRAY_IT(widget_io->data.as_row_data, it_row);
 
 				if (String_IndexOf(	ts_data,
-									widget_io->data.s_row_filter.value,
-									widget_io->data.s_row_filter.length) >= 0
+									widget_io->data.s_row_filter) >= 0
 				) {
 					Array_Add(&widget_io->data.a_filter_data, *ts_data);
 				}
@@ -1418,7 +1417,7 @@ Widget_GetSelectedRowBuffer(
 	String *ts_row_data = &ARRAY_IT(*as_target, widget->data.active_row_id);
 
 	String_Clear(s_row_data_out);
-	String_Append(s_row_data_out, ts_row_data->value, ts_row_data->length);
+	String_Append(s_row_data_out, *ts_row_data);
 }
 
 instant void
@@ -1520,17 +1519,16 @@ Layout_Add(
 instant void
 Widget_LoadDirectoryList(
 	Widget *widget_io,
-	String *s_directory,
+	String  s_directory,
 	Array<Directory_Entry> *a_entries_out,
 	bool show_full_path = false
 ) {
 	Assert(widget_io);
 	Assert(widget_io->type == WIDGET_LISTBOX);
-	Assert(s_directory);
 
 	/// in case the directory string came from the to be destroyed directory entries
 	static String ts_directory;
-	String_Append(&ts_directory, s_directory->value, s_directory->length);
+	String_Append(&ts_directory, s_directory);
 
 	FOR_ARRAY(*a_entries_out, it) {
 		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_out, it);
@@ -1542,15 +1540,15 @@ Widget_LoadDirectoryList(
 	widget_io->data.active_row_id = 0;
 
 	/// remove "\" from directroy path (f.e. C:\) for consistency
-	if (String_EndWith(&ts_directory, "\\")) {
+	if (String_EndWith(&ts_directory, S("\\"))) {
 		String_Remove(&ts_directory, ts_directory.length - 1, ts_directory.length);
 	}
 
 	/// will still include path into dir array, even if it is not rendering,
 	/// so the path does not have to concatonate the find the targeted file,
 	/// which is more practical, than simply knowing the filename
-	File_ReadDirectory(a_entries_out, ts_directory.value, 0, ts_directory.length, true, 0, DIR_LIST_ONLY_DIR);
-	File_ReadDirectory(a_entries_out, ts_directory.value, 0, ts_directory.length, true, 0, DIR_LIST_ONLY_FILES);
+	File_ReadDirectory(a_entries_out, ts_directory, 0, true, 0, DIR_LIST_ONLY_DIR);
+	File_ReadDirectory(a_entries_out, ts_directory, 0, true, 0, DIR_LIST_ONLY_FILES);
 
 	Widget_ClearRows(widget_io);
 
@@ -1581,9 +1579,8 @@ Widget_CreateLabel(
 	Window *window,
 	Font *font,
 	Rect rect_box,
-	const char *c_data = 0,
-	TEXT_ALIGN_X_TYPE text_align_x = TEXT_ALIGN_X_LEFT,
-	u64 c_length = 0
+	String s_data,
+	TEXT_ALIGN_X_TYPE text_align_x = TEXT_ALIGN_X_LEFT
 ) {
 	Assert(window);
 	Assert(font);
@@ -1619,7 +1616,8 @@ Widget_CreateLabel(
 
 	t_widget.text.font = font;
 
-	String_Append(&t_widget.text.s_data, c_data, c_length);
+	if (s_data.length)
+		String_Append(&t_widget.text.s_data, s_data);
 
 	t_widget.trigger_autosize = true;
 
@@ -1631,8 +1629,7 @@ Widget_CreateButton(
 	Window *window,
 	Font *font,
 	Rect rect_box,
-	const char *c_data = 0,
-	u64 c_length = 0
+	String s_data
 ) {
 	Assert(window);
 	Assert(font);
@@ -1659,7 +1656,8 @@ Widget_CreateButton(
 
 	t_widget.text.font = font;
 
-	String_Append(&t_widget.text.s_data, c_data, c_length);
+	if (s_data.length)
+		String_Append(&t_widget.text.s_data, s_data);
 
 	t_widget.trigger_autosize = true;
 
@@ -1702,9 +1700,8 @@ Widget_CreateCheckBox(
 	Window *window,
 	Font *font,
 	Rect rect_box,
-	const char *c_data,
-	bool checked,
-	u64 c_length = 0
+	String s_data,
+	bool checked
 ) {
 	Assert(window);
 	Assert(font);
@@ -1726,7 +1723,7 @@ Widget_CreateCheckBox(
 
 	t_widget.text.font = font;
 
-	String_Append(&t_widget.text.s_data, c_data, c_length);
+	String_Append(&t_widget.text.s_data, s_data);
 
 	t_widget.text.data.rect_padding = {2, 2, 2, 2};
 
@@ -1812,7 +1809,7 @@ Widget_UpdateInputNumberPicker(
 				char *c_value = ToCString(t_slide->value);
 
 				String_Clear(&tw_label->text.s_data);
-				String_Append(&tw_label->text.s_data, c_value);
+				String_Append(&tw_label->text.s_data, S(c_value));
 
 				Memory_Free(c_value);
 			}
@@ -1865,9 +1862,9 @@ Widget_CreateNumberPicker(
 
 	t_widget.data.is_focusable = false;
 
-	Widget wg_label       = Widget_CreateLabel( window, font, {0, 0, 50, 24});
-	Widget wg_button_up   = Widget_CreateButton(window, font, {0, 0, 24, 24}, "<");
-	Widget wg_button_down = Widget_CreateButton(window, font, {0, 0, 24, 24}, ">");
+	Widget wg_label       = Widget_CreateLabel( window, font, {0, 0, 50, 24}, {});
+	Widget wg_button_up   = Widget_CreateButton(window, font, {0, 0, 24, 24}, S("<"));
+	Widget wg_button_down = Widget_CreateButton(window, font, {0, 0, 24, 24}, S(">"));
 	Widget wg_spreader    = Widget_CreateSpreader(window);
 
 	wg_button_up.trigger_autosize   = false;
@@ -1882,7 +1879,7 @@ Widget_CreateNumberPicker(
 	wg_label.text.data.rect_padding = {2, 2, 2, 2};
 
 	char *c_value = ToCString(slide.value);
-	String_Append(&wg_label.text.s_data, c_value);
+	String_Append(&wg_label.text.s_data, S(c_value));
 	Memory_Free(c_value);
 
 	Array_Add(&t_widget.a_subwidgets, wg_label);
@@ -2043,9 +2040,9 @@ Widget_UpdateInputComboBox(
 					static String s_row_data;
 					Widget_GetSelectedRowBuffer(wg_list, &s_row_data);
 
-					if (!String_IsEqual(&wg_text->text.s_data, s_row_data.value, s_row_data.length)) {
+					if (!String_IsEqual(wg_text->text.s_data, s_row_data)) {
 						String_Clear(&wg_text->text.s_data);
-						String_Append(&wg_text->text.s_data, s_row_data.value, s_row_data.length);
+						String_Append(&wg_text->text.s_data, s_row_data);
 						wg_text->events.on_text_change = true;
 
 						wg_text->text.cursor.data.index_select_end   = s_row_data.length;
@@ -2108,7 +2105,7 @@ Widget_CreateComboBox(
 	t_widget.layout_data.settings.auto_width = true;
 
 	Widget wg_text   = Widget_CreateTextBox(window, font, {});
-	Widget wg_button = Widget_CreateButton( window, font, {}, "+");
+	Widget wg_button = Widget_CreateButton( window, font, {}, S("+"));
 	Widget wg_list   = Widget_CreateListBox(window, font, {0, 0, 0, combo_height});
 
 	wg_text.UpdateCustomInputs   = Widget_UpdateInputComboBox;

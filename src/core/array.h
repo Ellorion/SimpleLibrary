@@ -142,12 +142,15 @@ Array_Reserve(
 
 	if (new_max > old_max) {
 		array_io->max = new_max;
-		array_io->memory = (T *)_Memory_Resize(array_io->memory, array_io->max  * sizeof(T));
+		array_io->memory = (T *)_Memory_Resize( array_io->memory,
+												array_io->max  * sizeof(T));
 	}
 
 	if (clear_zero) {
 		/// only clear new reserved data
-		Memory_Set(array_io->memory + array_io->count, 0, (new_max - old_max) * sizeof(T));
+		Memory_Set( array_io->memory + array_io->count,
+					0,
+					(new_max - old_max) * sizeof(T));
 	}
 }
 

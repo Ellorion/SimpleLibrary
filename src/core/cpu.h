@@ -104,24 +104,24 @@ CPU_GetFeatures() {
 	return (cpu_features);
 }
 
-instant Array<const char *>
+instant Array<String>
 CPU_GetFeaturesName(
 ) {
-	Array<const char *> a_features_out;
+	Array<String> a_features_out;
 
 	CPU_Features cpu_features = CPU_GetFeatures();
 
-	if (cpu_features.mmx)     Array_Add(&a_features_out, "MMX");
-	if (cpu_features.mmx_ext) Array_Add(&a_features_out, "MMX Ext");
+	if (cpu_features.mmx)     Array_Add(&a_features_out, S("MMX"));
+	if (cpu_features.mmx_ext) Array_Add(&a_features_out, S("MMX Ext"));
 
-	if (cpu_features.sse)     Array_Add(&a_features_out, "SSE");
-	if (cpu_features.sse2)    Array_Add(&a_features_out, "SSE2");
-	if (cpu_features.sse3)    Array_Add(&a_features_out, "SSE3");
-	if (cpu_features.sse4_1)  Array_Add(&a_features_out, "SSE4.1");
-	if (cpu_features.sse4_2)  Array_Add(&a_features_out, "SSE4.2");
+	if (cpu_features.sse)     Array_Add(&a_features_out, S("SSE"));
+	if (cpu_features.sse2)    Array_Add(&a_features_out, S("SSE2"));
+	if (cpu_features.sse3)    Array_Add(&a_features_out, S("SSE3"));
+	if (cpu_features.sse4_1)  Array_Add(&a_features_out, S("SSE4.1"));
+	if (cpu_features.sse4_2)  Array_Add(&a_features_out, S("SSE4.2"));
 
-	if (cpu_features._3dnow)     Array_Add(&a_features_out, "3DNow");
-	if (cpu_features._3dnow_ext) Array_Add(&a_features_out, "3DNow Ext");
+	if (cpu_features._3dnow)     Array_Add(&a_features_out, S("3DNow"));
+	if (cpu_features._3dnow_ext) Array_Add(&a_features_out, S("3DNow Ext"));
 
 	return a_features_out;
 }
