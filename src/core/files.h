@@ -149,9 +149,15 @@ File_Execute(
 ) {
 	String s_result;
 
-	char *tc_command = String_CreateCBufferCopy(s_command);
+	String ts_command;
+	String_Append(&ts_command, S("\""));
+	String_Append(&ts_command, s_command);
+	String_Append(&ts_command, S("\""));
 
-	FILE *pipe = popen(tc_command, "r");
+	/// length would calc. to 0 otherwise
+	String_Append(&ts_command, S("\0", 1));
+
+	FILE *pipe = popen(ts_command.value, "r");
 
 	/// without the delay, the pipe operations most likely will fail!
 	/// and the assert is unable to check that...
@@ -164,14 +170,20 @@ File_Execute(
 	u64 length = ftell(pipe);
 	rewind(pipe);
 
-	s_result.value  = Memory_Resize(s_result.value, char, length);
-	s_result.length = length;
-	fread(s_result.value, sizeof(char), sizeof(char) * length, pipe);
+	if (length) {
+		s_result.value  = Memory_Resize(s_result.value, char, length);
+		s_result.length = length;
+		fread(s_result.value, sizeof(char), sizeof(char) * length, pipe);
 
-	s_result.changed = true;
+		s_result.changed = true;
 
+	}
+
+	/// @Bug: might hang when executing command line executables
+	///       which do not produce an output to redirect
 	pclose(pipe);
-	Memory_Free(tc_command);
+
+	String_Destroy(&ts_command);
 
 	return s_result;
 }
@@ -461,4 +473,41 @@ File_GetExtension(
 	s_result = String_Copy(s_data->value + pos_ext, s_data->length - pos_ext);
 
 	return s_result;
+}
+
+instant bool
+File_ChangePath(
+	String *s_dest_io,
+	String  s_append
+) {
+	Assert(s_dest_io);
+
+	if (!(   String_EndWith(&s_append, S(".."))
+		  OR String_EndWith(&s_append, S("\\.."))
+		  OR String_EndWith(&s_append, S("\\..\\"))
+	)) {
+		if (!String_EndWith(s_dest_io, S("\\")))
+			String_Append(s_dest_io, S("\\"));
+
+		String_Append(s_dest_io, s_append);
+		return true;
+	}
+
+	while(   String_EndWith(s_dest_io, S("\\"))
+		  OR String_EndWith(s_dest_io, S("/"))
+	) {
+        String_Cut(s_dest_io, s_dest_io->length);
+	}
+
+	s64 pos_found;
+	bool found = String_FindRev(s_dest_io, S("\\"), &pos_found);
+
+	if (found) {
+		String_Cut(s_dest_io, pos_found);
+		return true;
+	}
+	else {
+		LOG_WARNING("[File] Impossible to go to parent directory. No parent directory exists.");
+		return false;
+	}
 }

@@ -49,12 +49,27 @@ instant String
 S(
 	const char *c_data
 ) {
-	String s_data;
+ 	String s_data;
 	s_data.is_reference = true;
 	s_data.changed      = true;
 
 	s_data.value  = (char *)c_data;
 	s_data.length = String_GetLength(c_data);
+
+	return s_data;
+}
+
+instant String
+S(
+	const char *c_data,
+	u64 length
+) {
+ 	String s_data;
+	s_data.is_reference = true;
+	s_data.changed      = true;
+
+	s_data.value  = (char *)c_data;
+	s_data.length = length;
 
 	return s_data;
 }
@@ -204,7 +219,8 @@ To_CString(
 ) {
 	Assert(s_data);
 
-	if (!c_length)  return;
+	if (!c_length)
+		return;
 
 	if (!s_data->length) {
 		c_buffer_out[0] = '\0';
@@ -381,8 +397,11 @@ String_IndexOfRev(
 	if (s_key.length == 0)
 		return result;
 
+	/// index_start "starts" at the end of a string,
+	/// and has to be converted from count
+	/// (which is +1 of an index)
 	if (index_start > (s64)s_data->length OR index_start < 0)
-		index_start = (s64)s_data->length;
+		index_start = (s64)s_data->length - 1;
 
 	for(s64 it = index_start; it >= 0; --it) {
 		if (String_IsEqual(s_data->value + it, s_key.value, s_key.length)) {

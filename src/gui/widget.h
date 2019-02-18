@@ -229,12 +229,8 @@ Widget_IsListType(
 instant void
 Widget_AddRow(
 	Widget *widget_io,
-	const char *c_row_data,
-	u64 c_length = 0
+	String s_row_data
 ) {
-	if (!c_row_data)
-		return;
-
 	/// list contained in subwidgets
 	switch (widget_io->type) {
 		case WIDGET_COMBOBOX: {
@@ -246,7 +242,7 @@ Widget_AddRow(
 
 	String *ts_data;
 	Array_AddEmpty(&widget_io->data.as_row_data, &ts_data);
-	*ts_data = String_Copy(c_row_data, c_length);
+	*ts_data = String_Copy(s_row_data.value, s_row_data.length);
 }
 
 instant void
@@ -260,7 +256,7 @@ Widget_AddRows(
 	FOR_ARRAY(*as_list, it) {
 		String *ts_item = &ARRAY_IT(*as_list, it);
 
-		Widget_AddRow(widget_io, ts_item->value, ts_item->length);
+		Widget_AddRow(widget_io, *ts_item);
 	}
 }
 
@@ -1527,8 +1523,8 @@ Widget_LoadDirectoryList(
 	Assert(widget_io->type == WIDGET_LISTBOX);
 
 	/// in case the directory string came from the to be destroyed directory entries
-	static String ts_directory;
-	String_Append(&ts_directory, s_directory);
+	static String ts_directory_buffer;
+	String_Append(&ts_directory_buffer, s_directory);
 
 	FOR_ARRAY(*a_entries_out, it) {
 		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_out, it);
@@ -1539,16 +1535,18 @@ Widget_LoadDirectoryList(
 
 	widget_io->data.active_row_id = 0;
 
-	/// remove "\" from directroy path (f.e. C:\) for consistency
-	if (String_EndWith(&ts_directory, S("\\"))) {
-		String_Remove(&ts_directory, ts_directory.length - 1, ts_directory.length);
+	/// remove "\" from directory path (f.e. C:\) for consistency
+	if (String_EndWith(&ts_directory_buffer, S("\\"))) {
+		String_Remove(	&ts_directory_buffer,
+						 ts_directory_buffer.length - 1,
+						 ts_directory_buffer.length);
 	}
 
 	/// will still include path into dir array, even if it is not rendering,
 	/// so the path does not have to concatonate the find the targeted file,
 	/// which is more practical, than simply knowing the filename
-	File_ReadDirectory(a_entries_out, ts_directory, DIR_LIST_ONLY_DIR  );
-	File_ReadDirectory(a_entries_out, ts_directory, DIR_LIST_ONLY_FILES);
+	File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_DIR  , show_full_path);
+	File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_FILES, show_full_path);
 
 	Widget_ClearRows(widget_io);
 
@@ -1556,22 +1554,23 @@ Widget_LoadDirectoryList(
 		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_out, it);
 
 		String ts_entry_name = t_entry->s_name;
+		ts_entry_name.is_reference = true;
 
-		if (!show_full_path) {
-			ts_entry_name.value  += ts_directory.length;
-			ts_entry_name.length -= ts_directory.length;
-		}
+#if 0
+		/// @TODO: for File_ChangePath version, which "squishes" an existing path,
+		///        that includes \.. already
+		if (!show_full_path)
+			String_AddOffset(&ts_entry_name, ts_directory_buffer.length);
 
 		/// removing leading "\" to indicate file type
-		if (t_entry->type == DIR_ENTRY_FILE) {
-			ts_entry_name.value  += 1;
-			ts_entry_name.length -= 1;
-		}
+		if (t_entry->type == DIR_ENTRY_FILE)
+			String_AddOffset(&ts_entry_name, 1);
+#endif // 0
 
-		Widget_AddRow(widget_io, ts_entry_name.value, ts_entry_name.length);
+		Widget_AddRow(widget_io, ts_entry_name);
 	}
 
-	String_Clear(&ts_directory);
+	String_Clear(&ts_directory_buffer);
 }
 
 instant Widget

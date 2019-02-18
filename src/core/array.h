@@ -27,7 +27,7 @@ struct Array {
 	u64   count  = 0;
 	u64   max    = 0;
 
-	/// for string chunks for now
+	/// f.e. for string chunks
 	bool  by_reference = false;
 };
 
