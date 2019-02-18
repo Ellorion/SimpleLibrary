@@ -247,7 +247,9 @@ Array_Sort_Ascending(
 	Array<T> *array_io
 ) {
 	Assert(array_io);
-	Assert(array_io->count);
+
+	if(!array_io->count)
+		return;
 
 	Sort_Quick( &array_io->memory[0],
 				&array_io->memory[array_io->count - 1],
@@ -260,7 +262,9 @@ Array_Sort_Descending(
 	Array<T> *array_io
 ) {
 	Assert(array_io);
-	Assert(array_io->count);
+
+	if(!array_io->count)
+		return;
 
 	Sort_Quick( &array_io->memory[0],
 				&array_io->memory[array_io->count - 1],

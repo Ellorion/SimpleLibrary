@@ -1547,8 +1547,8 @@ Widget_LoadDirectoryList(
 	/// will still include path into dir array, even if it is not rendering,
 	/// so the path does not have to concatonate the find the targeted file,
 	/// which is more practical, than simply knowing the filename
-	File_ReadDirectory(a_entries_out, ts_directory, 0, true, 0, DIR_LIST_ONLY_DIR);
-	File_ReadDirectory(a_entries_out, ts_directory, 0, true, 0, DIR_LIST_ONLY_FILES);
+	File_ReadDirectory(a_entries_out, ts_directory, DIR_LIST_ONLY_DIR  );
+	File_ReadDirectory(a_entries_out, ts_directory, DIR_LIST_ONLY_FILES);
 
 	Widget_ClearRows(widget_io);
 

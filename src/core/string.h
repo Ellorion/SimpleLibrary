@@ -823,13 +823,14 @@ operator < (
 	String &s_data1,
 	String &s_data2
 ) {
-	if (s_data1.length < s_data2.length)  return true;
-	if (s_data1.length > s_data2.length)  return false;
+	u64 length = MIN(s_data1.length, s_data2.length);
 
-	FOR(s_data1.length, it) {
+	FOR(length, it) {
 		if (s_data1.value[it] < s_data2.value[it]) return true;
 		if (s_data1.value[it] > s_data2.value[it]) return false;
 	}
+
+	if (s_data1.length < s_data2.length)  return true;
 
 	return false;
 }
@@ -839,13 +840,14 @@ operator > (
 	String &s_data1,
 	String &s_data2
 ) {
-	if (s_data1.length > s_data2.length)  return true;
-	if (s_data1.length < s_data2.length)  return false;
+	u64 length = MIN(s_data1.length, s_data2.length);
 
-	FOR(s_data1.length, it) {
+	FOR(length, it) {
 		if (s_data1.value[it] > s_data2.value[it]) return true;
 		if (s_data1.value[it] < s_data2.value[it]) return false;
 	}
+
+	if (s_data1.length > s_data2.length)  return true;
 
 	return false;
 }

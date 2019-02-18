@@ -316,17 +316,33 @@ enum DIR_LIST_TYPE {
 	DIR_LIST_ALL
 };
 
+bool
+operator < (
+	Directory_Entry &entry_1,
+	Directory_Entry &entry_2
+) {
+	return entry_1.s_name < entry_2.s_name;
+}
+
+bool
+operator > (
+	Directory_Entry &entry_1,
+	Directory_Entry &entry_2
+) {
+	return entry_1.s_name > entry_2.s_name;
+}
+
 /// does not list or includes subdirectories
 instant void
 File_ReadDirectory(
-	Array<Directory_Entry> *a_entries,
+	Array<Directory_Entry> *a_entries_io,
 	String s_path,
-	const char *extension_filter = 0,
+	DIR_LIST_TYPE type = DIR_LIST_ALL,
 	bool prefix_path = true,
-	const char *name_filter = 0,
-	DIR_LIST_TYPE type = DIR_LIST_ONLY_FILES
+	const char *extension_filter = 0,
+	const char *name_filter = 0
 ) {
-	Assert(a_entries);
+	Assert(a_entries_io);
 
 	if (!s_path.length)
 		return;
@@ -389,7 +405,7 @@ File_ReadDirectory(
 				else
 					dir_entry.type = DIR_ENTRY_FILE;
 
-				Array_Add(a_entries, dir_entry);
+				Array_Add(a_entries_io, dir_entry);
 			}
 		} while (FindNextFile(id_directory, &file_data));
 
