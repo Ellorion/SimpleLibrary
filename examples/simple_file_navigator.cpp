@@ -2,6 +2,25 @@
 #include "test/core.h"
 
 instant void
+Config_Save(
+	String s_filename,
+	String s_path
+) {
+	String s_config;
+
+	String_Append(&s_config, S("/:default\n"));
+	String_Append(&s_config, S("path\t\"{path}\""));
+
+	String_Replace(&s_config, S("{path}"), s_path);
+
+	File file_config = File_Open(s_filename, "w");
+	File_Write(&file_config, s_config);
+	File_Close(&file_config);
+
+	String_Destroy(&s_config);
+}
+
+instant void
 Window_HandleEvents(Window *window) {
 	MSG msg;
 	bool running = true;
@@ -22,7 +41,46 @@ Window_HandleEvents(Window *window) {
 
     Layout_Arrange(&layout);
 
-    String s_path = String_Copy("C:");
+    String s_config_section_id 	= S("/:");
+    String s_config_file 		= S("default.cfg");
+	String s_config      		= File_ReadAll(s_config_file);
+
+    String s_path = String_Copy("C:\\");
+
+	if (String_IsEmpty(&s_config)) {
+		Config_Save(s_config_file, s_path);
+	}
+	else {
+		String s_data;
+
+		Parser parser_config = Parser_Load(s_config);
+
+		while (Parser_IsRunning(&parser_config)) {
+			Parser_GetStringRef(&parser_config, &s_data);
+
+			if (String_StartWith(&s_data, s_config_section_id))
+				String_AddOffset(&s_data, 2);
+
+			if (String_IsEqual(s_data, S("default"))) {
+				while (Parser_IsRunning(&parser_config)) {
+					Parser_GetStringRef(&parser_config, &s_data, PARSER_MODE_PEEK);
+
+					if (String_StartWith(&s_data, s_config_section_id))
+						break;
+
+					Parser_GetStringRef(&parser_config, &s_data);
+
+					if (String_IsEqual(s_data, S("path"))) {
+						Parser_GetStringRef(&parser_config, &s_data);
+						String_Clear(&s_path);
+						String_Append(&s_path, s_data);
+					}
+				}
+			}
+		}
+
+	}
+
 	Array<Directory_Entry> a_listing;
 	Widget_LoadDirectoryList(&wg_listbox, s_path, &a_listing);
 
@@ -40,7 +98,6 @@ Window_HandleEvents(Window *window) {
 		OpenGL_AdjustScaleViewport(window, true);
 #endif // 0
 
-
 		Widget_Update(&a_widgets, keyboard);
 
 		if(keyboard->up[VK_ESCAPE]) {
@@ -50,6 +107,8 @@ Window_HandleEvents(Window *window) {
 		if (keyboard->up[VK_BACK]) {
 			File_ChangePath(&s_path, S(".."));
 			Widget_LoadDirectoryList(&wg_listbox, s_path, &a_listing, false);
+
+			Config_Save(s_config_file, s_path);
 		}
 
 		if (wg_listbox.events.on_list_change_final) {
@@ -60,6 +119,8 @@ Window_HandleEvents(Window *window) {
 			if (t_entry->type == DIR_ENTRY_DIR) {
 				File_ChangePath(&s_path, t_entry->s_name);
 				Widget_LoadDirectoryList(&wg_listbox, s_path, &a_listing, false);
+
+				Config_Save(s_config_file, s_path);
 			}
 			else
 			if (t_entry->type == DIR_ENTRY_FILE) {
@@ -82,6 +143,8 @@ Window_HandleEvents(Window *window) {
 }
 
 int main() {
+	Test_Run();
+
 	Window window;
 
 	Keyboard keyboard;

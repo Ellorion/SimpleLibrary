@@ -9,6 +9,16 @@ struct String {
 	char *value   = 0;
 };
 
+instant bool
+String_IsEmpty(
+	String *s_data
+) {
+	Assert(s_data);
+
+	return (   s_data->length == 0
+			OR s_data->value  == 0);
+}
+
 instant void
 String_Print(
 	String *s_data

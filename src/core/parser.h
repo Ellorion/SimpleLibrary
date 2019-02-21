@@ -102,18 +102,11 @@ Parser_Destroy(
 
 instant Parser
 Parser_Load(
-	const char *c_data,
-	u64         c_length = 0
+	String s_data
 ) {
-  	Assert(c_data);
-
-  	if (!c_length)
-		c_length = String_GetLength(c_data);
-
 	Parser parser = {};
 
-	parser.s_data.value   = (char *)c_data;
-	parser.s_data.length  = c_length;
+	parser.s_data         = s_data;
 	parser.s_data.changed = true;
 	parser.s_data.is_reference = true;
 

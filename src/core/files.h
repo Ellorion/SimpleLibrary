@@ -191,15 +191,11 @@ File_Execute(
 instant void
 File_Write(
 	File *file,
-	const char *data_out,
-	u64 length = 0
+	String s_data
 ) {
 	Assert(file);
 
-	if (!length)
-		length = String_GetLength(data_out);
-
-    fwrite(data_out, sizeof(char), sizeof(char) * length, file->fp);
+    fwrite(s_data.value, sizeof(char), sizeof(char) * s_data.length, file->fp);
 }
 
 instant String

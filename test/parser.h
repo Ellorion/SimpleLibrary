@@ -3,7 +3,7 @@
 instant void
 Test_Parser(
 ) {
-	Parser parser = Parser_Load(R"(
+	Parser parser = Parser_Load(S(R"(
 		/:default
 		text		FooBar
 		path		"X:/app folder/"
@@ -18,7 +18,7 @@ Test_Parser(
 
 		/:default
 		debug		false
-	)");
+	)"));
 
 	s64 id_section = -1;
 
