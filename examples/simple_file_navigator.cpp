@@ -1,17 +1,36 @@
 #include "src/SLib.h"
 #include "test/core.h"
 
+struct Config_Default {
+	String s_path;
+	String s_font;
+	u32 font_size;
+};
+
 instant void
 Config_Save(
 	String s_filename,
-	String s_path
+	Config_Default cfg_default
 ) {
 	String s_config;
 
-	String_Append(&s_config, S("/:default\n"));
-	String_Append(&s_config, S("path\t\"{path}\"\n"));
+	String_Append(&s_config, S(R"(
+/:default
+path_latest	"{path_latest}"
+font-file	"{font-file}"
+font-size	{font-size}
+	)"));
 
-	String_Replace(&s_config, S("{path}"), s_path);
+
+	char c_font_size[20];
+	itoa(cfg_default.font_size, c_font_size, 10);
+
+	String_Replace(&s_config, S("{path_latest}"), cfg_default.s_path);
+	String_Replace(&s_config, S("{font-file}"), cfg_default.s_font);
+	String_Replace(&s_config, S("{font-size}"), S(c_font_size));
+
+	String_TrimLeft(&s_config);
+	String_TrimRight(&s_config);
 
 	File file_config = File_Open(s_filename, "w");
 	File_Write(&file_config, s_config);
@@ -25,31 +44,20 @@ Window_HandleEvents(Window *window) {
 	MSG msg;
 	bool running = true;
 
-	ShaderSet 	 shader_set = ShaderSet_Create(window);
-	Font 		 font 		= Font_Load(S("default.ttf"), 18);
-	Keyboard	*keyboard	= window->keyboard;
+	Config_Default cfg_default;
 
-	Widget wg_listbox = Widget_CreateListBox(window, &font, {});
-
-    Array<Widget *> a_widgets;
-    Array_Add(&a_widgets, &wg_listbox);
-
-	Layout layout;
-	Layout_Create(&layout, {0, 0, window->width, window->height}, true);
-	Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
-    Layout_Add(&layout, &wg_listbox);
-
-    Layout_Arrange(&layout);
+	cfg_default.s_path    = String_Copy("C:\\");
+	cfg_default.s_font    = String_Copy("default.ttf");
+	cfg_default.font_size = 18;
 
     String s_config_section_id 	= S("/:");
     String s_config_file 		= S("default.cfg");
 	String s_config      		= File_ReadAll(s_config_file);
 
 	String s_data;
-    String s_path = String_Copy("C:\\");
 
-	if (String_IsEmpty(&s_config)) {
-		Config_Save(s_config_file, s_path);
+    if (String_IsEmpty(&s_config)) {
+		Config_Save(s_config_file, cfg_default);
 	}
 	else {
 		String s_data;
@@ -69,12 +77,29 @@ Window_HandleEvents(Window *window) {
 
 					Parser_GetString(&parser_config, &s_data);
 
-					if (s_data == "path") {
+					if (s_data == "font-file") {
+						Parser_GetString(&parser_config, &s_data);
+
+						if (File_Exists(s_data)) {
+							String_Clear(&cfg_default.s_font);
+							String_Append(&cfg_default.s_font, s_data);
+						}
+					}
+					else
+					if (s_data == "font-size") {
+						Parser_GetNumber(&parser_config, &s_data);
+
+						if (!Parser_HasError(&parser_config)) {
+							cfg_default.font_size = ToInt(&s_data);
+						}
+					}
+					else
+					if (s_data == "path_latest") {
 						Parser_GetString(&parser_config, &s_data);
 
 						if (File_IsDirectory(s_data)) {
-							String_Clear(&s_path);
-							String_Append(&s_path, s_data);
+							String_Clear(&cfg_default.s_path);
+							String_Append(&cfg_default.s_path, s_data);
 						}
 					}
 				}
@@ -82,10 +107,26 @@ Window_HandleEvents(Window *window) {
 		}
 	}
 
+	ShaderSet 	 shader_set = ShaderSet_Create(window);
+	Font 		 font 		= Font_Load(cfg_default.s_font,cfg_default.font_size);
+	Keyboard	*keyboard	= window->keyboard;
+
+	Widget wg_listbox = Widget_CreateListBox(window, &font, {});
+
+    Array<Widget *> a_widgets;
+    Array_Add(&a_widgets, &wg_listbox);
+
+	Layout layout;
+	Layout_Create(&layout, {0, 0, window->width, window->height}, true);
+	Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
+    Layout_Add(&layout, &wg_listbox);
+
+    Layout_Arrange(&layout);
+
 	/// assumes that the at least the default path exists,
 	/// or there will be no list entries
 	Array<Directory_Entry> a_listing;
-	Widget_LoadDirectoryList(&wg_listbox, s_path, &a_listing);
+	Widget_LoadDirectoryList(&wg_listbox, cfg_default.s_path, &a_listing);
 
 	while(running) {
 		msg = {};
@@ -108,10 +149,8 @@ Window_HandleEvents(Window *window) {
 		}
 		else
 		if (keyboard->up[VK_BACK]) {
-			File_ChangePath(&s_path, S(".."));
-			Widget_LoadDirectoryList(&wg_listbox, s_path, &a_listing, false);
-
-			Config_Save(s_config_file, s_path);
+			File_ChangePath(&cfg_default.s_path, S(".."));
+			Widget_LoadDirectoryList(&wg_listbox, cfg_default.s_path, &a_listing, false);
 		}
 
 		if (wg_listbox.events.on_list_change_final) {
@@ -120,18 +159,16 @@ Window_HandleEvents(Window *window) {
 			Directory_Entry *t_entry = &ARRAY_IT(a_listing, index);
 
 			if (t_entry->type == DIR_ENTRY_DIR) {
-				File_ChangePath(&s_path, t_entry->s_name);
-				Widget_LoadDirectoryList(&wg_listbox, s_path, &a_listing, false);
-
-				Config_Save(s_config_file, s_path);
+				File_ChangePath(&cfg_default.s_path, t_entry->s_name);
+				Widget_LoadDirectoryList(&wg_listbox, cfg_default.s_path, &a_listing, false);
 			}
 			else
 			if (t_entry->type == DIR_ENTRY_FILE) {
-				u64 length_path = s_path.length;
+				u64 length_path = cfg_default.s_path.length;
 
-				File_ChangePath(&s_path, t_entry->s_name);
-				File_Execute(s_path);
-				String_Cut(&s_path, length_path);
+				File_ChangePath(&cfg_default.s_path, t_entry->s_name);
+				File_Execute(cfg_default.s_path);
+				String_Cut(&cfg_default.s_path, length_path);
 			}
 		}
 
@@ -143,6 +180,8 @@ Window_HandleEvents(Window *window) {
 
 		Window_UpdateAndResetInput(window);
 	}
+
+	Config_Save(s_config_file, cfg_default);
 }
 
 int main() {
