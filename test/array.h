@@ -12,7 +12,7 @@ Test_Arrays(
 
 		FOR_ARRAY(as_test, it) {
 			String s_data_it = ARRAY_IT(as_test, it);
-			AssertMessage(String_IsEqual(s_data_it, S("test")), "[Test] Array_Add failed.");
+			AssertMessage(s_data_it == "test", "[Test] Array_Add failed.");
 		}
 
 		Array_ClearContainer(&as_test);
@@ -32,7 +32,7 @@ Test_Arrays(
 
 		FOR_ARRAY(as_test, it) {
 			String s_data_it = ARRAY_IT(as_test, it);
-			AssertMessage(String_IsEqual(s_data_it, S("bla")), "[Test] Array_AddEmpty failed.");
+			AssertMessage(s_data_it == "bla", "[Test] Array_AddEmpty failed.");
 		}
 
 		Array_AddEmpty(&as_test, &s_item);
@@ -58,7 +58,7 @@ Test_Arrays(
 		as_split = String_Split(&s_split, S("\n"));
 
 		AssertMessage(as_split.count == 1, "[Test] Incorrect amount of items split from string (1).");
-		AssertMessage(String_IsEqual(ARRAY_IT(as_split, 0), S("aaa")), "[Test] First Array item does not match.");
+		AssertMessage(ARRAY_IT(as_split, 0) == "aaa", "[Test] First Array item does not match.");
 
 		Array_Destroy(&as_split);
 	}
@@ -85,8 +85,8 @@ Test_Arrays(
 		as_split = String_Split(&s_split, S("\n"));
 
 		AssertMessage(as_split.count == 2, "[Test] Incorrect amount of items split from string (2).");
-		AssertMessage(String_IsEqual(ARRAY_IT(as_split, 0), S("aaa")), "[Test] First Array item does not match.");
-		AssertMessage(String_IsEqual(ARRAY_IT(as_split, 1), S("bbb")), "[Test] Second Array item does not match.");
+		AssertMessage(ARRAY_IT(as_split, 0) == "aaa", "[Test] First Array item does not match.");
+		AssertMessage(ARRAY_IT(as_split, 1) == "bbb", "[Test] Second Array item does not match.");
 
 		Array_Destroy(&as_split);
 		String_Destroy(&s_split);
@@ -111,18 +111,18 @@ Test_Arrays(
 
 		Array_Sort_Ascending(&as_data);
 
-		AssertMessage(		String_IsEqual(ARRAY_IT(as_data, 0), S("1"))
-						AND String_IsEqual(ARRAY_IT(as_data, 1), S("2"))
-						AND String_IsEqual(ARRAY_IT(as_data, 2), S("3"))
-						AND String_IsEqual(ARRAY_IT(as_data, 3), S("4"))
+		AssertMessage(		ARRAY_IT(as_data, 0) == "1"
+						AND ARRAY_IT(as_data, 1) == "2"
+						AND ARRAY_IT(as_data, 2) == "3"
+						AND ARRAY_IT(as_data, 3) == "4"
 							, "[Test] String array sorting failed (ascending).");
 
 		Array_Sort_Descending(&as_data);
 
-		AssertMessage(		String_IsEqual(ARRAY_IT(as_data, 0), S("4"))
-						AND String_IsEqual(ARRAY_IT(as_data, 1), S("3"))
-						AND String_IsEqual(ARRAY_IT(as_data, 2), S("2"))
-						AND String_IsEqual(ARRAY_IT(as_data, 3), S("1"))
+		AssertMessage(		ARRAY_IT(as_data, 0) == "4"
+						AND ARRAY_IT(as_data, 1) == "3"
+						AND ARRAY_IT(as_data, 2) == "2"
+						AND ARRAY_IT(as_data, 3) == "1"
 							, "[Test] String array sorting failed (descending).");
 
 		Array_Destroy(&as_data);

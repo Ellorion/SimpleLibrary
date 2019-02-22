@@ -125,7 +125,7 @@ Parser_IsString(
 	if (Parser_HasError(parser_io))
 		return;
 
-	bool is_equal = String_IsEqual(parser_io->s_data, s_data);
+	bool is_equal = (parser_io->s_data == s_data);
 
 	if (!is_equal) {
 		parser_io->has_error = true;
@@ -143,7 +143,7 @@ Parser_IsString(
 }
 
 instant void
-Parser_GetStringRef(
+Parser_GetString(
 	Parser *parser_io,
 	String *s_data_out,
 	String  s_until_match,
@@ -179,9 +179,10 @@ Parser_GetStringRef(
 }
 
 instant void
-Parser_GetStringRef(
+Parser_GetString(
 	Parser *parser_io,
 	String *s_data_out,
+	u64 start_index = 0,
 	PARSER_MODE_TYPE type = PARSER_MODE_SEEK
 ) {
 	Assert(parser_io);
@@ -222,7 +223,7 @@ Parser_GetStringRef(
 		return;
 	}
 
-	s_data_out->value   = parser_io->s_data.value;
+	s_data_out->value   = parser_io->s_data.value + start_index;
 	s_data_out->length  = 0;
 	s_data_out->changed = true;
 	s_data_out->is_reference = true;
@@ -245,7 +246,7 @@ Parser_GetStringRef(
 	}
 
 	if (type == PARSER_MODE_PEEK)
-		Parser_AddOffset(parser_io, -s_data_out->length);
+		Parser_AddOffset(parser_io, -(s_data_out->length + start_index));
 	else
 	if (type == PARSER_MODE_SEEK)
 		Parser_SkipUntilToken(parser_io);
@@ -368,4 +369,38 @@ Parser_GetNumber(
 	}
 
 	Parser_SkipUntilToken(parser_io);
+}
+
+instant bool
+Parser_IsSection(
+	Parser *parser_io,
+	String s_section_id
+) {
+	Assert(parser_io);
+	Assert(s_section_id.length);
+
+	String s_data;
+	Parser_GetString(parser_io, &s_data, 0, PARSER_MODE_PEEK);
+
+	return String_StartWith(&s_data, s_section_id);
+}
+
+instant bool
+Parser_GetSectionName(
+	Parser *parser_io,
+	String *s_data_out,
+	String s_section_id
+) {
+	Assert(parser_io);
+	Assert(s_data_out);
+	Assert(s_section_id.length);
+
+	bool is_section = Parser_IsSection(parser_io, s_section_id);
+
+	Parser_GetString(parser_io, s_data_out);
+
+	if (is_section)
+		String_AddOffset(s_data_out, s_section_id.length);
+
+	return is_section;
 }

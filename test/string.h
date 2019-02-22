@@ -16,10 +16,10 @@ Test_Strings(
 
 	String_Append(&s_data, S("Hello"));
 	To_CString(buffer, 100, &s_data);
-	AssertMessage(String_IsEqual(buffer,  "Hello", 5), "[Test] C_String data does not match");
-	AssertMessage(String_IsEqual(s_data, S("Hello")) , "[Test] String data does not match (truncated)");
-	AssertMessage(String_IsEqual(s_data, S("Hello")) , "[Test] String data does not match (autosize)");
-	AssertMessage(String_IsEqual(s_data, S("Hel"), 3), "[Test] String data does not match (substring)");
+	AssertMessage(String_IsEqual(buffer,  "Hello", 5)        , "[Test] C_String data does not match");
+	AssertMessage(String_IsEqual(s_data, S("Hello World"), 5), "[Test] String data does not match (truncated)");
+	AssertMessage(String_IsEqual(s_data, S("Hello"))         , "[Test] String data does not match (autosize)");
+	AssertMessage(String_IsEqual(s_data, S("Hel"), 3)        , "[Test] String data does not match (substring)");
 	AssertMessage(s_data.length == 5, "[Test] Appending c_string to empty string failed");
 
 	String_Destroy(&s_data);

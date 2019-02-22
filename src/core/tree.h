@@ -17,8 +17,7 @@ instant void
 Tree_AddBranch(
 	Tree<T> *tree_io,
 	Tree<T> **branch_out,
-	const char *c_name,
-	u64 c_length = 0
+	String s_name
 ) {
 	Assert(tree_io);
 	Assert(!tree_io->is_leaf);
@@ -26,7 +25,7 @@ Tree_AddBranch(
 	Assert(branch_out);
 
 	Array_AddEmpty(&tree_io->a_branch, branch_out);
-	String_Append(&(*branch_out)->s_name, c_name, c_length);
+	String_Append(&(*branch_out)->s_name, s_name);
 }
 
 template <typename T>
@@ -47,8 +46,7 @@ instant bool
 Tree_Find(
 	Tree<T> *tree_io,
 	Tree<T> **branch_out,
-	const char *c_name,
-	u64 c_length = 0
+	String s_name
 ) {
 	Assert(tree_io);
 	Assert(branch_out);
@@ -56,7 +54,7 @@ Tree_Find(
 	FOR_ARRAY(tree_io->a_branch, it) {
         Tree<T> *t_branch = &ARRAY_IT(tree_io->a_branch, it);
 
-        if (String_IsEqual(&t_branch->s_name, c_name, c_length)) {
+        if (t_branch->s_name == s_name) {
 			*branch_out = t_branch;
 			return true;
         }

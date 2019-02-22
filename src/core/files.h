@@ -340,6 +340,24 @@ operator > (
 	return entry_1.s_name > entry_2.s_name;
 }
 
+instant bool
+File_IsDirectory(
+	String s_path
+) {
+	Assert(s_path.length);
+
+	char *c_path = String_CreateCBufferCopy(s_path);
+
+	DWORD attrib = GetFileAttributes(c_path);
+
+	bool result =     (attrib != INVALID_FILE_ATTRIBUTES
+			      AND (attrib & FILE_ATTRIBUTE_DIRECTORY));
+
+	Memory_Free(c_path);
+
+	return result;
+}
+
 /// does not list or includes subdirectories
 instant void
 File_ReadDirectory(

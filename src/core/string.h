@@ -498,20 +498,16 @@ String_Cut(
 instant bool
 String_EndWith(
 	String *s_data,
-	String s_endwith,
-	u64 length = 0
+	String s_endwith
 ) {
-	if (!length)
-		length = s_endwith.length;
-
-	if (length > s_data->length)
+	if (s_endwith.length > s_data->length)
 		return false;
 
 	String ts_data = *s_data;
-	ts_data.value = ts_data.value + (ts_data.length - length);
-	ts_data.length = length;
+	ts_data.value = ts_data.value + (ts_data.length - s_endwith.length);
+	ts_data.length = s_endwith.length;
 
-	return String_IsEqual(ts_data, s_endwith, length);
+	return String_IsEqual(ts_data, s_endwith, s_endwith.length);
 }
 
 instant void
@@ -839,12 +835,22 @@ String_AppendCircle(
 	return (s_data_io->length == buffer_limit);
 }
 
+/// operator
+/// string - string
 bool
 operator == (
 	String &s_data1,
 	String &s_data2
 ) {
 	return String_IsEqual(s_data1, s_data2);
+}
+
+bool
+operator != (
+	String &s_data1,
+	String &s_data2
+) {
+	return !String_IsEqual(s_data1, s_data2);
 }
 
 bool
@@ -879,6 +885,39 @@ operator > (
 	if (s_data1.length > s_data2.length)  return true;
 
 	return false;
+}
+
+/// string - const char *
+bool
+operator == (
+	String		&s_data1,
+	const char	*c_data2
+) {
+	return String_IsEqual(s_data1, S(c_data2));
+}
+
+bool
+operator == (
+	const char 	*c_data1,
+	String 		&s_data2
+) {
+	return (s_data2 == c_data1);
+}
+
+bool
+operator != (
+	String		&s_data1,
+	const char	*c_data2
+) {
+	return !(s_data1 == c_data2);
+}
+
+bool
+operator != (
+	const char 	*c_data1,
+	String 		&s_data2
+) {
+	return !(s_data2 == c_data1);
 }
 
 /// ::: Dependencies

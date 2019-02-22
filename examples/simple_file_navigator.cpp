@@ -9,7 +9,7 @@ Config_Save(
 	String s_config;
 
 	String_Append(&s_config, S("/:default\n"));
-	String_Append(&s_config, S("path\t\"{path}\""));
+	String_Append(&s_config, S("path\t\"{path}\"\n"));
 
 	String_Replace(&s_config, S("{path}"), s_path);
 
@@ -45,6 +45,7 @@ Window_HandleEvents(Window *window) {
     String s_config_file 		= S("default.cfg");
 	String s_config      		= File_ReadAll(s_config_file);
 
+	String s_data;
     String s_path = String_Copy("C:\\");
 
 	if (String_IsEmpty(&s_config)) {
@@ -56,31 +57,33 @@ Window_HandleEvents(Window *window) {
 		Parser parser_config = Parser_Load(s_config);
 
 		while (Parser_IsRunning(&parser_config)) {
-			Parser_GetStringRef(&parser_config, &s_data);
+			/// skip non-section identifier
+			if (!Parser_GetSectionName(&parser_config, &s_data, s_config_section_id))
+				continue;
 
-			if (String_StartWith(&s_data, s_config_section_id))
-				String_AddOffset(&s_data, 2);
-
-			if (String_IsEqual(s_data, S("default"))) {
+			if (s_data == "default") {
 				while (Parser_IsRunning(&parser_config)) {
-					Parser_GetStringRef(&parser_config, &s_data, PARSER_MODE_PEEK);
-
-					if (String_StartWith(&s_data, s_config_section_id))
+					/// do not skip section data for parsing in outer loop
+					if (Parser_IsSection(&parser_config, s_config_section_id))
 						break;
 
-					Parser_GetStringRef(&parser_config, &s_data);
+					Parser_GetString(&parser_config, &s_data);
 
-					if (String_IsEqual(s_data, S("path"))) {
-						Parser_GetStringRef(&parser_config, &s_data);
-						String_Clear(&s_path);
-						String_Append(&s_path, s_data);
+					if (s_data == "path") {
+						Parser_GetString(&parser_config, &s_data);
+
+						if (File_IsDirectory(s_data)) {
+							String_Clear(&s_path);
+							String_Append(&s_path, s_data);
+						}
 					}
 				}
 			}
 		}
-
 	}
 
+	/// assumes that the at least the default path exists,
+	/// or there will be no list entries
 	Array<Directory_Entry> a_listing;
 	Widget_LoadDirectoryList(&wg_listbox, s_path, &a_listing);
 

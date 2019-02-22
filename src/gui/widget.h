@@ -802,8 +802,11 @@ Widget_Render(
 			return widget_io;
 		}
 
-		///@Refactor: update for list data, might make more sense
-		///           to move it into a seperate update function
+		///@Refactor:    update for list data, might make more sense
+		///              to move it into a seperate update function
+		///@Performance: and needs performance improvement with
+		///              high number of list entries
+		///@Obfuscated:  has to be simplified (alot)
 		if (Widget_HasChanged(widget_io, true)) {
 			Vertex_ClearAttributes(&widget_io->vertex_rect);
 			Widget_InvalidateBackground(widget_io);
@@ -1491,6 +1494,11 @@ Widget_ClearRows(
 	Assert(widget_out);
 
 	Array_Clear(&widget_out->data.as_row_data);
+
+//	widget_out->rect_content.x = 0;
+//	widget_out->rect_content.y = 0;
+
+	widget_out->text.offset_y = 0;
 }
 
 instant void
@@ -2039,7 +2047,7 @@ Widget_UpdateInputComboBox(
 					static String s_row_data;
 					Widget_GetSelectedRowBuffer(wg_list, &s_row_data);
 
-					if (!String_IsEqual(wg_text->text.s_data, s_row_data)) {
+					if (wg_text->text.s_data != s_row_data) {
 						String_Clear(&wg_text->text.s_data);
 						String_Append(&wg_text->text.s_data, s_row_data);
 						wg_text->events.on_text_change = true;
