@@ -15,12 +15,12 @@ File_HasExtension(
 
 	if (!s_extension.length)  return true;
 
-	Array<String> as_extentions = Array_Split(&s_extension, S("|"));
+	Array<String> as_extentions = Array_Split(&s_extension, S("|"), DELIMITER_IGNORE, true);
 
     FOR_ARRAY(as_extentions, it) {
-    	String s_data_it = ARRAY_IT(as_extentions, it);
+    	String ts_data = ARRAY_IT(as_extentions, it);
 
-		if (String_EndWith(s_filename, s_data_it)) {
+		if (String_EndWith(s_filename, ts_data)) {
 			result = true;
 			break;
 		}
@@ -157,6 +157,9 @@ File_Execute(
 	/// length would calc. to 0 otherwise
 	String_Append(&ts_command, S("\0", 1));
 
+	/// @todo: start process in seperate thread / independently,
+	///        so the app does not hang when something
+	///        is executing
 	FILE *pipe = popen(ts_command.value, "r");
 
 	/// without the delay, the pipe operations most likely will fail!
@@ -309,8 +312,9 @@ File_HasChanged(
 }
 
 enum DIR_ENTRY_TYPE {
-	DIR_ENTRY_FILE,
-	DIR_ENTRY_DIR
+	DIR_ENTRY_DRIVE,
+	DIR_ENTRY_DIR,
+	DIR_ENTRY_FILE
 };
 
 struct Directory_Entry {
@@ -329,7 +333,10 @@ operator < (
 	Directory_Entry &entry_1,
 	Directory_Entry &entry_2
 ) {
-	return entry_1.s_name < entry_2.s_name;
+	if(entry_1.type == entry_2.type)
+		return entry_1.s_name < entry_2.s_name;
+
+	return (entry_1.type < entry_2.type);
 }
 
 bool
@@ -337,14 +344,18 @@ operator > (
 	Directory_Entry &entry_1,
 	Directory_Entry &entry_2
 ) {
-	return entry_1.s_name > entry_2.s_name;
+	if(entry_1.type == entry_2.type)
+		return entry_1.s_name > entry_2.s_name;
+
+	return (entry_1.type > entry_2.type);
 }
 
 instant bool
 File_IsDirectory(
 	String s_path
 ) {
-	Assert(s_path.length);
+	if (!s_path.length)
+		return false;
 
 	char *c_path = String_CreateCBufferCopy(s_path);
 
@@ -437,6 +448,17 @@ File_ReadDirectory(
 
 		FindClose(id_directory);
 	}
+	else {
+		/// mouse support for going to parent directory
+		/// when navigating to connected non-inserted drives
+		/// like CD/DVD drives
+		Directory_Entry dir_entry;
+		String_Append(&dir_entry.s_name, S(".."));
+
+		dir_entry.type = DIR_ENTRY_DIR;
+
+		Array_Add(a_entries_io, dir_entry);
+	}
 
 	Memory_Free(c_search_path);
 	String_Destroy(&s_search_path);
@@ -489,6 +511,45 @@ File_GetExtension(
 	return s_result;
 }
 
+instant void
+File_GetDrives(
+	Array<Directory_Entry> *a_drives_out
+) {
+	Assert(a_drives_out);
+
+	Array_DestroyContainer(a_drives_out);
+
+	u64 buffer_size = GetLogicalDriveStrings(0, 0);
+
+	static String s_buffer;
+	String_CreateBuffer(&s_buffer, buffer_size, true);
+	GetLogicalDriveStringsA(s_buffer.length, s_buffer.value);
+
+	String s_buffer_it = S(s_buffer);
+
+	s64 index_found;
+	String s_find = S("\0", 1);
+
+	while(s_buffer_it.length) {
+		if (!String_Find(&s_buffer_it, s_find, &index_found))
+			break;
+
+		if (index_found) {
+			Directory_Entry dir_entry;
+			dir_entry.s_name = S(s_buffer_it, index_found);
+			dir_entry.type   = DIR_ENTRY_DRIVE;
+
+			Array_Add(a_drives_out, dir_entry);
+		}
+
+		String_AddOffset(&s_buffer_it, index_found + 1);
+	}
+
+	String_Destroy(&s_buffer);
+
+}
+
+/// @RemoveMe return value
 instant bool
 File_ChangePath(
 	String *s_dest_io,
@@ -500,8 +561,11 @@ File_ChangePath(
 		  OR String_EndWith(&s_append, S("\\.."))
 		  OR String_EndWith(&s_append, S("\\..\\"))
 	)) {
-		if (!String_EndWith(s_dest_io, S("\\")))
+		if (    !String_EndWith(s_dest_io, S("\\"))
+			AND s_dest_io->length
+		) {
 			String_Append(s_dest_io, S("\\"));
+		}
 
 		String_Append(s_dest_io, s_append);
 		return true;
@@ -510,7 +574,7 @@ File_ChangePath(
 	while(   String_EndWith(s_dest_io, S("\\"))
 		  OR String_EndWith(s_dest_io, S("/"))
 	) {
-        String_Cut(s_dest_io, s_dest_io->length);
+        String_Cut(s_dest_io, s_dest_io->length - 1);
 	}
 
 	s64 pos_found;
@@ -521,7 +585,7 @@ File_ChangePath(
 		return true;
 	}
 	else {
-		LOG_WARNING("[File] Impossible to go to parent directory. No parent directory exists.");
-		return false;
+		String_Clear(s_dest_io);
+		return true;
 	}
 }

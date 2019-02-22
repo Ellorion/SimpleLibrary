@@ -1531,6 +1531,7 @@ Widget_LoadDirectoryList(
 	Assert(widget_io->type == WIDGET_LISTBOX);
 
 	/// in case the directory string came from the to be destroyed directory entries
+	/// -> copy a to be destroyed string for a new path
 	static String ts_directory_buffer;
 	String_Append(&ts_directory_buffer, s_directory);
 
@@ -1553,8 +1554,14 @@ Widget_LoadDirectoryList(
 	/// will still include path into dir array, even if it is not rendering,
 	/// so the path does not have to concatonate the find the targeted file,
 	/// which is more practical, than simply knowing the filename
-	File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_DIR  , show_full_path);
-	File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_FILES, show_full_path);
+	if (ts_directory_buffer.length) {
+		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ALL, show_full_path);
+
+		Array_Sort_Ascending(a_entries_out);
+	}
+	else {
+		File_GetDrives(a_entries_out);
+	}
 
 	Widget_ClearRows(widget_io);
 

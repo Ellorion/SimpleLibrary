@@ -11,8 +11,8 @@ Test_Arrays(
 		Array_Add(&as_test, s_data);
 
 		FOR_ARRAY(as_test, it) {
-			String s_data_it = ARRAY_IT(as_test, it);
-			AssertMessage(s_data_it == "test", "[Test] Array_Add failed.");
+			String ts_data = ARRAY_IT(as_test, it);
+			AssertMessage(ts_data == "test", "[Test] Array_Add failed.");
 		}
 
 		Array_ClearContainer(&as_test);
@@ -31,8 +31,8 @@ Test_Arrays(
 		String_Append(s_item, S("bla"));
 
 		FOR_ARRAY(as_test, it) {
-			String s_data_it = ARRAY_IT(as_test, it);
-			AssertMessage(s_data_it == "bla", "[Test] Array_AddEmpty failed.");
+			String ts_data = ARRAY_IT(as_test, it);
+			AssertMessage(ts_data == "bla", "[Test] Array_AddEmpty failed.");
 		}
 
 		Array_AddEmpty(&as_test, &s_item);
@@ -55,7 +55,7 @@ Test_Arrays(
 		String_Append(&s_split, S("aaa"));
 
 		Array<String> as_split;
-		as_split = String_Split(&s_split, S("\n"));
+		as_split = String_Split(&s_split, S("\n"), DELIMITER_IGNORE, true);
 
 		AssertMessage(as_split.count == 1, "[Test] Incorrect amount of items split from string (1).");
 		AssertMessage(ARRAY_IT(as_split, 0) == "aaa", "[Test] First Array item does not match.");
@@ -82,7 +82,7 @@ Test_Arrays(
 		String_Append(&s_split, S("aaa\nbbb"));
 
 		Array<String> as_split;
-		as_split = String_Split(&s_split, S("\n"));
+		as_split = String_Split(&s_split, S("\n"), DELIMITER_IGNORE, true);
 
 		AssertMessage(as_split.count == 2, "[Test] Incorrect amount of items split from string (2).");
 		AssertMessage(ARRAY_IT(as_split, 0) == "aaa", "[Test] First Array item does not match.");
@@ -180,7 +180,7 @@ Test_Arrays(
 
 		///@Performance: text could be processed without having to split
 		///              data multiple times
-		Array<String> as_lines = Array_Split(&s_data, S("\r\n"), DELIMITER_ADD_BACK);
+		Array<String> as_lines = Array_Split(&s_data, S("\r\n"), DELIMITER_ADD_BACK, true);
 		String_Destroy(&s_data);
 
 		Array<String> as_words;
@@ -188,7 +188,7 @@ Test_Arrays(
 		FOR_ARRAY(as_lines, it_lines) {
 			String *ts_line = &ARRAY_IT(as_lines, it_lines);
 
-			Array<String> tas_words = Array_Split(ts_line, S(" "), DELIMITER_ADD_FRONT);
+			Array<String> tas_words = Array_Split(ts_line, S(" "), DELIMITER_ADD_FRONT, true);
 
 			FOR_ARRAY(tas_words, it_words) {
 				String *ts_word = &ARRAY_IT(tas_words, it_words);

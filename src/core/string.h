@@ -3,8 +3,8 @@
 #define String_Split Array_Split
 
 struct String {
-	bool  changed       = false;
 	bool  is_reference  = false;
+	bool  changed       = false;
 	u64   length  = 0;
 	char *value   = 0;
 };
@@ -60,11 +60,12 @@ S(
 	const char *c_data
 ) {
  	String s_data;
-	s_data.is_reference = true;
-	s_data.changed      = true;
 
 	s_data.value  = (char *)c_data;
 	s_data.length = String_GetLength(c_data);
+
+	s_data.is_reference = true;
+	s_data.changed      = true;
 
 	return s_data;
 }
@@ -75,13 +76,42 @@ S(
 	u64 length
 ) {
  	String s_data;
-	s_data.is_reference = true;
-	s_data.changed      = true;
-
 	s_data.value  = (char *)c_data;
 	s_data.length = length;
 
+	s_data.is_reference = true;
+	s_data.changed      = true;
+
 	return s_data;
+}
+
+instant String
+S(
+	String s_data
+) {
+ 	String s_data_it;
+	s_data_it = s_data;
+
+	s_data_it.is_reference = true;
+	s_data_it.changed      = true;
+
+	return s_data_it;
+}
+
+instant String
+S(
+	String s_data,
+	u64 length
+) {
+ 	String s_data_it;
+
+	s_data_it.value  = s_data.value;
+	s_data_it.length = length;
+
+	s_data_it.is_reference = true;
+	s_data_it.changed      = true;
+
+	return s_data_it;
 }
 
 instant void
@@ -126,8 +156,8 @@ String_Append(
 	String s_source,
 	u64 length_append = 0
 ) {
-    if (!s_dest_io)
-		return false;
+	Assert(s_dest_io);
+	Assert(!s_dest_io->is_reference);
 
     if (length_append == 0)
 		length_append = s_source.length;
@@ -153,10 +183,10 @@ String_Insert(
 	u64 index_start
 ) {
 	Assert(s_dest_io);
+	Assert(!s_dest_io->is_reference);
 	Assert(index_start <= s_dest_io->length);
 
-	String s_dest_io_it = *s_dest_io;
-	s_dest_io_it.is_reference = true;
+	String s_dest_io_it = S(*s_dest_io);
 
 	String s_buffer;
 	String_Append(&s_buffer, s_dest_io_it, index_start);
@@ -183,14 +213,9 @@ To_StringBuffer(
 	if (!c_length)
 		c_length = String_GetLength(c_data);
 
-	String s_data;
+	String s_data = S(c_data, c_length);
 
-	s_data.is_reference = true;
-	s_data.changed      = true;
-
-	s_data.value  = (char *)c_data;
-	s_data.length = c_length;
-
+	String_Destroy(s_data_out);
 	String_Append(s_data_out, s_data);
 }
 
@@ -214,7 +239,6 @@ String_Clear(
 	Assert(s_data_out);
 
 	s_data_out->length = 0;
-
 	s_data_out->changed = true;
 }
 
@@ -224,7 +248,7 @@ String_Clear(
 instant void
 To_CString(
 	char *c_buffer_out,
-	u64 c_length,
+	u64   c_length,
 	String *s_data
 ) {
 	Assert(s_data);
@@ -251,16 +275,18 @@ To_CString(
 	c_buffer_out[c_length - 1] = '\0';
 }
 
-instant String
+instant void
 String_CreateBuffer(
-	u32 buffer_size
+	String *s_buffer_out,
+	u32 buffer_size,
+	bool is_reference
 ) {
-	String s_buffer;
-	String_Resize(&s_buffer, buffer_size);
-	s_buffer.length = buffer_size;
-	s_buffer.changed = true;
+	Assert(s_buffer_out);
 
-	return s_buffer;
+	String_Resize(s_buffer_out, buffer_size);
+	s_buffer_out->length  = buffer_size;
+	s_buffer_out->changed = true;
+	s_buffer_out->is_reference = is_reference;
 }
 
 instant bool
@@ -401,7 +427,10 @@ String_IndexOfRev(
 ) {
 	int result = -1;
 
-	if (!s_data OR !s_data->length)
+	if (!s_data)
+		return result;
+
+	if (!s_data->length)
 		return result;
 
 	if (s_key.length == 0)
@@ -489,6 +518,9 @@ String_Cut(
 	String *s_data_io,
 	u32 length
 ) {
+	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
+
 	if (s_data_io AND length < s_data_io->length) {
 		s_data_io->length  = length;
 		s_data_io->changed = true;
@@ -514,8 +546,8 @@ instant void
 String_ToLower(
 	String *s_data_io
 ) {
-	if (!s_data_io)
-		return;
+	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	u64 index = 0;
 	u64 len_max = s_data_io->length + 1;
@@ -534,8 +566,8 @@ instant void
 String_ToUpper(
 	String *s_data_io
 ) {
-	if (!s_data_io)
-		return;
+	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	u64 index = 0;
 	u64 len_max = s_data_io->length + 1;
@@ -554,8 +586,8 @@ instant void
 String_Reverse(
 	String *s_data_io
 ) {
-	if (!s_data_io)
-		return;
+	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	u64 length = s_data_io->length;
 
@@ -574,6 +606,7 @@ String_TrimLeft(
 	String *s_data_io
 ) {
 	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	u64 length = 0;
 	u64 len_max = s_data_io->length;
@@ -595,6 +628,7 @@ String_TrimRight(
 	String *s_data_io
 ) {
 	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	u64 length = s_data_io->length;
 
@@ -617,6 +651,7 @@ String_Remove(
 	u64 index_end
 ) {
 	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	if (index_start == index_end)
 		return 0;
@@ -645,6 +680,7 @@ String_Replace(
 	String  s_replace
 ) {
 	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	s64 index_found = 0;
 	s64 index_start = 0;
@@ -665,6 +701,7 @@ String_Insert(
 	u64 index_start
 ) {
 	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	s64 length = 0;
 
@@ -707,6 +744,7 @@ String_Cut(
 	String s_end
 ) {
 	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	s64 start = 0, end = 0;
 
@@ -786,20 +824,18 @@ String_GetCodepoint(
 
 instant u64
 String_CalcWordCount(
-	String *s_data
+	String s_data
 ) {
-	Assert(s_data);
-
 	u64 count_words = 0;
 
-	FOR(s_data->length, it) {
-		char value = s_data->value[it];
+	FOR(s_data.length, it) {
+		char value = s_data.value[it];
 
 		if ((value == ' ') OR (value == '\n'))
 			++count_words;
 	}
 
-	if (s_data->length AND !count_words)
+	if (s_data.length AND !count_words)
 		++count_words;
 
 	return count_words;
@@ -815,6 +851,7 @@ String_AppendCircle(
 	bool reset_full_buffer
 ) {
 	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
 
 	if (!s_data.value)		return false;
 	if (!s_data.length)    return false;

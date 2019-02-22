@@ -14,9 +14,8 @@ Array_Destroy(
 
 	if (!array_out->by_reference) {
 		while(array_out->count) {
-			///@Idea: might be faster to remove from
-			///       the end to avoid reordering
-			String s_data_it = Array_Remove(array_out, 0);
+			String s_data_it = Array_Remove(array_out,
+											array_out->count - 1);
 			String_Destroy(&s_data_it);
 		}
 	}
@@ -53,14 +52,15 @@ Array_SplitRefBuffer(
 	Array<String> *as_buffer_out,
 	String *s_data,
 	String  s_delimiter,
-	DELIMITER_TYPE type
+	DELIMITER_TYPE type,
+	bool add_empty_entry
 ) {
 	Assert(s_data);
 
 	Array_Clear(as_buffer_out);
 	as_buffer_out->by_reference = true;
 
-	String s_data_it = *s_data;
+	String s_data_it = S(*s_data);
 
 	s64 index_found;
 
@@ -80,18 +80,22 @@ Array_SplitRefBuffer(
 			is_running = false;
 		}
 
-		String *s_element;
-		Array_AddEmpty(as_buffer_out, &s_element);
+		if (index_found OR add_empty_entry) {
+			String *s_element;
+			Array_AddEmpty(as_buffer_out, &s_element);
 
-		if (type == DELIMITER_ADD_BACK OR index_found == 0)
-			s_element->length += s_delimiter.length;
+			if (type == DELIMITER_ADD_BACK OR index_found == 0)
+				s_element->length += s_delimiter.length;
 
-		s_element->value   = s_data_it.value;
-		s_element->length += index_found;
+			s_element->value   = s_data_it.value;
+			s_element->length += index_found;
+			s_element->changed = true;
+			s_element->is_reference = true;
 
-		if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count > 1) {
-			s_element->value  -= s_delimiter.length;
-			s_element->length += s_delimiter.length;
+			if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count > 1) {
+				s_element->value  -= s_delimiter.length;
+				s_element->length += s_delimiter.length;
+			}
 		}
 
 		s_data_it.value  += index_found + s_delimiter.length;
@@ -103,12 +107,12 @@ instant Array<String>
 Array_SplitRef(
 	String *s_data,
 	String  s_delimiter,
-	DELIMITER_TYPE type = DELIMITER_IGNORE
-
+	DELIMITER_TYPE type,
+	bool add_empty_entry
 ) {
 	Array<String> as_result;
 
-	Array_SplitRefBuffer(&as_result, s_data, s_delimiter, type);
+	Array_SplitRefBuffer(&as_result, s_data, s_delimiter, type, add_empty_entry);
 
 	return as_result;
 }
@@ -119,15 +123,15 @@ Array_SplitBuffer(
 	Array<String> *as_buffer_out,
 	String *s_data,
 	String  s_delimiter,
-	DELIMITER_TYPE type = DELIMITER_IGNORE
-
+	DELIMITER_TYPE type,
+	bool add_empty_entry
 ) {
 	Assert(s_data);
 	Assert(as_buffer_out);
 
 	Array_Clear(as_buffer_out);
 
-	String s_data_it = *s_data;
+	String s_data_it = S(*s_data);
 
 	s64 pos_found;
 	while(String_Find(&s_data_it, s_delimiter, &pos_found)) {
@@ -146,7 +150,8 @@ Array_SplitBuffer(
 
 			Array_Add(as_buffer_out, s_element);
 		}
-		else {
+		else
+		if (add_empty_entry) {
 			/// in case of f.e: "\n\n\n" with "\n" as delimiter
 			String *s_element;
 			Array_AddEmpty(as_buffer_out, &s_element);
@@ -175,11 +180,12 @@ instant Array<String>
 Array_Split(
 	String *s_data,
 	String  s_delimiter,
-	DELIMITER_TYPE type = DELIMITER_IGNORE
+	DELIMITER_TYPE type,
+	bool add_empty_entry
 ) {
 	Array<String> as_result;
 
-	Array_SplitBuffer(&as_result, s_data, s_delimiter, type);
+	Array_SplitBuffer(&as_result, s_data, s_delimiter, type, add_empty_entry);
 
 	return as_result;
 }
@@ -200,7 +206,7 @@ Array_SplitWordsBuffer(
 	}
 	else {
 		as_words_out->by_reference = true;
-		Array_Reserve(as_words_out, String_CalcWordCount(s_data));
+		Array_Reserve(as_words_out, String_CalcWordCount(*s_data));
 	}
 
 	if (!s_data->length)
@@ -308,7 +314,7 @@ String_GetDelimiterSection(
 	static Array<String> as_section;
 
 	Array_Clear(&as_section);
-	as_section = Array_Split(s_data, s_delimiter);
+	as_section = Array_Split(s_data, s_delimiter, DELIMITER_IGNORE, true);
 
 	FOR_ARRAY(as_section, it) {
 		if (it == index) {

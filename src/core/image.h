@@ -25,7 +25,7 @@ Image_LoadBMP32(
 
 	File_Close(&file);
 
-    String s_data_it = s_data;
+    String s_data_it = S(s_data);
 
     if (String_StartWith(&s_data_it, S("BM"))) {
 		BITMAPFILEHEADER *bmp_header = (BITMAPFILEHEADER *)s_data_it.value;
@@ -41,7 +41,7 @@ Image_LoadBMP32(
 
 		result.flip_h = (bmp_info->biHeight > 0);
 
-		s_data_it = s_data;
+		s_data_it = S(s_data);
 		s_data_it.value  += bmp_header->bfOffBits;
 		s_data_it.length -= bmp_header->bfOffBits;
 

@@ -472,9 +472,6 @@ Text_CalcLineCount(
 	u64 index_line = 0;
 	bool line_start = true;
 
-	/// words will be in sequential order in memory!
-	String *ts_data_it = &ARRAY_IT(*as_words, 0);
-
 	if (as_words->count)
 		++count_lines;
 
@@ -561,11 +558,11 @@ Text_BuildLines(
 
 		/// words will be in sequential order in memory!
 		u64 index_data = 0;
-		String *ts_data_it = &ARRAY_IT(*as_words, 0);
+		String *ts_data = &ARRAY_IT(*as_words, 0);
 
 		if (as_words->count) {
 			Array_AddEmpty(a_text_line_out, &text_line);
-			text_line->s_data.value = &ts_data_it->value[index_data];
+			text_line->s_data.value = &ts_data->value[index_data];
 
 			current_height += line_height;
 		}
@@ -579,7 +576,7 @@ Text_BuildLines(
 
 			if (String_EndWith(ts_word, S("\n"))) {
 				Array_AddEmpty(a_text_line_out, &text_line);
-				text_line->s_data.value = &ts_data_it->value[index_data];
+				text_line->s_data.value = &ts_data->value[index_data];
 
 				/// height for the next (empty) line
 				current_height += line_height;
@@ -613,12 +610,12 @@ Text_BuildLines(
 		Text_Line *text_line = 0;
 
 		/// words will be in sequential order in memory!
-		String *ts_data_it = &ARRAY_IT(*as_words, 0);
+		String *ts_data = &ARRAY_IT(*as_words, 0);
 
 		if (as_words->count) {
 			Array_AddEmpty(a_text_line_out, &text_line);
 			current_height += line_height;
-			text_line->s_data.value = ts_data_it->value;
+			text_line->s_data.value = ts_data->value;
 		}
 
 		u64 index_data = 0;
@@ -644,7 +641,7 @@ Text_BuildLines(
 				current_height += line_height;
 				line_start = true;
 
-				text_line->s_data.value = &ts_data_it->value[index_data];
+				text_line->s_data.value = &ts_data->value[index_data];
 
 				rect_line_current.x  = rect.x;
 				rect_line_current.y += line_height;
@@ -658,7 +655,7 @@ Text_BuildLines(
 				Array_AddEmpty(a_text_line_out, &text_line);
 				line_start = true;
 
-				text_line->s_data.value = &ts_data_it->value[index_data];
+				text_line->s_data.value = &ts_data->value[index_data];
 
 				rect_line_current.x  = rect.x;
 				rect_line_current.y += line_height;

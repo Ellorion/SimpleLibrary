@@ -446,15 +446,15 @@ Window_SetSize(
 
 instant void
 Window_SetTitle(
-	Window *window_out,
+	Window *window_io,
 	const char *title
 ) {
-	Assert(window_out);
+	Assert(window_io);
 	Assert(title);
 
-	window_out->title = title;
+	window_io->title = title;
 
-	SetWindowText(window_out->hWnd, window_out->title);
+	SetWindowText(window_io->hWnd, window_io->title);
 }
 
 instant bool

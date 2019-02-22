@@ -1,33 +1,48 @@
 #include "src/SLib.h"
 #include "test/core.h"
 
-struct Config_Default {
+const char *app_title = "File-Navigator";
+
+struct Config_Basic {
 	String s_path;
 	String s_font;
 	u32 font_size;
 };
 
+struct Config_Window {
+	bool is_zooming;
+};
+
+struct Config {
+	Config_Basic   basic;
+    Config_Window  window;
+};
+
 instant void
 Config_Save(
 	String s_filename,
-	Config_Default cfg_default
+	Config config
 ) {
 	String s_config;
 
 	String_Append(&s_config, S(R"(
-/:default
+/:basic
 path_latest	"{path_latest}"
 font-file	"{font-file}"
 font-size	{font-size}
+
+/:window
+is_zooming	{is_zooming}
 	)"));
 
-
 	char c_font_size[20];
-	itoa(cfg_default.font_size, c_font_size, 10);
+	itoa(config.basic.font_size, c_font_size, 10);
 
-	String_Replace(&s_config, S("{path_latest}"), cfg_default.s_path);
-	String_Replace(&s_config, S("{font-file}"), cfg_default.s_font);
-	String_Replace(&s_config, S("{font-size}"), S(c_font_size));
+	String_Replace(&s_config, S("{path_latest}"), config.basic.s_path);
+	String_Replace(&s_config, S("{font-file}")  , config.basic.s_font);
+	String_Replace(&s_config, S("{font-size}")  , S(c_font_size));
+
+	String_Replace(&s_config, S("{is_zooming}"), config.window.is_zooming ? S("true") : S("false"));
 
 	String_TrimLeft(&s_config);
 	String_TrimRight(&s_config);
@@ -40,15 +55,39 @@ font-size	{font-size}
 }
 
 instant void
+Window_SetTitle(
+	Window *window,
+	String s_title
+) {
+	Assert(window);
+
+	String s_buffer;
+	String_Append(&s_buffer, S(app_title));
+
+	if (s_title.length) {
+		String_Append(&s_buffer, S(" :: "));
+		String_Append(&s_buffer, s_title);
+	}
+
+	String_Append(&s_buffer, S("\0", 1));
+
+	Window_SetTitle(window, s_buffer.value);
+
+	String_Destroy(&s_buffer);
+}
+
+instant void
 Window_HandleEvents(Window *window) {
 	MSG msg;
 	bool running = true;
 
-	Config_Default cfg_default;
+	Config config;
 
-	cfg_default.s_path    = String_Copy("C:\\");
-	cfg_default.s_font    = String_Copy("default.ttf");
-	cfg_default.font_size = 18;
+	config.basic.s_path    = String_Copy("");
+	config.basic.s_font    = String_Copy("default.ttf");
+	config.basic.font_size = 18;
+
+	config.window.is_zooming = true;
 
     String s_config_section_id 	= S("/:");
     String s_config_file 		= S("default.cfg");
@@ -57,7 +96,7 @@ Window_HandleEvents(Window *window) {
 	String s_data;
 
     if (String_IsEmpty(&s_config)) {
-		Config_Save(s_config_file, cfg_default);
+		Config_Save(s_config_file, config);
 	}
 	else {
 		String s_data;
@@ -69,9 +108,9 @@ Window_HandleEvents(Window *window) {
 			if (!Parser_GetSectionName(&parser_config, &s_data, s_config_section_id))
 				continue;
 
-			if (s_data == "default") {
+			if (s_data == "basic") {
 				while (Parser_IsRunning(&parser_config)) {
-					/// do not skip section data for parsing in outer loop
+					/// do not skip section data -> parsing in outer loop
 					if (Parser_IsSection(&parser_config, s_config_section_id))
 						break;
 
@@ -81,8 +120,8 @@ Window_HandleEvents(Window *window) {
 						Parser_GetString(&parser_config, &s_data);
 
 						if (File_Exists(s_data)) {
-							String_Clear(&cfg_default.s_font);
-							String_Append(&cfg_default.s_font, s_data);
+							String_Clear(&config.basic.s_font);
+							String_Append(&config.basic.s_font, s_data);
 						}
 					}
 					else
@@ -90,17 +129,34 @@ Window_HandleEvents(Window *window) {
 						Parser_GetNumber(&parser_config, &s_data);
 
 						if (!Parser_HasError(&parser_config)) {
-							cfg_default.font_size = ToInt(&s_data);
+							config.basic.font_size = ToInt(&s_data);
 						}
 					}
 					else
 					if (s_data == "path_latest") {
 						Parser_GetString(&parser_config, &s_data);
 
-						if (File_IsDirectory(s_data)) {
-							String_Clear(&cfg_default.s_path);
-							String_Append(&cfg_default.s_path, s_data);
+						/// is directory or list drives if empty
+						if (   File_IsDirectory(s_data)
+							OR !s_data.length
+						) {
+							String_Clear(&config.basic.s_path);
+							String_Append(&config.basic.s_path, s_data);
 						}
+					}
+				}
+			}
+			else
+			if (s_data == "window") {
+				while (Parser_IsRunning(&parser_config)) {
+					/// do not skip section data -> parsing in outer loop
+					if (Parser_IsSection(&parser_config, s_config_section_id))
+						break;
+
+					Parser_GetString(&parser_config, &s_data);
+
+					if (s_data == "is_zooming") {
+						Parser_GetBoolean(&parser_config, &config.window.is_zooming);
 					}
 				}
 			}
@@ -108,7 +164,7 @@ Window_HandleEvents(Window *window) {
 	}
 
 	ShaderSet 	 shader_set = ShaderSet_Create(window);
-	Font 		 font 		= Font_Load(cfg_default.s_font,cfg_default.font_size);
+	Font 		 font 		= Font_Load(config.basic.s_font,config.basic.font_size);
 	Keyboard	*keyboard	= window->keyboard;
 
 	Widget wg_listbox = Widget_CreateListBox(window, &font, {});
@@ -126,7 +182,11 @@ Window_HandleEvents(Window *window) {
 	/// assumes that the at least the default path exists,
 	/// or there will be no list entries
 	Array<Directory_Entry> a_listing;
-	Widget_LoadDirectoryList(&wg_listbox, cfg_default.s_path, &a_listing);
+	Widget_LoadDirectoryList(&wg_listbox, config.basic.s_path, &a_listing);
+
+	Window_SetTitle(window, config.basic.s_path);
+
+	bool is_zooming = config.window.is_zooming;
 
 	while(running) {
 		msg = {};
@@ -135,12 +195,10 @@ Window_HandleEvents(Window *window) {
 		/// ===================================================================
 		Window_ReadMessage(msg, running, window);
 
-#if 0	/// resize window to observe changes
-		OpenGL_AdjustScaleViewport(window, false);
-		Layout_Rearrange(&layout, window);
-#else
-		OpenGL_AdjustScaleViewport(window, true);
-#endif // 0
+		OpenGL_AdjustScaleViewport(window, is_zooming);
+
+		if (!is_zooming)
+			Layout_Rearrange(&layout, window);
 
 		Widget_Update(&a_widgets, keyboard);
 
@@ -149,8 +207,10 @@ Window_HandleEvents(Window *window) {
 		}
 		else
 		if (keyboard->up[VK_BACK]) {
-			File_ChangePath(&cfg_default.s_path, S(".."));
-			Widget_LoadDirectoryList(&wg_listbox, cfg_default.s_path, &a_listing, false);
+			File_ChangePath(&config.basic.s_path, S(".."));
+			Widget_LoadDirectoryList(&wg_listbox, config.basic.s_path, &a_listing, false);
+
+			Window_SetTitle(window, config.basic.s_path);
 		}
 
 		if (wg_listbox.events.on_list_change_final) {
@@ -158,17 +218,25 @@ Window_HandleEvents(Window *window) {
 
 			Directory_Entry *t_entry = &ARRAY_IT(a_listing, index);
 
-			if (t_entry->type == DIR_ENTRY_DIR) {
-				File_ChangePath(&cfg_default.s_path, t_entry->s_name);
-				Widget_LoadDirectoryList(&wg_listbox, cfg_default.s_path, &a_listing, false);
-			}
-			else
-			if (t_entry->type == DIR_ENTRY_FILE) {
-				u64 length_path = cfg_default.s_path.length;
+			switch (t_entry->type) {
+				case DIR_ENTRY_DIR:
+				case DIR_ENTRY_DRIVE: {
+					File_ChangePath(&config.basic.s_path, t_entry->s_name);
+					Widget_LoadDirectoryList(&wg_listbox, config.basic.s_path, &a_listing, false);
 
-				File_ChangePath(&cfg_default.s_path, t_entry->s_name);
-				File_Execute(cfg_default.s_path);
-				String_Cut(&cfg_default.s_path, length_path);
+					Window_SetTitle(window, config.basic.s_path);
+				} break;
+
+				case DIR_ENTRY_FILE: {
+					u64 length_path = config.basic.s_path.length;
+
+					File_ChangePath(&config.basic.s_path, t_entry->s_name);
+					File_Execute(config.basic.s_path);
+					String_Cut(&config.basic.s_path, length_path);
+				} break;
+
+				default:
+					AssertMessage(false, "Unhandled directory type.");
 			}
 		}
 
@@ -181,7 +249,7 @@ Window_HandleEvents(Window *window) {
 		Window_UpdateAndResetInput(window);
 	}
 
-	Config_Save(s_config_file, cfg_default);
+	Config_Save(s_config_file, config);
 }
 
 int main() {
@@ -192,7 +260,7 @@ int main() {
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window_Create(&window, "Simple File-Navigator", 800, 480, 32, &keyboard, &mouse);
+	Window_Create(&window, app_title, 800, 480, 32, &keyboard, &mouse);
 	Window_Show(&window);
 
 	OpenGL_Init(&window);
