@@ -182,7 +182,6 @@ instant void
 Parser_GetString(
 	Parser *parser_io,
 	String *s_data_out,
-	u64 start_index = 0,
 	PARSER_MODE_TYPE type = PARSER_MODE_SEEK
 ) {
 	Assert(parser_io);
@@ -223,7 +222,7 @@ Parser_GetString(
 		return;
 	}
 
-	s_data_out->value   = parser_io->s_data.value + start_index;
+	s_data_out->value   = parser_io->s_data.value;
 	s_data_out->length  = 0;
 	s_data_out->changed = true;
 	s_data_out->is_reference = true;
@@ -246,7 +245,7 @@ Parser_GetString(
 	}
 
 	if (type == PARSER_MODE_PEEK)
-		Parser_AddOffset(parser_io, -(s_data_out->length + start_index));
+		Parser_AddOffset(parser_io, -s_data_out->length);
 	else
 	if (type == PARSER_MODE_SEEK)
 		Parser_SkipUntilToken(parser_io);
@@ -380,7 +379,7 @@ Parser_IsSection(
 	Assert(s_section_id.length);
 
 	String s_data;
-	Parser_GetString(parser_io, &s_data, 0, PARSER_MODE_PEEK);
+	Parser_GetString(parser_io, &s_data, PARSER_MODE_PEEK);
 
 	return String_StartWith(&s_data, s_section_id);
 }

@@ -59,7 +59,7 @@ Test_Parser(
 		switch (id_section) {
 			case 0: {	/// /:default
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetString(&parser, &s_data, 0, PARSER_MODE_PEEK);
+					Parser_GetString(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
 					if (String_StartWith(&s_data, S(c_section_ident)))
@@ -96,7 +96,7 @@ Test_Parser(
 
 			case 1: {	/// /:save
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetString(&parser, &s_data, 0, PARSER_MODE_PEEK);
+					Parser_GetString(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
 					if (String_StartWith(&s_data, S(c_section_ident)))
@@ -125,7 +125,7 @@ Test_Parser(
 
 			case 2: {	/// /:music
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetString(&parser, &s_data, 0, PARSER_MODE_PEEK);
+					Parser_GetString(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
 					if (String_StartWith(&s_data, S(c_section_ident)))
