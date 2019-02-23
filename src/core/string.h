@@ -379,6 +379,13 @@ String_Copy(
 	return s_result;
 }
 
+instant String
+String_Copy(
+	String s_data
+) {
+	return String_Copy(s_data.value, s_data.length);
+}
+
 instant char *
 String_CreateCBufferCopy(
 	String s_source

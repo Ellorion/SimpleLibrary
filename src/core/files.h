@@ -331,8 +331,30 @@ operator < (
 	Directory_Entry &entry_1,
 	Directory_Entry &entry_2
 ) {
-	if(entry_1.type == entry_2.type)
-		return entry_1.s_name < entry_2.s_name;
+	if(entry_1.type == entry_2.type) {
+		static String s_entry_1_lower;
+		static String s_entry_2_lower;
+
+		String_Clear(&s_entry_1_lower);
+		String_Clear(&s_entry_2_lower);
+
+		String_Append(&s_entry_1_lower, entry_1.s_name);
+		String_Append(&s_entry_2_lower, entry_2.s_name);
+
+		if (s_entry_1_lower == "..") return false;
+		if (s_entry_2_lower == "..") return false;
+
+		long index_1 = String_IndexOfRev(&s_entry_1_lower, S("."));
+		long index_2 = String_IndexOfRev(&s_entry_2_lower, S("."));
+
+		String_Cut(&s_entry_1_lower, index_1);
+		String_Cut(&s_entry_2_lower, index_2);
+
+		String_ToLower(&s_entry_1_lower);
+		String_ToLower(&s_entry_2_lower);
+
+		return (s_entry_1_lower < s_entry_2_lower);
+	}
 
 	return (entry_1.type < entry_2.type);
 }
@@ -342,8 +364,30 @@ operator > (
 	Directory_Entry &entry_1,
 	Directory_Entry &entry_2
 ) {
-	if(entry_1.type == entry_2.type)
-		return entry_1.s_name > entry_2.s_name;
+	if(entry_1.type == entry_2.type) {
+		static String s_entry_1_lower;
+		static String s_entry_2_lower;
+
+		String_Clear(&s_entry_1_lower);
+		String_Clear(&s_entry_2_lower);
+
+		String_Append(&s_entry_1_lower, entry_1.s_name);
+		String_Append(&s_entry_2_lower, entry_2.s_name);
+
+		if (s_entry_1_lower == "..") return false;
+		if (s_entry_2_lower == "..") return false;
+
+		long index_1 = String_IndexOfRev(&s_entry_1_lower, S("."));
+		long index_2 = String_IndexOfRev(&s_entry_2_lower, S("."));
+
+		String_Cut(&s_entry_1_lower, index_1);
+		String_Cut(&s_entry_2_lower, index_2);
+
+		String_ToLower(&s_entry_1_lower);
+		String_ToLower(&s_entry_2_lower);
+
+		return (s_entry_1_lower > s_entry_2_lower);
+	}
 
 	return (entry_1.type > entry_2.type);
 }
@@ -446,15 +490,19 @@ File_ReadDirectory(
 		FindClose(id_directory);
 	}
 	else {
-		/// mouse support for going to parent directory
-		/// when navigating to connected non-inserted drives
-		/// like CD/DVD drives
-		Directory_Entry dir_entry;
-		String_Append(&dir_entry.s_name, S(".."));
+		if (   type == DIR_LIST_ALL
+			OR type == DIR_LIST_ONLY_DIR
+		) {
+			/// mouse support for going to parent directory
+			/// when navigating to connected non-inserted drives
+			/// like CD/DVD drives
+			Directory_Entry dir_entry;
+			String_Append(&dir_entry.s_name, S(".."));
 
-		dir_entry.type = DIR_ENTRY_DIR;
+			dir_entry.type = DIR_ENTRY_DIR;
 
-		Array_Add(a_entries_io, dir_entry);
+			Array_Add(a_entries_io, dir_entry);
+		}
 	}
 
 	String_Destroy(&s_search_path);
