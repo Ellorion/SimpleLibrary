@@ -82,10 +82,9 @@ File_CreateDirectory(
 		String_Append(&s_path_relative, S("./"));
 
 	String_Append(&s_path_relative, s_directory);
+	String_Append(&s_path_relative, S("\0", 1));
 
-	char *c_path_relative = String_CreateCBufferCopy(s_path_relative);
-
-	bool success = (CreateDirectory(c_path_relative, 0) != 0);
+	bool success = (CreateDirectory(s_path_relative.value, 0) != 0);
 
 	if (!success) {
 		/// you wanted it, you got it -> success
@@ -93,7 +92,6 @@ File_CreateDirectory(
 			success = true;
 	}
 
-	Memory_Free(c_path_relative);
 	String_Destroy(&s_path_relative);
 
 	return success;
@@ -390,12 +388,11 @@ File_ReadDirectory(
 	String s_search_path;
 	String_Append(&s_search_path, s_path);
 	String_Append(&s_search_path, S("/*"));
+	String_Append(&s_search_path, S("\0", 1));
 
 	String s_extension_filter = S(extension_filter);
 
-	char *c_search_path = String_CreateCBufferCopy(s_search_path);
-
-	if ((id_directory = FindFirstFile(c_search_path, &file_data)) != INVALID_HANDLE_VALUE) {
+	if ((id_directory = FindFirstFile(s_search_path.value, &file_data)) != INVALID_HANDLE_VALUE) {
 		do {
 			const bool is_directory = (file_data.dwFileAttributes &
 									   FILE_ATTRIBUTE_DIRECTORY)  != 0;
@@ -460,7 +457,6 @@ File_ReadDirectory(
 		Array_Add(a_entries_io, dir_entry);
 	}
 
-	Memory_Free(c_search_path);
 	String_Destroy(&s_search_path);
 }
 
@@ -476,19 +472,15 @@ File_Rename(
 	String_Append(&s_file_old, s_path);
 	String_Append(&s_file_old, S("/"));
 	String_Append(&s_file_old, s_filename_old);
+	String_Append(&s_file_old, S("\0", 1));
 
 	String s_file_new;
 	String_Append(&s_file_new, s_path);
 	String_Append(&s_file_new, S("/"), 1);
 	String_Append(&s_file_new, s_filename_new);
+	String_Append(&s_file_new, S("\0", 1));
 
-	char *tc_file_old = String_CreateCBufferCopy(s_file_old);
-	char *tc_file_new = String_CreateCBufferCopy(s_file_new);
-
-	MoveFile(tc_file_old, tc_file_new);
-
-	Memory_Free(tc_file_old);
-	Memory_Free(tc_file_new);
+	MoveFile(s_file_old.value, s_file_new.value);
 
 	String_Destroy(&s_file_old);
 	String_Destroy(&s_file_new);

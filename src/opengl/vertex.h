@@ -192,12 +192,11 @@ Vertex_Load(
 			String s_error;
 			String_Append(&s_error, S("[Vertex] Shader and attributes mismatch.\n    Missing: "));
 			String_Append(&s_error, S(entry->name));
+			String_Append(&s_error, S("\0", 1));
 
-			char *c_error_msg = String_CreateCBufferCopy(s_error);
+			AssertMessage(false, s_error.value);
 
-			AssertMessage(false, c_error_msg);
-
-			Memory_Free(c_error_msg);
+			String_Destroy(&s_error);
 
 			continue;
 		}

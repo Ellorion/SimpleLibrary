@@ -331,6 +331,7 @@ ToInt(
 	char *c_data = String_CreateCBufferCopy(*s_data);
 	s32 result = atoi(c_data);
 	Memory_Free(c_data);
+
 	return result;
 }
 
