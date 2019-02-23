@@ -1525,7 +1525,7 @@ Widget_LoadDirectoryList(
 	Widget *widget_io,
 	String  s_directory,
 	Array<Directory_Entry> *a_entries_out,
-	bool show_full_path = false
+	bool show_full_path
 ) {
 	Assert(widget_io);
 	Assert(widget_io->type == WIDGET_LISTBOX);
@@ -1551,11 +1551,9 @@ Widget_LoadDirectoryList(
 						 ts_directory_buffer.length);
 	}
 
-	/// will still include path into dir array, even if it is not rendering,
-	/// so the path does not have to concatonate the find the targeted file,
-	/// which is more practical, than simply knowing the filename
 	if (ts_directory_buffer.length) {
-		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ALL, show_full_path);
+		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_DIR  , show_full_path);
+		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_FILES, show_full_path);
 
 		Array_Sort_Ascending(a_entries_out);
 	}

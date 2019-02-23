@@ -95,69 +95,62 @@ Window_HandleEvents(Window *window) {
 
 	String s_data;
 
-    if (String_IsEmpty(&s_config)) {
-		Config_Save(s_config_file, config);
-	}
-	else {
-		String s_data;
+	Parser parser_config = Parser_Load(s_config);
 
-		Parser parser_config = Parser_Load(s_config);
+	while (Parser_IsRunning(&parser_config)) {
+		/// skip non-section identifier
+		if (!Parser_GetSectionName(&parser_config, &s_data, s_config_section_id))
+			continue;
 
-		while (Parser_IsRunning(&parser_config)) {
-			/// skip non-section identifier
-			if (!Parser_GetSectionName(&parser_config, &s_data, s_config_section_id))
-				continue;
+		if (s_data == "basic") {
+			while (Parser_IsRunning(&parser_config)) {
+				/// do not skip section data -> parsing in outer loop
+				if (Parser_IsSection(&parser_config, s_config_section_id))
+					break;
 
-			if (s_data == "basic") {
-				while (Parser_IsRunning(&parser_config)) {
-					/// do not skip section data -> parsing in outer loop
-					if (Parser_IsSection(&parser_config, s_config_section_id))
-						break;
+				Parser_GetString(&parser_config, &s_data);
 
+				if (s_data == "font-file") {
 					Parser_GetString(&parser_config, &s_data);
 
-					if (s_data == "font-file") {
-						Parser_GetString(&parser_config, &s_data);
-
-						if (File_Exists(s_data)) {
-							String_Clear(&config.basic.s_font);
-							String_Append(&config.basic.s_font, s_data);
-						}
+					if (File_Exists(s_data)) {
+						String_Clear(&config.basic.s_font);
+						String_Append(&config.basic.s_font, s_data);
 					}
-					else
-					if (s_data == "font-size") {
-						Parser_GetNumber(&parser_config, &s_data);
+				}
+				else
+				if (s_data == "font-size") {
+					Parser_GetNumber(&parser_config, &s_data);
 
-						if (!Parser_HasError(&parser_config)) {
-							config.basic.font_size = ToInt(&s_data);
-						}
+					if (!Parser_HasError(&parser_config)) {
+						config.basic.font_size = ToInt(&s_data);
 					}
-					else
-					if (s_data == "path_latest") {
-						Parser_GetString(&parser_config, &s_data);
+				}
+				else
+				if (s_data == "path_latest") {
+					Parser_GetString(&parser_config, &s_data);
 
-						/// is directory or list drives if empty
-						if (   File_IsDirectory(s_data)
-							OR !s_data.length
-						) {
-							String_Clear(&config.basic.s_path);
-							String_Append(&config.basic.s_path, s_data);
-						}
+					/// is directory or list drives if empty
+					if (   File_IsDirectory(s_data)
+						OR !s_data.length
+					) {
+						String_Clear(&config.basic.s_path);
+						String_Append(&config.basic.s_path, s_data);
 					}
 				}
 			}
-			else
-			if (s_data == "window") {
-				while (Parser_IsRunning(&parser_config)) {
-					/// do not skip section data -> parsing in outer loop
-					if (Parser_IsSection(&parser_config, s_config_section_id))
-						break;
+		}
+		else
+		if (s_data == "window") {
+			while (Parser_IsRunning(&parser_config)) {
+				/// do not skip section data -> parsing in outer loop
+				if (Parser_IsSection(&parser_config, s_config_section_id))
+					break;
 
-					Parser_GetString(&parser_config, &s_data);
+				Parser_GetString(&parser_config, &s_data);
 
-					if (s_data == "is_zooming") {
-						Parser_GetBoolean(&parser_config, &config.window.is_zooming);
-					}
+				if (s_data == "is_zooming") {
+					Parser_GetBoolean(&parser_config, &config.window.is_zooming);
 				}
 			}
 		}
@@ -182,7 +175,7 @@ Window_HandleEvents(Window *window) {
 	/// assumes that the at least the default path exists,
 	/// or there will be no list entries
 	Array<Directory_Entry> a_listing;
-	Widget_LoadDirectoryList(&wg_listbox, config.basic.s_path, &a_listing);
+	Widget_LoadDirectoryList(&wg_listbox, config.basic.s_path, &a_listing, false);
 
 	Window_SetTitle(window, config.basic.s_path);
 
