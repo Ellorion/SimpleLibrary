@@ -3,57 +3,6 @@
 
 const char *app_title = "File-Navigator";
 
-struct Config_Basic {
-	String s_path;
-	String s_font;
-	u32 font_size;
-};
-
-struct Config_Window {
-	bool is_zooming;
-};
-
-struct Config {
-	Config_Basic   basic;
-    Config_Window  window;
-};
-
-instant void
-Config_Save(
-	String s_filename,
-	Config config
-) {
-	String s_config;
-
-	String_Append(&s_config, S(R"(
-/:basic
-path_latest	"{path_latest}"
-font-file	"{font-file}"
-font-size	{font-size}
-
-/:window
-is_zooming	{is_zooming}
-	)"));
-
-	char c_font_size[20];
-	itoa(config.basic.font_size, c_font_size, 10);
-
-	String_Replace(&s_config, S("{path_latest}"), config.basic.s_path);
-	String_Replace(&s_config, S("{font-file}")  , config.basic.s_font);
-	String_Replace(&s_config, S("{font-size}")  , S(c_font_size));
-
-	String_Replace(&s_config, S("{is_zooming}"), config.window.is_zooming ? S("true") : S("false"));
-
-	String_TrimLeft(&s_config);
-	String_TrimRight(&s_config);
-
-	File file_config = File_Open(s_filename, "w");
-	File_Write(&file_config, s_config);
-	File_Close(&file_config);
-
-	String_Destroy(&s_config);
-}
-
 instant void
 Window_SetTitle(
 	Window *window,
@@ -76,22 +25,66 @@ Window_SetTitle(
 	String_Destroy(&s_buffer);
 }
 
+struct Config_Basic {
+	String s_path;
+	String s_font;
+	u32 font_size;
+};
+
+struct Config_Window {
+	bool is_zooming;
+};
+
+struct Config {
+	Config_Basic   basic;
+    Config_Window  window;
+};
+
 instant void
-Window_HandleEvents(Window *window) {
-	MSG msg;
-	bool running = true;
+Config_Save(
+	String s_filename,
+	String s_section_id,
+	Config config
+) {
+	String s_config;
 
-	Config config;
+	String_Append(&s_config, S(R"(
+{/:}basic
+path_latest	"{path_latest}"
+font-file	"{font-file}"
+font-size	{font-size}
 
-	config.basic.s_path    = String_Copy("");
-	config.basic.s_font    = String_Copy("default.ttf");
-	config.basic.font_size = 18;
+{/:}window
+is_zooming	{is_zooming}
+	)"));
 
-	config.window.is_zooming = true;
+	char c_font_size[20];
+	itoa(config.basic.font_size, c_font_size, 10);
 
-    String s_config_section_id 	= S("/:");
-    String s_config_file 		= S("default.cfg");
-	String s_config      		= File_ReadAll(s_config_file);
+	String_Replace(&s_config, S("{/:}")         , s_section_id);
+	String_Replace(&s_config, S("{path_latest}"), config.basic.s_path);
+	String_Replace(&s_config, S("{font-file}")  , config.basic.s_font);
+	String_Replace(&s_config, S("{font-size}")  , S(c_font_size));
+
+	String_Replace(&s_config, S("{is_zooming}"), config.window.is_zooming ? S("true") : S("false"));
+
+	String_TrimLeft(&s_config);
+	String_TrimRight(&s_config);
+
+	File file_config = File_Open(s_filename, "w");
+	File_Write(&file_config, s_config);
+	File_Close(&file_config);
+
+	String_Destroy(&s_config);
+}
+
+instant void
+Config_Parse(
+	Config *config,
+	String s_section_id,
+	String s_config
+) {
+	Assert(config);
 
 	String s_data;
 
@@ -99,13 +92,13 @@ Window_HandleEvents(Window *window) {
 
 	while (Parser_IsRunning(&parser_config)) {
 		/// skip non-section identifier
-		if (!Parser_GetSectionName(&parser_config, &s_data, s_config_section_id))
+		if (!Parser_GetSectionName(&parser_config, &s_data, s_section_id))
 			continue;
 
 		if (s_data == "basic") {
 			while (Parser_IsRunning(&parser_config)) {
 				/// do not skip section data -> parsing in outer loop
-				if (Parser_IsSection(&parser_config, s_config_section_id))
+				if (Parser_IsSection(&parser_config, s_section_id))
 					break;
 
 				Parser_GetString(&parser_config, &s_data);
@@ -114,8 +107,8 @@ Window_HandleEvents(Window *window) {
 					Parser_GetString(&parser_config, &s_data);
 
 					if (File_Exists(s_data)) {
-						String_Clear(&config.basic.s_font);
-						String_Append(&config.basic.s_font, s_data);
+						String_Clear(&config->basic.s_font);
+						String_Append(&config->basic.s_font, s_data);
 					}
 				}
 				else
@@ -123,7 +116,7 @@ Window_HandleEvents(Window *window) {
 					Parser_GetNumber(&parser_config, &s_data);
 
 					if (!Parser_HasError(&parser_config)) {
-						config.basic.font_size = ToInt(&s_data);
+						config->basic.font_size = ToInt(&s_data);
 					}
 				}
 				else
@@ -134,8 +127,8 @@ Window_HandleEvents(Window *window) {
 					if (   File_IsDirectory(s_data)
 						OR !s_data.length
 					) {
-						String_Clear(&config.basic.s_path);
-						String_Append(&config.basic.s_path, s_data);
+						String_Clear(&config->basic.s_path);
+						String_Append(&config->basic.s_path, s_data);
 					}
 				}
 			}
@@ -144,27 +137,49 @@ Window_HandleEvents(Window *window) {
 		if (s_data == "window") {
 			while (Parser_IsRunning(&parser_config)) {
 				/// do not skip section data -> parsing in outer loop
-				if (Parser_IsSection(&parser_config, s_config_section_id))
+				if (Parser_IsSection(&parser_config, s_section_id))
 					break;
 
 				Parser_GetString(&parser_config, &s_data);
 
 				if (s_data == "is_zooming") {
-					Parser_GetBoolean(&parser_config, &config.window.is_zooming);
+					Parser_GetBoolean(&parser_config, &config->window.is_zooming);
 				}
 			}
 		}
 	}
+}
 
+instant void
+Window_HandleEvents(Window *window) {
+	MSG msg;
+	bool running = true;
+
+	/// configuration
+	Config config;
+	config.basic.s_path      = String_Copy("");
+	config.basic.s_font      = String_Copy("default.ttf");
+	config.basic.font_size   = 18;
+	config.window.is_zooming = true;
+
+	String s_config_section_id = S("/:");
+    String s_config_file       = S("default.cfg");
+	String s_config            = File_ReadAll(s_config_file);
+
+	Config_Parse(&config, s_config_section_id, s_config);
+
+	/// basics
 	ShaderSet 	 shader_set = ShaderSet_Create(window);
-	Font 		 font 		= Font_Load(config.basic.s_font,config.basic.font_size);
+	Font 		 font 		= Font_Load(config.basic.s_font, config.basic.font_size);
 	Keyboard	*keyboard	= window->keyboard;
 
+	/// widgets
 	Widget wg_listbox = Widget_CreateListBox(window, &font, {});
 
     Array<Widget *> a_widgets;
     Array_Add(&a_widgets, &wg_listbox);
 
+    /// layout
 	Layout layout;
 	Layout_Create(&layout, {0, 0, window->width, window->height}, true);
 	Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
@@ -172,11 +187,9 @@ Window_HandleEvents(Window *window) {
 
     Layout_Arrange(&layout);
 
-	/// assumes that the at least the default path exists,
-	/// or there will be no list entries
+    /// load list on startup
 	Array<Directory_Entry> a_listing;
 	Widget_LoadDirectoryList(&wg_listbox, config.basic.s_path, &a_listing, false);
-
 	Window_SetTitle(window, config.basic.s_path);
 
 	bool is_zooming = config.window.is_zooming;
@@ -184,15 +197,16 @@ Window_HandleEvents(Window *window) {
 	while(running) {
 		msg = {};
 
-		/// Events
-		/// ===================================================================
+		/// events
 		Window_ReadMessage(msg, running, window);
 
+		/// scaling behavior
 		OpenGL_AdjustScaleViewport(window, is_zooming);
 
 		if (!is_zooming)
 			Layout_Rearrange(&layout, window);
 
+		/// update
 		Widget_Update(&a_widgets, keyboard);
 
 		if(keyboard->up[VK_ESCAPE]) {
@@ -233,8 +247,7 @@ Window_HandleEvents(Window *window) {
 			}
 		}
 
-		/// Render
-		/// ===================================================================
+		/// render
 		OpenGL_ClearScreen();
 
 		Widget_Render(&shader_set, &a_widgets);
@@ -242,12 +255,11 @@ Window_HandleEvents(Window *window) {
 		Window_UpdateAndResetInput(window);
 	}
 
-	Config_Save(s_config_file, config);
+	/// save changes on exit
+	Config_Save(s_config_file, s_config_section_id, config);
 }
 
 int main() {
-	Test_Run();
-
 	Window window;
 
 	Keyboard keyboard;
