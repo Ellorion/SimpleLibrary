@@ -22,7 +22,6 @@
 main.cpp
 
 # Others
-*.txt
 *.dat
 *.ttf
 *.ini
