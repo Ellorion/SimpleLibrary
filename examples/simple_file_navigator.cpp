@@ -11,13 +11,15 @@ Window_SetTitle(
 	Assert(window);
 
 	String s_buffer;
-	String_Append(&s_buffer, S(app_title));
 
 	if (s_title.length) {
-		String_Append(&s_buffer, S(" :: "));
+		String_Append(&s_buffer, S("["));
 		String_Append(&s_buffer, s_title);
+		String_Append(&s_buffer, S("]"));
+		String_Append(&s_buffer, S(" :: "));
 	}
 
+	String_Append(&s_buffer, S(app_title));
 	String_Append(&s_buffer, S("\0", 1));
 
 	Window_SetTitle(window, s_buffer.value);
@@ -173,6 +175,11 @@ Window_HandleEvents(Window *window) {
 	Font 		 font 		= Font_Load(config.basic.s_font, config.basic.font_size);
 	Keyboard	*keyboard	= window->keyboard;
 
+	if (Font_HasError(&font)) {
+		MessageBox(window->hWnd, font.s_error.value, 0, MB_OK);
+		return;
+	}
+
 	/// widgets
 	Widget wg_listbox = Widget_CreateListBox(window, &font, {});
 
@@ -193,6 +200,8 @@ Window_HandleEvents(Window *window) {
 	Window_SetTitle(window, config.basic.s_path);
 
 	bool is_zooming = config.window.is_zooming;
+
+	Timer tmrRunning;
 
 	while(running) {
 		msg = {};

@@ -239,7 +239,7 @@ File_ReadAll(
 		file = File_Open(s_filename, "r");
 
 	if (!file.fp)
-		LOG_WARNING("File \"" << c_filename << "\" does not exists.");
+		LOG_WARNING("File \"" << s_filename.value << "\" does not exists.");
 
 	String s_data = File_Read(&file);
 

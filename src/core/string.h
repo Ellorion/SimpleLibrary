@@ -169,6 +169,7 @@ String_Append(
 
 	String_Resize(s_dest_io, length_append);
 	Memory_Copy(s_dest_io->value + s_dest_io->length, s_source.value, length_append);
+
 	s_dest_io->length += length_append;
 
 	s_dest_io->changed = true;

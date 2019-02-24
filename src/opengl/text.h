@@ -16,6 +16,7 @@ struct Codepoint {
 struct Font {
 	stbtt_fontinfo info = {};
 	String s_data;
+	String s_error;
 	s32 size = 0;
 	s32 ascent = 0;
 	s32 descent = 0;
@@ -37,6 +38,15 @@ operator == (
 	return false;
 }
 
+instant bool
+Font_HasError(
+	Font *font
+) {
+	Assert(font);
+
+	return (font->s_error.length > 0);
+}
+
 instant Font
 Font_Load(
 	String s_file,
@@ -46,23 +56,33 @@ Font_Load(
     String s_font_data = File_ReadAll(s_file, true);
 
     if (!s_font_data.length) {
-		char *c_filename = String_CreateCBufferCopy(s_file);
-
-		LOG_ERROR("Font \"" << c_filename << "\" does not exists.");
+		String_Append(&font.s_error, S("Font \""));
+		String_Append(&font.s_error, s_file);
+		String_Append(&font.s_error, S("\" does not exist."));
+		String_Append(&font.s_error, S("\0", 1));
     }
     else {
-		font.s_data = s_font_data;
-		font.size = size;
+		if (stbtt_GetNumberOfFonts((u8 *)s_font_data.value) == 0) {
+			String_Append(&font.s_error, S("Font \""));
+			String_Append(&font.s_error, s_file);
+			String_Append(&font.s_error, S("\" is corrupted or not a valid TrueType font file."));
+			String_Append(&font.s_error, S("\0", 1));
+		}
+		else {
+			font.s_data = s_font_data;
+			font.size = size;
 
-		const u8 *c_data = (u8 *)font.s_data.value;
-		stbtt_InitFont(&font.info, c_data, stbtt_GetFontOffsetForIndex(c_data, 0));
+			const u8 *c_data = (u8 *)font.s_data.value;
 
-		font.scale = stbtt_ScaleForPixelHeight(&font.info, font.size);
+			stbtt_InitFont(&font.info, c_data, stbtt_GetFontOffsetForIndex(c_data, 0));
 
-		stbtt_GetFontVMetrics(&font.info, &font.ascent, &font.descent, &font.linegap);
-		font.ascent  *= font.scale;
-		font.descent *= font.scale;
-		font.linegap *= font.scale;
+			font.scale = stbtt_ScaleForPixelHeight(&font.info, font.size);
+
+			stbtt_GetFontVMetrics(&font.info, &font.ascent, &font.descent, &font.linegap);
+			font.ascent  *= font.scale;
+			font.descent *= font.scale;
+			font.linegap *= font.scale;
+		}
     }
 
     return font;
@@ -82,6 +102,7 @@ Font_Destroy(
 	}
 
 	String_Destroy(&font_out->s_data);
+	String_Destroy(&font_out->s_error);
 
 	*font_out = {};
 }

@@ -32,6 +32,9 @@ _Memory_Alloc_Empty(
 	u64 size
 ) {
 	void *mem = calloc(1, size + sizeof(Memory_Header));
+
+	AssertMessage(mem, "Memory could not be allocated.");
+
 	((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
 	mem = (char *)mem + sizeof(Memory_Header);
 
@@ -58,7 +61,11 @@ _Memory_Resize(
 
 	///@Info: - will NOT keep the same (virtual) memory address!!!
 	///       - does NOT init to 0 (zero)
+	///       - will also once in a blue moon return 0 when there
+	///         is still enouth memory available
 	mem = realloc(mem, size + sizeof(Memory_Header));
+
+	AssertMessage(mem, "Memory could not be reallocated.");
 
 	if (mem != mem_old)
 		LOG_WARNING("Memory resizing resulted in a new base pointer.");
