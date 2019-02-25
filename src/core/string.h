@@ -290,40 +290,63 @@ String_CreateBuffer(
 	s_buffer_out->is_reference = is_reference;
 }
 
-instant bool
-String_IsEqual(
-	const char *c_text1,
-	const char *c_text2,
-	u64 length = 0
+instant char
+String_ToLower(
+	char value
 ) {
-	bool result = true;
+	if (value >= 'A' AND value <= 'Z')
+		 return (value + 32);
 
-	/// check if both have equally nothing
-	if (!c_text1 AND !c_text2)
-		return true;
+	return value;
+}
 
-	/// in case one has more than nothing
-	if (!c_text1 OR !c_text2)
-		return false;
+/// -1 = data_1 < data_2
+///  0 = data_1 = data_2
+/// +1 = data_1 < data_2
+instant s32
+String_Compare(
+	String s_data_1,
+	String s_data_2,
+	u64 length_opt,
+	bool is_case_sensitive
+) {
+	u64 length = length_opt;
 
-	while(true) {
-		/// both have the same length
-		if (*c_text1 == 0 AND *c_text2 == 0)
-			break;
+	if (!length)
+		length = MIN(s_data_1.length, s_data_2.length);
 
-		/// check everything in between
-		/// (before the end was reached)
-		if (*c_text1++ != *c_text2++) {
-			return false;
+	FOR(length, it) {
+		char value_1;
+		char value_2;
+
+		if (is_case_sensitive) {
+			value_1 = s_data_1.value[it];
+			value_2 = s_data_2.value[it];
+		}
+		else {
+			value_1 = String_ToLower(s_data_1.value[it]);
+			value_2 = String_ToLower(s_data_2.value[it]);
 		}
 
-		/// abort checking, if
-		/// length is specified
-		if (length)
-			if (--length <= 0) break;
+		if (value_1 < value_2) return -1;
+		if (value_1 > value_2) return +1;
 	}
 
-	return result;
+	if (!length_opt) {
+		if (s_data_1.length < s_data_2.length)  return -1;
+		if (s_data_1.length > s_data_2.length)  return +1;
+	}
+
+	return 0;
+}
+
+instant bool
+String_IsEqual(
+	const char *c_first,
+	const char *c_second,
+	u64 length = 0
+) {
+	return (String_Compare(S(c_first), S(c_second), length, true) == 0);
 }
 
 instant bool
@@ -332,30 +355,7 @@ String_IsEqual(
 	String s_second,
 	u64 length = 0
 ) {
-	if (!length) {
-		if (s_first.length != s_second.length)
-			return false;
-
-		length = s_first.length;
-	}
-	else {
-		if (length > s_first.length)
-			return false;
-
-		if (length > s_second.length)
-			return false;
-	}
-
-	u64 it = 0;
-
-	while(it < length) {
-		if (s_first.value[it] != s_second.value[it])
-			return false;
-
-		++it;
-	}
-
-	return true;
+	return (String_Compare(s_first, s_second, length, true) == 0);
 }
 
 instant String
@@ -521,6 +521,9 @@ String_FindRev(
 	return true;
 }
 
+/// @Risk: might corrupt / break reallocation
+///        when the length is shorter than
+///        the already allocated buffer
 instant void
 String_Cut(
 	String *s_data_io,

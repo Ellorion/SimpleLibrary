@@ -332,65 +332,42 @@ operator < (
 	Directory_Entry &entry_2
 ) {
 	if(entry_1.type == entry_2.type) {
+		/// do not move, should always be the first entry
 		if (entry_1.s_name == "..") return false;
 		if (entry_2.s_name == "..") return false;
 
-		String s_entry_1_lower;
-		String s_entry_2_lower;
+		long index_1 = String_IndexOfRev(&entry_1.s_name, S("."));
+		long index_2 = String_IndexOfRev(&entry_2.s_name, S("."));
 
-		String_Append(&s_entry_1_lower, entry_1.s_name);
-		String_Append(&s_entry_2_lower, entry_2.s_name);
+		u64 length = 0;
 
-		long index_1 = String_IndexOfRev(&s_entry_1_lower, S("."));
-		long index_2 = String_IndexOfRev(&s_entry_2_lower, S("."));
+		if (index_1 >= 0 AND index_2 >= 0)
+			length = MIN(index_1, index_2);
 
-		String_Cut(&s_entry_1_lower, index_1);
-		String_Cut(&s_entry_2_lower, index_2);
-
-		String_ToLower(&s_entry_1_lower);
-		String_ToLower(&s_entry_2_lower);
-
-		bool is_less = (s_entry_1_lower < s_entry_2_lower);
-
-		String_Destroy(&s_entry_1_lower);
-		String_Destroy(&s_entry_2_lower);
-
-		return is_less;
+		return (String_Compare(entry_1.s_name, entry_2.s_name, length, false) < 0);
 	}
 
 	return (entry_1.type < entry_2.type);
 }
-
 bool
 operator > (
 	Directory_Entry &entry_1,
 	Directory_Entry &entry_2
 ) {
 	if(entry_1.type == entry_2.type) {
+		/// do not move, should always be the first entry
 		if (entry_1.s_name == "..") return false;
 		if (entry_2.s_name == "..") return false;
 
-		String s_entry_1_lower;
-		String s_entry_2_lower;
+		long index_1 = String_IndexOfRev(&entry_1.s_name, S("."));
+		long index_2 = String_IndexOfRev(&entry_2.s_name, S("."));
 
-		String_Append(&s_entry_1_lower, entry_1.s_name);
-		String_Append(&s_entry_2_lower, entry_2.s_name);
+		u64 length = 0;
 
-		long index_1 = String_IndexOfRev(&s_entry_1_lower, S("."));
-		long index_2 = String_IndexOfRev(&s_entry_2_lower, S("."));
+		if (index_1 >= 0 AND index_2 >= 0)
+			length = MIN(index_1, index_2);
 
-		String_Cut(&s_entry_1_lower, index_1);
-		String_Cut(&s_entry_2_lower, index_2);
-
-		String_ToLower(&s_entry_1_lower);
-		String_ToLower(&s_entry_2_lower);
-
-		bool is_not_less = (s_entry_1_lower > s_entry_2_lower);
-
-		String_Destroy(&s_entry_1_lower);
-		String_Destroy(&s_entry_2_lower);
-
-		return is_not_less;
+		return (String_Compare(entry_1.s_name, entry_2.s_name, length, false) > 0);
 	}
 
 	return (entry_1.type > entry_2.type);
