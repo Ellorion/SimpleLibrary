@@ -10,22 +10,26 @@
 
 #define Window_IsCreated(window) (window->hWnd != 0)
 
-#define Window_ReadMessage(_msg, _running, _ptr_window) 				            \
+#define Window_ReadMessage(_msg, _running, _ptr_window, _is_zooming)				\
 	while (PeekMessage(&_msg, _ptr_window->hWnd, 0, 0, PM_REMOVE)) {				\
 		if (Mouse_Update(_ptr_window->mouse, _ptr_window, &_msg))	continue;		\
 		if (Keyboard_Update(_ptr_window->keyboard, &_msg))          continue;		\
-																\
-		switch (msg.message) {									\
-			case WM_QUIT: {										\
-				_msg.wParam = 0;								\
-				_running = false;								\
-			} break;											\
-																\
-			default: {											\
-				TranslateMessage(&_msg);						\
-				DispatchMessage(&_msg);							\
-			}													\
-		}														\
+																	\
+		switch (msg.message) {										\
+			case WINDOW_CLOSE: {									\
+				msg.wParam = 0;										\
+				running = false;									\
+			} break;												\
+																	\
+			case WINDOW_RESIZE: {									\
+				OpenGL_AdjustScaleViewport(window, _is_zooming);	\
+			} break;												\
+																	\
+			default: {												\
+				TranslateMessage(&_msg);							\
+				DispatchMessage(&_msg);								\
+			}														\
+		}															\
 	}
 
 instant bool
@@ -137,6 +141,9 @@ static const char *class_name = "OpenGL";
 struct Mouse;
 struct Keyboard;
 
+#define WINDOW_CLOSE	WM_USER+0001
+#define WINDOW_RESIZE	WM_USER+0002
+
 struct Window {
 	const char  *title	 	  = 0;
 	HWND   		 hWnd         = 0;
@@ -160,7 +167,12 @@ LONG WINAPI WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		} break;
 
 		case WM_CLOSE: {
-			PostQuitMessage(0);
+			PostMessage(hWnd, WINDOW_CLOSE, wParam, lParam);
+			return 0;
+		} break;
+
+		case WM_SIZE: {
+			PostMessage(hWnd, WINDOW_RESIZE, wParam, lParam);
 			return 0;
 		} break;
 

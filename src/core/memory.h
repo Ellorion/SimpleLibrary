@@ -41,6 +41,61 @@ _Memory_Alloc_Empty(
 	return mem;
 }
 
+instant void
+Memory_Copy(
+	const void *dest_out,
+	const void *src,
+	u64 length
+) {
+	if (!dest_out OR !src OR !length)	return;
+	if (dest_out == src)				return;
+
+    char *c_dest = (char *)dest_out;
+    char *c_src  = (char *)src;
+
+    if (dest_out > src) {
+		while(length-- > 0)
+			c_dest[length] = c_src[length];
+    }
+    else {
+		FOR(length, it) {
+			c_dest[it] = c_src[it];
+		}
+    }
+}
+
+/// will set the free'd pointer to 0
+/// - extra security
+#define Memory_Free(_data) \
+	_data = _Memory_Free(_data);
+
+template <typename T>
+instant T
+_Memory_Free(
+	T data
+) {
+	Assert(std::is_pointer<T>::value);
+
+	if (data == 0)
+		return 0;
+
+	Memory_Header mem_header;
+	Memory_GetHeader(&mem_header, data);
+
+	if (mem_header.sig == MEMORY_SIGNATURE) {
+		void *mem = (char *)data - sizeof(Memory_Header);
+		free(mem);
+
+		Assert(mem != data);
+	}
+	else {
+		LOG_WARNING("Trying to free heap pointer(?).")
+	}
+
+	return 0;
+}
+
+
 instant void *
 _Memory_Resize(
 	void *mem,
@@ -75,60 +130,6 @@ _Memory_Resize(
 	mem = (char *)mem + sizeof(Memory_Header);
 
 	return mem;
-}
-
-/// will set the free'd pointer to 0
-/// - extra security
-#define Memory_Free(_data) \
-	_data = _Memory_Free(_data);
-
-template <typename T>
-instant T
-_Memory_Free(
-	T data
-) {
-	Assert(std::is_pointer<T>::value);
-
-	if (data == 0)
-		return 0;
-
-	Memory_Header mem_header;
-	Memory_GetHeader(&mem_header, data);
-
-	if (mem_header.sig == MEMORY_SIGNATURE) {
-		void *mem = (char *)data - sizeof(Memory_Header);
-		free(mem);
-
-		Assert(mem != data);
-	}
-	else {
-		LOG_WARNING("Trying to free heap pointer(?).")
-	}
-
-	return 0;
-}
-
-instant void
-Memory_Copy(
-	const void *dest_out,
-	const void *src,
-	u64 length
-) {
-	if (!dest_out OR !src OR !length)	return;
-	if (dest_out == src)				return;
-
-    char *c_dest = (char *)dest_out;
-    char *c_src  = (char *)src;
-
-    if (dest_out > src) {
-		while(length-- > 0)
-			c_dest[length] = c_src[length];
-    }
-    else {
-		FOR(length, it) {
-			c_dest[it] = c_src[it];
-		}
-    }
 }
 
 instant void
