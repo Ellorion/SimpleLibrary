@@ -14,19 +14,19 @@ Window_HandleEvents(
 	Timer timer_fps_log;
 	Time_Reset(&timer_fps_log);
 
-	Font font = Font_Load("default.ttf", 20);
+	Font font = Font_Load(S("default.ttf"), 20);
 
 	ShaderSet shader_set = ShaderSet_Create(window);
 
 	Keyboard *keyboard = window->keyboard;
 
 	String s_file;
-	String_Append(&s_file, __FILE__);
+	String_Append(&s_file, S(__FILE__));
 
-	String s_data = File_ReadAll(s_file.value, s_file.length);
+	String s_data = File_ReadAll(s_file);
 	String_Destroy(&s_file);
 
-	String_Replace(&s_data, "\r\n", "\n");
+	String_Replace(&s_data, S("\r\n"), S("\n"));
 
 	Text text = Text_Create(&shader_set, &font, &s_data, {10, 10, window->width - 20, window->height}, TEXT_ALIGN_X_LEFT);
 	text.data.color = {1, 0, 0, 1};
@@ -36,7 +36,7 @@ Window_HandleEvents(
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 		OpenGL_AdjustScaleViewport(window);
 
 		if (keyboard->up[VK_ESCAPE])

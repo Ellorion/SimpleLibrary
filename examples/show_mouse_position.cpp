@@ -16,7 +16,7 @@ Window_HandleEvents(
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 
 		/// Render
 		/// ===================================================================

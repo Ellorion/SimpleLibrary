@@ -20,11 +20,11 @@ Window_HandleEvents(
 
 	Keyboard *keyboard = window->keyboard;
 
-	Font font_20 = Font_Load("default.ttf", 20);
+	Font font_20 = Font_Load(S("default.ttf"), 20);
 
 	Widget widget_listbox  = Widget_CreateListBox(window, &font_20, { 10,  20, 300, 200});
-	Widget widget_click_me = Widget_CreateButton( window, &font_20, {320,  20, 100,  30}, "click me");
-	Widget widget_exit     = Widget_CreateButton( window, &font_20, {320,  50, 100,  30}, "Exit");
+	Widget widget_click_me = Widget_CreateButton( window, &font_20, {320,  20, 100,  30}, S("click me"));
+	Widget widget_exit     = Widget_CreateButton( window, &font_20, {320,  50, 100,  30}, S("Exit"));
 
 	widget_click_me.trigger_autosize = false;
 	widget_exit.trigger_autosize     = false;
@@ -34,28 +34,28 @@ Window_HandleEvents(
 	Array_Add(&ap_widgets, &widget_click_me);
 	Array_Add(&ap_widgets, &widget_exit);
 
-	Widget_AddRow(&widget_listbox, "1");
-	Widget_AddRow(&widget_listbox, "2");
-	Widget_AddRow(&widget_listbox, "3");
-	Widget_AddRow(&widget_listbox, "4");
-	Widget_AddRow(&widget_listbox, "5");
-	Widget_AddRow(&widget_listbox, "6");
-	Widget_AddRow(&widget_listbox, "7");
-	Widget_AddRow(&widget_listbox, "8");
-	Widget_AddRow(&widget_listbox, "9");
-	Widget_AddRow(&widget_listbox, "10");
-	Widget_AddRow(&widget_listbox, "11");
-	Widget_AddRow(&widget_listbox, "12");
-	Widget_AddRow(&widget_listbox, "13");
-	Widget_AddRow(&widget_listbox, "14");
-	Widget_AddRow(&widget_listbox, "15");
+	Widget_AddRow(&widget_listbox, S("1"));
+	Widget_AddRow(&widget_listbox, S("2"));
+	Widget_AddRow(&widget_listbox, S("3"));
+	Widget_AddRow(&widget_listbox, S("4"));
+	Widget_AddRow(&widget_listbox, S("5"));
+	Widget_AddRow(&widget_listbox, S("6"));
+	Widget_AddRow(&widget_listbox, S("7"));
+	Widget_AddRow(&widget_listbox, S("8"));
+	Widget_AddRow(&widget_listbox, S("9"));
+	Widget_AddRow(&widget_listbox, S("10"));
+	Widget_AddRow(&widget_listbox, S("11"));
+	Widget_AddRow(&widget_listbox, S("12"));
+	Widget_AddRow(&widget_listbox, S("13"));
+	Widget_AddRow(&widget_listbox, S("14"));
+	Widget_AddRow(&widget_listbox, S("15"));
 
 	while(running) {
 		msg = {};
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 		OpenGL_AdjustScaleViewport(window);
 
 		/// hold shift-key to get reverse tab order

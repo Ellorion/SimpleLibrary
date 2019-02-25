@@ -332,17 +332,14 @@ operator < (
 	Directory_Entry &entry_2
 ) {
 	if(entry_1.type == entry_2.type) {
-		static String s_entry_1_lower;
-		static String s_entry_2_lower;
+		if (entry_1.s_name == "..") return false;
+		if (entry_2.s_name == "..") return false;
 
-		String_Clear(&s_entry_1_lower);
-		String_Clear(&s_entry_2_lower);
+		String s_entry_1_lower;
+		String s_entry_2_lower;
 
 		String_Append(&s_entry_1_lower, entry_1.s_name);
 		String_Append(&s_entry_2_lower, entry_2.s_name);
-
-		if (s_entry_1_lower == "..") return false;
-		if (s_entry_2_lower == "..") return false;
 
 		long index_1 = String_IndexOfRev(&s_entry_1_lower, S("."));
 		long index_2 = String_IndexOfRev(&s_entry_2_lower, S("."));
@@ -353,7 +350,12 @@ operator < (
 		String_ToLower(&s_entry_1_lower);
 		String_ToLower(&s_entry_2_lower);
 
-		return (s_entry_1_lower < s_entry_2_lower);
+		bool is_less = (s_entry_1_lower < s_entry_2_lower);
+
+		String_Destroy(&s_entry_1_lower);
+		String_Destroy(&s_entry_2_lower);
+
+		return is_less;
 	}
 
 	return (entry_1.type < entry_2.type);
@@ -365,17 +367,14 @@ operator > (
 	Directory_Entry &entry_2
 ) {
 	if(entry_1.type == entry_2.type) {
-		static String s_entry_1_lower;
-		static String s_entry_2_lower;
+		if (entry_1.s_name == "..") return false;
+		if (entry_2.s_name == "..") return false;
 
-		String_Clear(&s_entry_1_lower);
-		String_Clear(&s_entry_2_lower);
+		String s_entry_1_lower;
+		String s_entry_2_lower;
 
 		String_Append(&s_entry_1_lower, entry_1.s_name);
 		String_Append(&s_entry_2_lower, entry_2.s_name);
-
-		if (s_entry_1_lower == "..") return false;
-		if (s_entry_2_lower == "..") return false;
 
 		long index_1 = String_IndexOfRev(&s_entry_1_lower, S("."));
 		long index_2 = String_IndexOfRev(&s_entry_2_lower, S("."));
@@ -386,7 +385,12 @@ operator > (
 		String_ToLower(&s_entry_1_lower);
 		String_ToLower(&s_entry_2_lower);
 
-		return (s_entry_1_lower > s_entry_2_lower);
+		bool is_not_less = (s_entry_1_lower > s_entry_2_lower);
+
+		String_Destroy(&s_entry_1_lower);
+		String_Destroy(&s_entry_2_lower);
+
+		return is_not_less;
 	}
 
 	return (entry_1.type > entry_2.type);

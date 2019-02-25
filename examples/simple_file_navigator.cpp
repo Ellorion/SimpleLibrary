@@ -201,13 +201,11 @@ Window_HandleEvents(Window *window) {
 
 	bool is_zooming = config.window.is_zooming;
 
-	Timer tmrRunning;
-
 	while(running) {
 		msg = {};
 
 		/// events
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 
 		/// scaling behavior
 		OpenGL_AdjustScaleViewport(window, is_zooming);

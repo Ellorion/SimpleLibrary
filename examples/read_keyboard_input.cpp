@@ -15,7 +15,7 @@ Window_HandleEvents(Window *window) {
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
 
 		/// Render
@@ -30,8 +30,7 @@ Window_HandleEvents(Window *window) {
 			}
 			else if (keyboard->is_down) {
 				Keyboard_AppendKey(keyboard, &s_keyboard);
-				char *c_buffer = String_CreateCBufferCopy(	s_keyboard.value,
-															s_keyboard.length);
+				char *c_buffer = String_CreateCBufferCopy(s_keyboard);
 				LOG_DEBUG(c_buffer);
 				Memory_Free(c_buffer);
 			}

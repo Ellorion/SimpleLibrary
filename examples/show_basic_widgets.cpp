@@ -14,11 +14,11 @@ Window_HandleEvents(
 
 	Keyboard *keyboard = window->keyboard;
 
-	Font font_20 = Font_Load("default.ttf", 20);
+	Font font_20 = Font_Load(S("default.ttf"), 20);
 
-	Widget widget_label    = Widget_CreateLabel( window, &font_20, {  10,  20, 300, 200}, "Label");
-	Widget widget_click_me = Widget_CreateButton(window, &font_20, { 320,  20, 100,  30}, "click me");
-	Widget widget_exit     = Widget_CreateButton(window, &font_20, { 320,  50, 100,  30}, "Exit");
+	Widget widget_label    = Widget_CreateLabel( window, &font_20, {  10,  20, 300, 200}, S("Label"));
+	Widget widget_click_me = Widget_CreateButton(window, &font_20, { 320,  20, 100,  30}, S("click me"));
+	Widget widget_exit     = Widget_CreateButton(window, &font_20, { 320,  50, 100,  30}, S("Exit"));
 
 	Array<Widget *> ap_widgets;
 	Array_Add(&ap_widgets, &widget_label);
@@ -30,7 +30,7 @@ Window_HandleEvents(
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 		OpenGL_AdjustScaleViewport(window);
 
 		/// hold shift-key to get reverse order

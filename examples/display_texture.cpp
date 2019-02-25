@@ -34,7 +34,7 @@ Window_HandleEvents(
 
 	Image_Destroy(&image);
 #else
-	Texture_Reload(&texture, "32_bit_(rgba)_bitmap.bmp");
+	Texture_Reload(&texture, S("32_bit_(rgba)_bitmap.bmp"));
 #endif // 0
 
 	ShaderSet shader_set = ShaderSet_Create(window);
@@ -51,7 +51,7 @@ Window_HandleEvents(
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
 
 		/// Render

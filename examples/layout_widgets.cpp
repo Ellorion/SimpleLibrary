@@ -14,23 +14,23 @@ Window_HandleEvents(
 
 	Keyboard *keyboard = window->keyboard;
 
-	Font font_20 = Font_Load("default.ttf", 20);
+	Font font_20 = Font_Load(S("default.ttf"), 20);
 
-	Widget w_button_menu_1   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "menu_1");
-	Widget w_button_menu_2   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "menu_2");
-	Widget w_button_menu_3   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "menu_3");
+	Widget w_button_menu_1   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, S("menu_1"));
+	Widget w_button_menu_2   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, S("menu_2"));
+	Widget w_button_menu_3   = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, S("menu_3"));
 
-	Widget w_button_top_1    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "top_1");
-	Widget w_button_top_2    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, "top_2");
+	Widget w_button_top_1    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, S("top_1"));
+	Widget w_button_top_2    = Widget_CreateButton(window, &font_20, {0, 0, 100, 30}, S("top_2"));
 	Widget w_combobox        = Widget_CreateComboBox(window, &font_20, {}, 200);
 
 	Widget *w_combo_list = &ARRAY_IT(w_combobox.a_subwidgets, 2);
 
-	Widget_AddRow(&w_combobox, "Hello");
+	Widget_AddRow(&w_combobox, S("Hello"));
 
 	w_combo_list->data.color_background = Color_MakeGrey(0.5f);
 
-	Widget w_button_center_1 = Widget_CreateCheckBox(window, &font_20, {0, 0, 100, 30}, "center_1", false);
+	Widget w_button_center_1 = Widget_CreateCheckBox(window, &font_20, {0, 0, 100, 30}, S("center_1"), false);
 	Widget w_spreader        = Widget_CreateSpreader(window);
 	Widget w_numpic          = Widget_CreateNumberPicker(window, &font_20, {0, 0, 100, 30}, {0, 5, 3, 1});
 
@@ -68,7 +68,7 @@ Window_HandleEvents(
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 		OpenGL_AdjustScaleViewport(window);
 
 		Layout_Rearrange(&layout, {0, 0, window->width, window->height});
@@ -85,8 +85,6 @@ Window_HandleEvents(
 		OpenGL_ClearScreen();
 
 		Widget_Render(&shader_set, &ap_widgets);
-
-		LOG_DEBUG(Widget::widget_focus_current->type)
 
 		Window_UpdateAndResetInput(window);
 	}

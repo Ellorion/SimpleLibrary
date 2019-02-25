@@ -15,7 +15,7 @@ Window_HandleEvents(Window *window) {
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
 
 		Joypad_GetInput(&joypad, 0);

@@ -125,7 +125,7 @@ Parser_IsString(
 	if (Parser_HasError(parser_io))
 		return;
 
-	bool is_equal = (parser_io->s_data == s_data);
+	bool is_equal = String_IsEqual(parser_io->s_data, s_data, s_data.length);
 
 	if (!is_equal) {
 		parser_io->has_error = true;

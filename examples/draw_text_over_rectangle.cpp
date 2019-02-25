@@ -14,7 +14,7 @@ Window_HandleEvents(
 
 	Keyboard *keyboard = window->keyboard;
 
-	Font font = Font_Load("default.ttf", 20);
+	Font font = Font_Load(S("default.ttf"), 20);
 
 	Rect rect_box = {10, 20, 300, 200};
 
@@ -30,14 +30,14 @@ Window_HandleEvents(
 	Text text_box;
 	{
 		String s_box_data;
-		String_Append(&s_box_data, "Hello");
+		String_Append(&s_box_data, S("Hello"));
 
 		text_box.shader_set = &shader_set;
 		text_box.data.rect  = rect_box;
 		text_box.font       = &font;
 		text_box.data.color = Color_MakeGrey(0.4f);
 
-		String_Append(&text_box.s_data, s_box_data.value, s_box_data.length);
+		String_Append(&text_box.s_data, s_box_data);
 
 		String_Destroy(&s_box_data);
 
@@ -49,7 +49,7 @@ Window_HandleEvents(
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window);
+		Window_ReadMessage(msg, running, window, false);
 		OpenGL_AdjustScaleViewport(window);
 
 		if (keyboard->up[VK_ESCAPE])
