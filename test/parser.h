@@ -39,7 +39,7 @@ Test_Parser(
 		Parser_GetString(&parser, &s_data);
 
 		/// require sections
-		if (!String_StartWith(&s_data, S(c_section_ident)))
+		if (!String_StartWith(&s_data, S(c_section_ident), true))
 			continue;
 
 		id_section = -1;
@@ -62,7 +62,7 @@ Test_Parser(
 					Parser_GetString(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
-					if (String_StartWith(&s_data, S(c_section_ident)))
+					if (String_StartWith(&s_data, S(c_section_ident), true))
 						break;
 
 					Parser_GetString(&parser, &s_data);
@@ -99,7 +99,7 @@ Test_Parser(
 					Parser_GetString(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
-					if (String_StartWith(&s_data, S(c_section_ident)))
+					if (String_StartWith(&s_data, S(c_section_ident), true))
 						break;
 
 					Parser_GetString(&parser, &s_data);
@@ -128,7 +128,7 @@ Test_Parser(
 					Parser_GetString(&parser, &s_data, PARSER_MODE_PEEK);
 
 					/// section switch
-					if (String_StartWith(&s_data, S(c_section_ident)))
+					if (String_StartWith(&s_data, S(c_section_ident), true))
 						break;
 
 					Parser_GetString(&parser, &s_data);

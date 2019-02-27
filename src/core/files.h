@@ -20,7 +20,7 @@ File_HasExtension(
     FOR_ARRAY(as_extentions, it) {
     	String ts_data = ARRAY_IT(as_extentions, it);
 
-		if (String_EndWith(s_filename, ts_data)) {
+		if (String_EndWith(s_filename, ts_data, true)) {
 			result = true;
 			break;
 		}
@@ -450,8 +450,11 @@ File_ReadDirectory(
 
 				if (prefix_path) {
 					String_Append(&ts_filename, s_path);
-					if (!String_EndWith(&ts_filename, S("/")) AND !String_EndWith(&ts_filename, S("\\")))
+					if (    !String_EndWith(&ts_filename, S("/") , true)
+						AND !String_EndWith(&ts_filename, S("\\"), true)
+					) {
 						String_Append(&ts_filename, S("\\"));
+					}
 				}
 
 				String_Append(&ts_filename, S(file_data.cFileName));
@@ -578,11 +581,11 @@ File_ChangePath(
 ) {
 	Assert(s_dest_io);
 
-	if (!(   String_EndWith(&s_append, S(".."))
-		  OR String_EndWith(&s_append, S("\\.."))
-		  OR String_EndWith(&s_append, S("\\..\\"))
+	if (!(   String_EndWith(&s_append, S("..")    , true)
+		  OR String_EndWith(&s_append, S("\\..")  , true)
+		  OR String_EndWith(&s_append, S("\\..\\"), true)
 	)) {
-		if (    !String_EndWith(s_dest_io, S("\\"))
+		if (    !String_EndWith(s_dest_io, S("\\"), true)
 			AND s_dest_io->length
 		) {
 			String_Append(s_dest_io, S("\\"));
@@ -592,8 +595,8 @@ File_ChangePath(
 		return true;
 	}
 
-	while(   String_EndWith(s_dest_io, S("\\"))
-		  OR String_EndWith(s_dest_io, S("/"))
+	while(   String_EndWith(s_dest_io, S("\\"), true)
+		  OR String_EndWith(s_dest_io, S("/") , true)
 	) {
         String_Cut(s_dest_io, s_dest_io->length - 1);
 	}

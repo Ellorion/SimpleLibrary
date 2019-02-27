@@ -331,3 +331,65 @@ String_GetDelimiterSection(
 
 	return s_result;
 }
+
+template <typename T>
+instant void
+Array_Print(
+	Array<T> *a_data,
+	String s_delimiter
+) {
+	Assert(a_data);
+
+	FOR_ARRAY(*a_data, it) {
+		T t_data = ARRAY_IT(*a_data, it);
+
+		std::cout << t_data;
+
+		if (it+1 < a_data->count)
+			String_Print(s_delimiter);
+	}
+}
+
+instant void
+Array_Print(
+	Array<String> *a_data,
+	String s_delimiter
+) {
+	Assert(a_data);
+
+	FOR_ARRAY(*a_data, it) {
+		String t_data = ARRAY_IT(*a_data, it);
+
+		String_Print(t_data);
+
+		if (it+1 < a_data->count)
+			String_Print(s_delimiter);
+	}
+}
+
+template <typename T>
+instant void
+Array_PrintList(
+	Array<T> *a_data
+) {
+	Assert(a_data);
+
+	FOR_ARRAY(*a_data, it) {
+		T t_data = ARRAY_IT(*a_data, it);
+
+		std::cout << t_data << std::endl;
+	}
+}
+
+instant void
+Array_PrintList(
+	Array<String> *a_data
+) {
+	Assert(a_data);
+
+	FOR_ARRAY(*a_data, it) {
+		String t_data = ARRAY_IT(*a_data, it);
+
+		String_PrintLine(t_data);
+	}
+}

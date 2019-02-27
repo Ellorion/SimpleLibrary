@@ -74,7 +74,7 @@ Test_Strings(
 
 	String_Append(&s_buffer, S("xxx_test_xxx"));
 	AssertMessage(String_IndexOf(&s_buffer, S("test")) == 4, "[Test] String indexof failed.");
-	AssertMessage(String_StartWith(&s_buffer, S("xxx_")), "[Test] String startwidth failed.");
+	AssertMessage(String_StartWith(&s_buffer, S("xxx_"), true), "[Test] String startwidth failed.");
 
 	long pos_found = 0;
 	if (String_Find(&s_buffer, S("_xxx"), &pos_found)) {
@@ -91,7 +91,7 @@ Test_Strings(
 		AssertMessage(false, "[Test] Could not find data in string.");
 	}
 
-	AssertMessage(String_EndWith(&s_buffer, S("_xxx")), "[Test] End not found in string.");
+	AssertMessage(String_EndWith(&s_buffer, S("_xxx"), true), "[Test] End not found in string.");
 
 	String_Destroy(&s_buffer);
 

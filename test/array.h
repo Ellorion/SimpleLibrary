@@ -218,4 +218,300 @@ Test_Arrays(
 		Array_Destroy(&as_lines);
 		Array_Destroy(&as_words);
 	}
+
+	{
+		typedef bool (*OnFilterIfTrue)(s64);
+
+		Array<s64> a_numbers;
+		Array_AddRange(&a_numbers, 1, 30);
+
+		/// useable variants
+		OnFilterIfTrue   fn_2 =       [](s64 value)         { return value % 2 == 0; };
+		bool           (*fn_3)(s64) = [](s64 value)         { return value % 3 == 0; };
+		auto             fn_5 =       [](s64 value) -> bool { return value % 5 == 0; };
+
+		Array<OnFilterIfTrue> a_filters;
+		Array_Add(&a_filters, fn_2);
+		Array_Add(&a_filters, fn_3);
+
+		/// does not work without casting
+		Array_Add(&a_filters, (OnFilterIfTrue)fn_5);
+
+		Array_Filter(&a_numbers, a_filters);
+
+		s32 counter = 0;
+
+		FOR_ARRAY(a_numbers, it) {
+			s64 t_number = ARRAY_IT(a_numbers, it);
+
+			switch (t_number) {
+				case 1:
+				case 7:
+				case 11:
+				case 13:
+				case 17:
+				case 19:
+				case 23:
+				case 29: {
+					++counter;
+				} break;
+
+				default:
+					AssertMessage(false, "[test] Array filter failed #1.1 (prime numbers).");
+			}
+		}
+
+		AssertMessage(counter == 8, "[test] Array filter failed #1.2 (prime numbers).");
+
+		Array_DestroyContainer(&a_numbers);
+	}
+
+	{
+		Array<s64> a_numbers;
+		Array_AddRange(&a_numbers, 1, 30);
+
+		bool (*OnFilterIfTrue)(s64) = [](s64 value) {
+			if (value % 2 == 0)  return true;
+			if (value % 3 == 0)  return true;
+			if (value % 5 == 0)  return true;
+
+			return false;
+		};
+
+		Array_Filter(&a_numbers, OnFilterIfTrue);
+
+		s32 counter = 0;
+
+		FOR_ARRAY(a_numbers, it) {
+			s64 t_number = ARRAY_IT(a_numbers, it);
+
+			switch (t_number) {
+				case 1:
+				case 7:
+				case 11:
+				case 13:
+				case 17:
+				case 19:
+				case 23:
+				case 29: {
+					++counter;
+				} break;
+
+				default:
+					AssertMessage(false, "[test] Array filter failed #2.1 (prime numbers).");
+			}
+		}
+
+		AssertMessage(counter == 8, "[test] Array filter failed #2.2 (prime numbers).");
+
+		Array_DestroyContainer(&a_numbers);
+	}
+
+	{
+		Array<s64> a_numbers;
+		Array_AddRange(&a_numbers, 1, 30);
+
+		auto OnFilterIfTrue = [](s64 value) -> bool {
+			if (value % 2 == 0)  return true;
+			if (value % 3 == 0)  return true;
+			if (value % 5 == 0)  return true;
+
+			return false;
+		};
+
+		Array_Filter(&a_numbers, OnFilterIfTrue);
+
+		s32 counter = 0;
+
+		FOR_ARRAY(a_numbers, it) {
+			s64 t_number = ARRAY_IT(a_numbers, it);
+
+			switch (t_number) {
+				case 1:
+				case 7:
+				case 11:
+				case 13:
+				case 17:
+				case 19:
+				case 23:
+				case 29: {
+					++counter;
+				} break;
+
+				default:
+					AssertMessage(false, "[test] Array filter failed #3.1 (prime numbers).");
+			}
+		}
+
+		AssertMessage(counter == 8, "[test] Array filter failed #3.2 (prime numbers).");
+
+		Array_DestroyContainer(&a_numbers);
+	}
+
+	{
+		Array<s64> a_numbers;
+		Array_AddRange(&a_numbers, 1, 30);
+
+		/// auto function parameter variance
+		auto OnFilterIfTrue = [](auto value) -> bool {
+			if (value % 2 == 0)  return true;
+			if (value % 3 == 0)  return true;
+			if (value % 5 == 0)  return true;
+
+			return false;
+		};
+
+		Array_Filter(&a_numbers, OnFilterIfTrue);
+
+		s32 counter = 0;
+
+		FOR_ARRAY(a_numbers, it) {
+			s64 t_number = ARRAY_IT(a_numbers, it);
+
+			switch (t_number) {
+				case 1:
+				case 7:
+				case 11:
+				case 13:
+				case 17:
+				case 19:
+				case 23:
+				case 29: {
+					++counter;
+				} break;
+
+				default:
+					AssertMessage(false, "[test] Array filter failed #3.1 (prime numbers).");
+			}
+		}
+
+		AssertMessage(counter == 8, "[test] Array filter failed #3.2 (prime numbers).");
+
+		Array_DestroyContainer(&a_numbers);
+	}
+
+	{
+		Array<s64> a_numbers;
+		Array_AddRange(&a_numbers, 1, 30);
+
+		/// auto function parameter variance
+		auto OnFilterIfTrue = [](s64 value) {
+			if (value % 2 == 0)  return true;
+			if (value % 3 == 0)  return true;
+			if (value % 5 == 0)  return true;
+
+			return false;
+		};
+
+		Array_Filter(&a_numbers, OnFilterIfTrue);
+
+		s32 counter = 0;
+
+		FOR_ARRAY(a_numbers, it) {
+			s64 t_number = ARRAY_IT(a_numbers, it);
+
+			switch (t_number) {
+				case 1:
+				case 7:
+				case 11:
+				case 13:
+				case 17:
+				case 19:
+				case 23:
+				case 29: {
+					++counter;
+				} break;
+
+				default:
+					AssertMessage(false, "[test] Array filter failed #3.1 (prime numbers).");
+			}
+		}
+
+		AssertMessage(counter == 8, "[test] Array filter failed #3.2 (prime numbers).");
+
+		Array_DestroyContainer(&a_numbers);
+	}
+
+	{
+		Array<s64> a_numbers;
+		Array_AddRange(&a_numbers, 1, 30);
+
+		/// auto function parameter variance
+		auto OnFilterIfTrue = [](auto value) {
+			if (value % 2 == 0)  return true;
+			if (value % 3 == 0)  return true;
+			if (value % 5 == 0)  return true;
+
+			return false;
+		};
+
+		Array_Filter(&a_numbers, OnFilterIfTrue);
+
+		s32 counter = 0;
+
+		FOR_ARRAY(a_numbers, it) {
+			s64 t_number = ARRAY_IT(a_numbers, it);
+
+			switch (t_number) {
+				case 1:
+				case 7:
+				case 11:
+				case 13:
+				case 17:
+				case 19:
+				case 23:
+				case 29: {
+					++counter;
+				} break;
+
+				default:
+					AssertMessage(false, "[test] Array filter failed #3.1 (prime numbers).");
+			}
+		}
+
+		AssertMessage(counter == 8, "[test] Array filter failed #3.2 (prime numbers).");
+
+		Array_DestroyContainer(&a_numbers);
+	}
+
+	{
+		Array<s64> a_numbers;
+		Array_AddRange(&a_numbers, 1, 30);
+
+		Array_Filter(&a_numbers,
+			[](s64 value) {
+				if (value % 2 == 0)  return true;
+				if (value % 3 == 0)  return true;
+				if (value % 5 == 0)  return true;
+
+				return false;
+			}
+		);
+
+		s32 counter = 0;
+
+		FOR_ARRAY(a_numbers, it) {
+			s64 t_number = ARRAY_IT(a_numbers, it);
+
+			switch (t_number) {
+				case 1:
+				case 7:
+				case 11:
+				case 13:
+				case 17:
+				case 19:
+				case 23:
+				case 29: {
+					++counter;
+				} break;
+
+				default:
+					AssertMessage(false, "[test] Array filter failed #4.1 (prime numbers).");
+			}
+		}
+
+		AssertMessage(counter == 8, "[test] Array filter failed #4.2 (prime numbers).");
+
+		Array_DestroyContainer(&a_numbers);
+	}
 }

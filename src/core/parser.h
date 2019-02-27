@@ -190,7 +190,7 @@ Parser_GetString(
 	if (Parser_HasError(parser_io))
 		return;
 
-	if (String_StartWith(&parser_io->s_data, S("\""))) {
+	if (String_StartWith(&parser_io->s_data, S("\""), true)) {
 		Parser_AddOffset(parser_io, 1);
 
 		s64 index_found;
@@ -270,7 +270,7 @@ Parser_GetBoolean(
 	FOR(ARRAY_COUNT(values_false), it) {
 		String ts_value = S(values_false[it]);
 
-		if (String_StartWith(&parser_io->s_data, ts_value)) {
+		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
 			Parser_SkipUntilToken(parser_io);
 
@@ -287,7 +287,7 @@ Parser_GetBoolean(
 	FOR(ARRAY_COUNT(values_true), it) {
 		String ts_value = S(values_true[it]);
 
-		if (String_StartWith(&parser_io->s_data, ts_value)) {
+		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
 			Parser_SkipUntilToken(parser_io);
 
@@ -350,7 +350,7 @@ Parser_GetNumber(
         index_parsing += 1;
 	}
 
-	has_error |= String_EndWith(s_number_out, S("."));
+	has_error |= String_EndWith(s_number_out, S("."), true);
 	has_error |= (s_number_out->length == 0);
 
 	if (has_error) {
@@ -381,7 +381,7 @@ Parser_IsSection(
 	String s_data;
 	Parser_GetString(parser_io, &s_data, PARSER_MODE_PEEK);
 
-	return String_StartWith(&s_data, s_section_id);
+	return String_StartWith(&s_data, s_section_id, true);
 }
 
 instant bool

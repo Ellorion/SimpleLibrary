@@ -21,18 +21,16 @@ String_IsEmpty(
 
 instant void
 String_Print(
-	String *s_data
+	String s_data
 ) {
-	Assert(s_data);
-
-	FOR(s_data->length, it) {
-		std::cout << s_data->value[it];
+	FOR(s_data.length, it) {
+		std::cout << s_data.value[it];
 	}
 }
 
 instant void
 String_PrintLine(
-	String *s_data
+	String s_data
 ) {
 	String_Print(s_data);
 	std::cout << std::endl;
@@ -462,12 +460,13 @@ String_IndexOfRev(
 instant bool
 String_StartWith(
 	String *s_data,
-	String  s_startwith
+	String  s_startwith,
+	bool is_case_sensitive
 ) {
 	if (!s_startwith.length OR !s_data OR !s_data->length)
 		return false;
 
-	return String_IsEqual(*s_data, s_startwith, s_startwith.length);
+	return (String_Compare(*s_data, s_startwith, s_startwith.length, is_case_sensitive) == 0);
 }
 
 instant bool
@@ -541,7 +540,8 @@ String_Cut(
 instant bool
 String_EndWith(
 	String *s_data,
-	String s_endwith
+	String s_endwith,
+	bool is_case_sensitive
 ) {
 	if (s_endwith.length > s_data->length)
 		return false;
@@ -550,7 +550,7 @@ String_EndWith(
 	ts_data.value = ts_data.value + (ts_data.length - s_endwith.length);
 	ts_data.length = s_endwith.length;
 
-	return String_IsEqual(ts_data, s_endwith, s_endwith.length);
+	return (String_Compare(ts_data, s_endwith, s_endwith.length, is_case_sensitive) == 0);
 }
 
 instant void

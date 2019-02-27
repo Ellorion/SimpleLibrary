@@ -74,7 +74,7 @@ struct Widget_Data {
 	Array<String> as_row_data;
 
 	String s_row_filter;
-	Array<String> a_filter_data;
+	Array<String> as_filter_data;
 };
 
 struct Widget {
@@ -482,8 +482,20 @@ Widget_Update(
 	}
 
 	if (widget_io->data.s_row_filter.changed) {
-		Array_Clear(&widget_io->data.a_filter_data);
-		widget_io->data.a_filter_data.by_reference = true;
+#if 0
+		widget_io->data.as_filter_data.by_reference = true;
+
+		Array_Filter(
+			&widget_io->data.as_filter_data,
+			&widget_io->data.as_row_data,
+
+			[&](String s_value) {
+				return (String_IndexOf(&s_value, widget_io->data.s_row_filter) >= 0);
+			}
+		);
+#else
+		Array_Clear(&widget_io->data.as_filter_data);
+		widget_io->data.as_filter_data.by_reference = true;
 		widget_io->data.active_row_id = 0;
 
 		if (widget_io->data.s_row_filter.length) {
@@ -493,10 +505,11 @@ Widget_Update(
 				if (String_IndexOf(	ts_data,
 									widget_io->data.s_row_filter) >= 0
 				) {
-					Array_Add(&widget_io->data.a_filter_data, *ts_data);
+					Array_Add(&widget_io->data.as_filter_data, *ts_data);
 				}
 			}
 		}
+#endif // 0
 
 		widget_io->data.s_row_filter.changed = false;
 	}
@@ -730,8 +743,8 @@ Widget_GetListArrayFiltered(
 	Array<String> *as_target = &widget->data.as_row_data;
 
 	if (widget->data.s_row_filter.length) {
-		as_target = &widget->data.a_filter_data;
-		Clamp(&widget->data.active_row_id, 0, widget->data.a_filter_data.count - 1);
+		as_target = &widget->data.as_filter_data;
+		Clamp(&widget->data.active_row_id, 0, widget->data.as_filter_data.count - 1);
 	}
 
 	*as_row_data_out = as_target;
@@ -1545,7 +1558,7 @@ Widget_LoadDirectoryList(
 	widget_io->data.active_row_id = 0;
 
 	/// remove "\" from directory path (f.e. C:\) for consistency
-	if (String_EndWith(&ts_directory_buffer, S("\\"))) {
+	if (String_EndWith(&ts_directory_buffer, S("\\"), true)) {
 		String_Remove(	&ts_directory_buffer,
 						 ts_directory_buffer.length - 1,
 						 ts_directory_buffer.length);

@@ -8,7 +8,7 @@
 /// Compiler: g++ (6.3.0) (mingw)
 ///
 /// Linker flags:
-///		-lcomdlg32
+///	   [-lcomdlg32]
 ///		-lopengl32
 ///		-lgdi32
 ///
@@ -29,6 +29,10 @@
 ///    as_ -> Array<String> ...
 ///     t_ -> temporary local variable (which might overlap in name with
 ///           a parameter / or when shadowing)
+///
+///		Events (function delegates):
+///     - nameing starts with On... (f.e. OnDidSomething)
+///     - in case of an array of events: a_On... (f.e. a_OnDoThisAndThat)
 ///
 ///     Postfix Pointer Parameter:
 ///     ------------------------------------------------------

@@ -31,6 +31,21 @@ struct Array {
 	bool  by_reference = false;
 };
 
+template <typename T>
+instant void
+Array_Clear(
+	Array<T> *array_out
+) {
+	Assert(array_out);
+
+	if (!array_out->by_reference) {
+		if (std::is_class<T>::value)
+			AssertMessage(false, "Trying to clear unspecialized array which uses a class as a template type.");
+	}
+
+    Array_ClearContainer(array_out);
+}
+
 ///@Info: will copy the struct element pointers only
 ///
 ///       if the array should take ownership of all data
@@ -269,4 +284,146 @@ Array_Sort_Descending(
 	Sort_Quick( &array_io->memory[0],
 				&array_io->memory[array_io->count - 1],
 				SORT_ORDER_DESCENDING);
+}
+
+instant void
+Array_AddRange(
+	Array<s64> *a_data_io,
+	s64 min,
+	s64 max
+) {
+	Assert(a_data_io);
+
+	s64 t_min = MIN(min, max);
+	s64 t_max = MAX(min, max);
+
+	s64 t_delta = t_max - t_min;
+
+	for(s64 it = t_min; it <= t_max; ++it) {
+		Array_Add(a_data_io, it);
+	}
+}
+
+instant void
+Array_AddRange(
+	Array<u64> *a_data_io,
+	u64 min,
+	u64 max
+) {
+	Assert(a_data_io);
+
+	u64 t_min = MIN(min, max);
+	u64 t_max = MAX(min, max);
+
+	u64 t_delta = t_max - t_min;
+
+	for(u64 it = t_min; it <= t_max; ++it) {
+		Array_Add(a_data_io, it);
+	}
+}
+
+/// does NOT work when lamba is declared as auto,
+/// since template typename has to match the
+/// event function return type
+template <typename T>
+instant void
+Array_Filter(
+	Array<T> *a_data_io,
+	bool (*OnFilterIfTrue) (T value)
+) {
+	Assert(a_data_io);
+
+	FOR_ARRAY(*a_data_io, it) {
+		T t_data = ARRAY_IT(*a_data_io, it);
+
+		if (OnFilterIfTrue(t_data)) {
+			Array_Remove(a_data_io, it);
+			--it;
+		}
+	}
+}
+
+template <typename T, typename Func>
+instant void
+Array_Filter(
+	Array<T> *a_data_io,
+	Func OnFilterIfTrue
+) {
+	Assert(a_data_io);
+
+	FOR_ARRAY(*a_data_io, it) {
+		T t_data = ARRAY_IT(*a_data_io, it);
+
+		if (OnFilterIfTrue(t_data)) {
+			Array_Remove(a_data_io, it);
+			--it;
+		}
+	}
+}
+
+template <typename T, typename Func>
+instant void
+Array_Filter(
+	Array<T> *a_data_io,
+	Array<Func> a_OnFilterIfTrue
+) {
+	Assert(a_data_io);
+
+	FOR_ARRAY(*a_data_io, it_data) {
+		T t_data = ARRAY_IT(*a_data_io, it_data);
+
+		FOR_ARRAY(a_OnFilterIfTrue, it_func) {
+			Func OnFilterIfTrue = ARRAY_IT(a_OnFilterIfTrue, it_func);
+
+			bool result = OnFilterIfTrue(t_data);
+
+			if (result) {
+				Array_Remove(a_data_io, it_data);
+				--it_data;
+				break;
+			}
+		}
+	}
+}
+
+template <typename T>
+instant void
+Array_Filter(
+	Array<T> *a_dest_out,
+	Array<T> *a_source,
+	bool (*OnFilterIfTrue) (T value)
+) {
+	Assert(a_source);
+	Assert(a_dest_out);
+
+    Array_Clear(a_dest_out);
+
+	FOR_ARRAY(*a_source, it) {
+		T t_data = ARRAY_IT(*a_source, it);
+
+		if (!OnFilterIfTrue(t_data)) {
+			Array_Add(a_dest_out, t_data);
+		}
+	}
+}
+
+template <typename T, typename Func>
+instant void
+Array_Filter(
+	Array<T> *a_dest_out,
+	Array<T> *a_source,
+	Func OnFilterIfTrue
+) {
+	Assert(a_source);
+	Assert(a_dest_out);
+
+    Array_Clear(a_dest_out);
+
+	FOR_ARRAY(*a_source, it) {
+		T t_data = ARRAY_IT(*a_source, it);
+
+		if (!OnFilterIfTrue(t_data)) {
+			Array_Add(a_dest_out, t_data);
+		}
+	}
 }

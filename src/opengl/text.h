@@ -523,7 +523,7 @@ Text_CalcLineCount(
 
 		index_data += ts_word->length;
 
-		if (String_EndWith(ts_word, S("\n"))) {
+		if (String_EndWith(ts_word, S("\n"), true)) {
 			++count_lines;
 			line_start = true;
 
@@ -595,7 +595,7 @@ Text_BuildLines(
 
 			index_data += ts_word->length;
 
-			if (String_EndWith(ts_word, S("\n"))) {
+			if (String_EndWith(ts_word, S("\n"), true)) {
 				Array_AddEmpty(a_text_line_out, &text_line);
 				text_line->s_data.value = &ts_data->value[index_data];
 
@@ -672,7 +672,7 @@ Text_BuildLines(
 
 			index_data += ts_word->length;
 
-			if (String_EndWith(ts_word, S("\n"))) {
+			if (String_EndWith(ts_word, S("\n"), true)) {
 				Array_AddEmpty(a_text_line_out, &text_line);
 				line_start = true;
 
@@ -1230,7 +1230,7 @@ Text_Cursor_Move(
 				if (cursor->data.index_select_end < text_io->s_data.length)
 					cursor->data.index_select_end -= 1;
 
-				if (String_EndWith(&text_line->s_data, S("\r\n")))
+				if (String_EndWith(&text_line->s_data, S("\r\n"), true))
 					cursor->data.index_select_end -= 1;
 
 				if (cursor->data.index_select_end != index_cursor) {
