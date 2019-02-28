@@ -270,6 +270,10 @@ IsNumeric(
 #include "core/image.h"
 #include "core/map.h"
 
+#include "utility/base64.h"
+#include "utility/clipboard.h"
+#include "utility/file_watcher.h"
+
 /// interlocking dependencies
 #include "windows/windows.h"
 #include "opengl/core.h"

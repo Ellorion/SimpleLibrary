@@ -252,63 +252,6 @@ File_ReadAll(
 	return s_data;
 }
 
-struct File_Watcher {
-	HANDLE file = 0;
-	bool exists = false;
-	FILETIME lastWriteTime = {};
-};
-
-instant void
-File_Watch(
-	File_Watcher *file_watcher_out,
-	String s_filename
-) {
-	Assert(file_watcher_out);
-
-	*file_watcher_out = {};
-
-	char *tc_filename = String_CreateCBufferCopy(s_filename);
-
-	file_watcher_out->file = CreateFile(
-			tc_filename,
-			0,
-			0,
-			NULL,
-			OPEN_EXISTING,
-			0,
-			NULL
-		);
-
-	if (file_watcher_out->file)
-		file_watcher_out->exists = true;
-
-	Memory_Free(tc_filename);
-}
-
-instant bool
-File_HasChanged(
-	File_Watcher *file_watcher
-) {
-	Assert(file_watcher);
-
-	bool has_changed = false;
-
-	if (!file_watcher->exists)  return false;
-
-	FILETIME *lwt = &file_watcher->lastWriteTime;
-
-	FILETIME prevWriteTime = *lwt;
-	GetFileTime(file_watcher->file, 0, 0, lwt);
-
-	if (lwt->dwHighDateTime != prevWriteTime.dwHighDateTime)
-		has_changed = true;
-	else
-	if (lwt->dwLowDateTime  != prevWriteTime.dwLowDateTime )
-		has_changed = true;
-
-	return has_changed;
-}
-
 enum DIR_ENTRY_TYPE {
 	DIR_ENTRY_DRIVE,
 	DIR_ENTRY_DIR,
