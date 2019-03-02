@@ -385,6 +385,8 @@ Widget_AddBorderSizes(
 	}
 }
 
+/// @idea: might need a subindex to set focus to widgets,
+///        which are embedded into a widget
 instant void
 Widget_SetFocus(
 	Widget *widget_io
