@@ -25,7 +25,6 @@ Window_HandleEvents(
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(msg, running, window, false);
-		OpenGL_AdjustScaleViewport(window, false);
 
 		if (keyboard->up[VK_ESCAPE])
 			running = false;
