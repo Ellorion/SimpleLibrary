@@ -518,3 +518,17 @@ Layout_GetWidgetArray(
 
 	return layout->ap_widgets;
 }
+
+instant bool
+Layout_Block_IsVisible (
+	Layout *layout,
+	u64 index_block
+) {
+	Assert(layout);
+
+	Layout_Block *layout_block = 0;
+	bool got_block = Layout_GetBlock(layout, index_block, &layout_block);
+	Assert(got_block);
+
+	return layout_block->is_visible;
+}

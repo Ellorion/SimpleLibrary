@@ -845,6 +845,17 @@ String_AppendCircle(
 	return (s_data_io->length == buffer_limit);
 }
 
+instant void
+String_Overwrite(
+	String *s_dest_io,
+	String  s_source
+) {
+	Assert(s_dest_io);
+
+	String_Clear(s_dest_io);
+	String_Append(s_dest_io, s_source);
+}
+
 /// operator
 /// string - string
 bool

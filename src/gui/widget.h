@@ -147,20 +147,6 @@ Layout_Block_SetVisible (
 	}
 }
 
-instant bool
-Layout_Block_IsVisible (
-	Layout *layout,
-	u64 index_block
-) {
-	Assert(layout);
-
-	Layout_Block *layout_block = 0;
-	bool got_block = Layout_GetBlock(layout, index_block, &layout_block);
-	Assert(got_block);
-
-	return layout_block->is_visible;
-}
-
 ///@Depricated
 /// simply create an array of parent widgets
 ///
@@ -532,7 +518,7 @@ Widget_Redraw(
 		return;
 	}
 
-	Rect    rect_box =  widget_io->layout_data.settings.rect;
+	Rect rect_box =  widget_io->layout_data.settings.rect;
 
 	/// static rect init
 	/// -----------------------------------------------------------------------
@@ -584,27 +570,29 @@ Widget_Redraw(
 			Layout_Create(&layout, &widget_io->layout_data, false);
 			layout.padding = 0;
 
-			Layout_Block *t_block;
-			u64 index_block = 0;
+			{
+				Layout_Block *t_block;
+				u64 index_block = 0;
 
-			index_block = Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
+				index_block = Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
 
-			if (!Layout_GetBlock(&layout, index_block, &t_block))
-				Assert(false);
+				if (!Layout_GetBlock(&layout, index_block, &t_block))
+					Assert(false);
 
-			t_block->padding = 0;
+				t_block->padding = 0;
 
-			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_TEXT));
-			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_TOGGLE));
+				Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_TEXT));
+				Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_TOGGLE));
 
-			index_block = Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
+				index_block = Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
 
-			if (!Layout_GetBlock(&layout, index_block, &t_block))
-				Assert(false);
+				if (!Layout_GetBlock(&layout, index_block, &t_block))
+					Assert(false);
 
-			t_block->padding = 0;
+				t_block->padding = 0;
 
-			Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_LIST));
+				Layout_Add(&layout, &ARRAY_IT(widget_io->a_subwidgets, WIDGET_COMBOBOX_LIST));
+			}
 
 			Layout_Arrange(&layout);
 		} break;
@@ -2214,4 +2202,13 @@ Widget_LoadFile(
 
 	String_Clear(s_data);
 	String_Append(s_data, File_ReadAll(s_filename, true));
+}
+
+instant String*
+Widget_GetTextData(
+	Widget *widget
+) {
+	Assert(widget);
+
+	return &widget->text.s_data;
 }
