@@ -403,3 +403,89 @@ Parser_GetSectionName(
 
 	return is_section;
 }
+
+instant bool
+Parser_CanTokenize(
+	char character
+) {
+	if (    character <   48
+		OR (character >=  58 AND character <=  64)
+		OR (character >=  91 AND character <=  96)
+		OR (character >= 123 AND character <= 127)
+	) {
+		return false;
+	}
+
+	return true;
+}
+
+instant void
+Parser_PeekToken(
+	Parser *parser,
+	String *s_token_out
+) {
+	Assert(parser);
+	Assert(s_token_out);
+
+	if (Parser_HasError(parser))
+		return;
+
+	Parser_SkipUntilToken(parser);
+
+	String s_data_it = S(parser->s_data);
+
+	String_Destroy(s_token_out);
+	s_token_out->is_reference = true;
+	s_token_out->value        = s_data_it.value;
+
+	while(s_data_it.length) {
+		++s_token_out->length;
+
+		if (s_data_it.length == 1)
+			break;
+
+		if (!Parser_CanTokenize(s_data_it.value[0]))
+			break;
+
+		if (!Parser_CanTokenize(s_data_it.value[1]))
+			break;
+
+		String_AddOffset(&s_data_it, 1);
+	}
+}
+
+instant void
+Parser_GetToken(
+    Parser *parser,
+    String *s_token_out
+) {
+	if (Parser_HasError(parser))
+		return;
+
+	Parser_PeekToken(parser, s_token_out);
+	Parser_AddOffset(parser, s_token_out->length);
+}
+
+instant bool
+Parser_IsToken(
+	Parser *parser,
+	String  s_token
+) {
+	Assert(parser);
+
+	if (Parser_HasError(parser))
+		return false;
+
+	String ts_token;
+	Parser_PeekToken(parser, &ts_token);
+
+	if (!(s_token == ts_token)) {
+		parser->has_error = true;
+		String_Overwrite(&parser->s_error, S("Token in parser did not match expected result."));
+		return false;
+	}
+
+	Parser_AddOffset(parser, s_token.length);
+
+	return true;
+}
