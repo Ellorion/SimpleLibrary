@@ -155,34 +155,26 @@ File_Execute(
 	/// length would calc. to 0 otherwise
 	String_Append(&ts_command, S("\0", 1));
 
-	/// @todo: start process in seperate thread / independently,
-	///        so the app does not hang when something
-	///        is executing
-	FILE *pipe = popen(ts_command.value, "r");
+	STARTUPINFO info_startup = {};
+	PROCESS_INFORMATION info_proc = {};
 
-	/// without the delay, the pipe operations most likely will fail!
-	/// and the assert is unable to check that...
-	Sleep(30);
+	info_startup.dwFlags = STARTF_USESTDHANDLES;
 
-	if (!pipe)
-		Assert(false);
+	bool result = CreateProcess(
+		0,
+		ts_command.value,
+		0,
+		0,
+		false,
+		CREATE_NEW_CONSOLE,
+		0,
+		0,
+		&info_startup,
+		&info_proc
+	);
 
-	fseek (pipe, 0, SEEK_END);
-	u64 length = ftell(pipe);
-	rewind(pipe);
-
-	if (length) {
-		s_result.value  = Memory_Resize(s_result.value, char, length);
-		s_result.length = length;
-		fread(s_result.value, sizeof(char), sizeof(char) * length, pipe);
-
-		s_result.changed = true;
-
-	}
-
-	/// @Bug: might hang when executing command line executables
-	///       which do not produce an output to redirect
-	pclose(pipe);
+	if (!result)
+		LOG_WARNING("could not open file: " << ts_command.value);
 
 	String_Destroy(&ts_command);
 
@@ -516,8 +508,7 @@ File_GetDrives(
 
 }
 
-/// @RemoveMe return value
-instant bool
+instant void
 File_ChangePath(
 	String *s_dest_io,
 	String  s_append
@@ -535,7 +526,7 @@ File_ChangePath(
 		}
 
 		String_Append(s_dest_io, s_append);
-		return true;
+		return;
 	}
 
 	while(   String_EndWith(s_dest_io, S("\\"), true)
@@ -549,10 +540,10 @@ File_ChangePath(
 
 	if (found) {
 		String_Cut(s_dest_io, pos_found);
-		return true;
+		return;
 	}
 	else {
 		String_Clear(s_dest_io);
-		return true;
+		return;
 	}
 }
