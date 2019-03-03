@@ -182,14 +182,14 @@ String_Insert(
 	u64 index_start
 ) {
 	Assert(s_dest_io);
-	Assert(!s_dest_io->is_reference);
+ 	Assert(!s_dest_io->is_reference);
 	Assert(index_start <= s_dest_io->length);
 
 	String s_dest_io_it = S(*s_dest_io);
 
 	String s_buffer;
 	String_Append(&s_buffer, s_dest_io_it, index_start);
-	String_Append(&s_buffer, s_source);
+ 	String_Append(&s_buffer, s_source);
 
 	String_AddOffset(&s_dest_io_it, index_start);
 	String_Append(&s_buffer, s_dest_io_it);
@@ -729,7 +729,8 @@ String_Insert(
 	}
 	else
 	if (c_data == '\r' OR c_data == '\n') {
-		String_Insert(s_data_io, S("\n"), index_start);
+		length = 1;
+ 		String_Insert(s_data_io, S("\n"), index_start);
 	}
 	else {
 		length = 1;

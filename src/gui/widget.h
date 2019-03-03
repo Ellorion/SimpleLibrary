@@ -2198,3 +2198,20 @@ Widget_CreateProgressbar(
 
 	return t_widget;
 }
+
+instant void
+Widget_LoadFile(
+	Widget *widget_io,
+	String s_filename
+) {
+	Assert(widget_io);
+	Assert(widget_io->type == WIDGET_TEXTBOX);
+
+	if (!File_Exists(s_filename))
+		LOG_WARNING("Trying to load file content into a textbox widget has failed.");
+
+	String *s_data = &widget_io->text.s_data;
+
+	String_Clear(s_data);
+	String_Append(s_data, File_ReadAll(s_filename, true));
+}

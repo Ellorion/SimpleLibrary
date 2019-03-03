@@ -1779,8 +1779,8 @@ Text_UpdateInput(
 
 					cursor->move_index_x = String_Insert(
 												&text_io->s_data,
-												cursor->data.index_select_end,
-												key
+												key,
+												cursor->data.index_select_end
 											);
 
 					IF_SET(cursor_changed_out) = true;
