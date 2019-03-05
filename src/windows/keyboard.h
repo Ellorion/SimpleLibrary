@@ -7,6 +7,7 @@ struct Keyboard {
     bool down[KEYBOARD_KEYCOUNT] 		= {};
     bool pressing[KEYBOARD_KEYCOUNT] 	= {};
     bool repeating[KEYBOARD_KEYCOUNT] 	= {};
+    bool toggled[KEYBOARD_KEYCOUNT] 	= {};
 
     /// last_key_virtual = msg.wParam = SL_KEYBOARD_KEYCOUNT (max.)
 	u32  last_key_virtual	= 0;
@@ -27,14 +28,19 @@ Keyboard_Reset(
 		return;
 
 	bool pressing[KEYBOARD_KEYCOUNT] = {};
+	bool toggled[KEYBOARD_KEYCOUNT]  = {};
 
-	if (!full_reset)
+	if (!full_reset) {
 		Memory_Copy(&pressing, &keyboard_out->pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
+		Memory_Copy(&toggled , &keyboard_out->toggled , sizeof(bool) * KEYBOARD_KEYCOUNT);
+	}
 
     *keyboard_out = {};
 
-    if (!full_reset)
+    if (!full_reset) {
 		Memory_Copy(&keyboard_out->pressing, &pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
+		Memory_Copy(&keyboard_out->toggled , &toggled , sizeof(bool) * KEYBOARD_KEYCOUNT);
+    }
 }
 
 instant void
@@ -137,6 +143,7 @@ Keyboard_SetUp(
 		keyboard_io->up[msg->wParam] 		= true;
 		keyboard_io->pressing[msg->wParam] 	= false;
 		keyboard_io->repeating[msg->wParam] = false;
+		keyboard_io->toggled[msg->wParam]   = !keyboard_io->toggled[msg->wParam];
 
 		Keyboard_GetKeySym(keyboard_io, msg);
 

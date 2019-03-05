@@ -29,6 +29,7 @@
 ///    as_ -> Array<String> ...
 ///     t_ -> temporary local variable (which might overlap in name with
 ///           a parameter / or when shadowing)
+///    ap_ -> Array<something *> (an array of pointers)
 ///
 ///		Events (function delegates):
 ///     - nameing starts with On... (f.e. OnDidSomething)
