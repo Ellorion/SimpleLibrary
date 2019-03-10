@@ -1,11 +1,12 @@
 #pragma once
 
-#define SHOW_WARNING			0
+#define SHOW_INFO				0
+#define SHOW_WARNING			1
 
 #define DEBUG_EVENT_STATUS		0
 #define DEBUG_BENCHMARK			0
 
-/// Compiler: g++ (6.3.0) (mingw)
+/// Compiler: g++ (8.2.0) (mingw)
 ///
 /// Linker flags:
 ///	   [-lcomdlg32]
@@ -149,7 +150,12 @@ _AssertMessage(
 #endif
 
 #define LOG_DEBUG(text) std::cout << text << std::endl;
-#define LOG_INFO(_text) std::cout << "Info: " << _text << std::endl;
+
+#if SHOW_INFO
+#	define LOG_INFO(_text) std::cout << "Info: " << _text << std::endl;
+#else
+#	define LOG_INFO(_text)
+#endif
 
 #if SHOW_WARNING
 #	define LOG_WARNING(_text) std::cout << "Warning: " << _text << std::endl;

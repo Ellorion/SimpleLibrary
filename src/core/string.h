@@ -2,12 +2,49 @@
 
 #define String_Split Array_Split
 
-struct String {
-	bool  is_reference  = false;
-	bool  changed       = false;
-	u64   length  = 0;
-	char *value   = 0;
+enum STRING_LENGTH_TYPE {
+	STRING_LENGTH_BYTES,
+	STRING_LENGTH_CODEPOINTS
 };
+
+struct String {
+	bool  is_reference = false;
+	bool  changed      = false;
+	u64   length = 0;
+	char *value  = 0;
+};
+
+#include "utf8.h"
+
+/// does support UTF-8
+instant u64
+String_GetLength(
+	const char *c_data,
+	STRING_LENGTH_TYPE type = STRING_LENGTH_BYTES
+) {
+	u64 result = 0;
+	u64 len_bytes = 0;
+	u64 len_codepoints = 0;
+
+	if (c_data == 0)
+		return len_bytes;
+
+	while (*c_data) {
+		s16 length_data = UTF8_GetByteCount(c_data);
+
+		if (length_data < 0)
+			break;
+
+		c_data += length_data;
+
+		len_bytes      += length_data;
+		len_codepoints += 1;
+	}
+
+	result = (type == STRING_LENGTH_BYTES ? len_bytes : len_codepoints);
+
+	return result;
+}
 
 instant bool
 String_IsEmpty(
@@ -34,22 +71,6 @@ String_PrintLine(
 ) {
 	String_Print(s_data);
 	std::cout << std::endl;
-}
-
-/// does NOT support UTF-8
-instant u64
-String_GetLength(
-	const char *c_data
-) {
-	u64 length = 0;
-
-	if (c_data == 0)
-		return length;
-
-	while (*c_data++)
-		++length;
-
-	return length;
 }
 
 /// (temporary) string conversion
@@ -298,6 +319,7 @@ String_ToLower(
 	return value;
 }
 
+/// @Note compares bytes, not codepoints
 /// -1 = data_1 < data_2
 ///  0 = data_1 = data_2
 /// +1 = data_1 < data_2
@@ -593,6 +615,7 @@ String_ToUpper(
 	s_data_io->changed = true;
 }
 
+/// no utf support
 instant void
 String_Reverse(
 	String *s_data_io
@@ -658,11 +681,14 @@ String_TrimRight(
 instant u64
 String_Remove(
 	String *s_data_io,
-	u64 index_start,
-	u64 index_end
+	s64 index_start,
+	s64 index_end
 ) {
 	Assert(s_data_io);
 	Assert(!s_data_io->is_reference);
+
+	Assert(index_start >= 0);
+	Assert(index_end   >= 0);
 
 	if (index_start == index_end)
 		return 0;
@@ -670,7 +696,7 @@ String_Remove(
 	if (index_start > index_end)
 		Swap(&index_start, &index_end);
 
-	if (index_end > s_data_io->length)
+	if (index_end > (s64)s_data_io->length)
 		index_end = s_data_io->length;
 
 	u64 length = s_data_io->length - index_end;
@@ -705,50 +731,6 @@ String_Replace(
 	s_data_io->changed = true;
 }
 
-instant s64
-String_Insert(
-	String *s_data_io,
-	const char c_data,
-	u64 index_start
-) {
-	Assert(s_data_io);
-	Assert(!s_data_io->is_reference);
-
-	s64 length = 0;
-
-	if (c_data == '\b') {
-		/// make sure there is something to remove
-		if (index_start) {
-			length = 0;
-			if (s_data_io->value[index_start + length - 1] == '\n')  --length;
-			if (s_data_io->value[index_start + length - 1] == '\r')  --length;
-			if (!length) --length;
-
-			String_Remove(s_data_io, index_start + length, index_start);
-		}
-	}
-	else
-	if (c_data == '\r' OR c_data == '\n') {
-		length = 1;
- 		String_Insert(s_data_io, S("\n"), index_start);
-	}
-	else {
-		length = 1;
-
-		String s_data;
-		s_data.value   = (char *)&c_data;
-		s_data.length  = length;
-		s_data.changed = true;
-		s_data.is_reference = true;
-
-		String_Insert(s_data_io, s_data, index_start);
-	}
-
-	s_data_io->changed = true;
-
-	return length;
-}
-
 instant void
 String_Cut(
 	String *s_data_io,
@@ -778,21 +760,99 @@ String_Cut(
 instant s32
 String_GetCodepoint(
 	String *s_data,
-	u64 index
+	s32 *utf_byte_count
 ) {
 	Assert(s_data);
+	Assert(utf_byte_count);
 
 	if (s_data->length == 0) {
 		LOG_WARNING("No string available to read codepoint from.");
 		return 0;
 	}
 
-	if (index >= s_data->length) {
-		LOG_WARNING("Index out of range. Can not read codepoint from string.");
-		return -1;
+	return UTF8_ToCodepoint(s_data, utf_byte_count);
+}
+
+instant s32
+String_GetCodepointAtIndex(
+	String *s_data,
+	u64 index,
+	s32 *utf_byte_count
+) {
+	Assert(s_data);
+	Assert(utf_byte_count);
+
+	if (s_data->length == 0) {
+		LOG_WARNING("No string available to read codepoint from.");
+		return 0;
 	}
 
-	return s_data->value[index];
+	if (index >= s_data->length)
+		index = s_data->length - 1;
+
+	String s_data_it = S(*s_data);
+	String_AddOffset(&s_data_it, index);
+
+	s32 codepoint = UTF8_ToCodepoint(&s_data_it, utf_byte_count);
+
+	return codepoint;
+}
+
+instant s64
+String_Insert(
+	String *s_data_io,
+	const char c_data,
+	u64 index_start
+) {
+	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
+
+	s32 length = 0;
+
+	if (c_data == '\b') {
+
+		/// begin after the to-be-removed character
+		if (index_start) {
+			length = 0;
+
+			/// remove 2 chars, if it is line-break
+			if (s_data_io->value[index_start + length - 1] == '\n')  --length;
+			if (s_data_io->value[index_start + length - 1] == '\r')  --length;
+
+			if (!length) {
+				s32 utf_byte_count = 0;
+				String_GetCodepointAtIndex(s_data_io, index_start - 1, &utf_byte_count);
+ 				length = -utf_byte_count;
+
+				s64 index_end = index_start + length;
+
+ 				if (index_end < 0)
+					index_start = index_start - index_end;
+			}
+
+			String_Remove(s_data_io, index_start, index_start + length);
+		}
+	}
+	else
+	if (c_data == '\r' OR c_data == '\n') {
+		length = 1;
+ 		String_Insert(s_data_io, S("\n"), index_start);
+	}
+	else {
+		length = 1;
+
+		String s_data;
+		s_data.value   = (char *)&c_data;
+		s_data.length  = length;
+		s_data.changed = true;
+		s_data.is_reference = true;
+
+		String_Insert(s_data_io, s_data, index_start);
+	}
+
+	s_data_io->changed = true;
+
+	return length;
 }
 
 instant u64

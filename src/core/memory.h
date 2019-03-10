@@ -123,7 +123,7 @@ _Memory_Resize(
 	AssertMessage(mem, "Memory could not be reallocated.");
 
 	if (mem != mem_old)
-		LOG_WARNING("Memory resizing resulted in a new base pointer.");
+		LOG_INFO("Memory resizing resulted in a new base pointer.");
 
 	((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
 

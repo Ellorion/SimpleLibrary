@@ -772,18 +772,17 @@ Text_AddLines(
 	FOR_ARRAY(*a_text_lines, it_line) {
 		Text_Line *text_line = &ARRAY_IT(*a_text_lines, it_line);
 
-		u64 it_data = 0;
+		String s_data_it = S(text_line->s_data);
 
-		while(it_data < text_line->s_data.length) {
+		while(s_data_it.length) {
 			Codepoint codepoint;
+			s32 utf_byte_count;
 
-			Assert(text_line->s_data.value);
-
-			s8 ch = text_line->s_data.value[it_data];
+			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
 
  			Codepoint_GetDataConditional(
 				text->font,
-				ch,
+				cp,
 				&codepoint,
 				rect_position.x - x_line_start,
 				codepoint_space.advance
@@ -823,7 +822,7 @@ Text_AddLines(
 
 			rect_position.x += codepoint.advance - codepoint.left_side_bearing;
 
-			++it_data;
+			String_AddOffset(&s_data_it, utf_byte_count);
 		}
 
 		rect_position.x  = x_line_start;
@@ -995,16 +994,17 @@ Text_Cursor_FindIndex(
 
 		bool is_newline_char_once = false;
 
-		FOR(text_line->s_data.length, it_data) {
-			bool is_last_char = (it_data + 1 == text_line->s_data.length);
+		String s_data_it = S(text_line->s_data);
 
+		while(s_data_it.length) {
 			Codepoint codepoint;
+			s32 utf_byte_count;
 
-			s8 character = text_line->s_data.value[it_data];
+			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
 
 			Codepoint_GetDataConditional(
 				text->font,
-				character,
+				cp,
 				&codepoint,
 				rect_position_it.x - x_pos_start,
 				codepoint_space.advance
@@ -1012,19 +1012,18 @@ Text_Cursor_FindIndex(
 
 			rect_position_it.w = codepoint.advance;
 
-			bool is_newline_char = (character == '\r' OR character == '\n');
+			bool is_newline_char = (cp == '\r' OR cp == '\n');
 
 			if (is_newline_char)
 				return cursor_index;
 
-			if (is_last_char)
-				return (cursor_index + 1);
-
 			if (point.x < rect_position_it.x + rect_position_it.w)
 				return cursor_index;
 
-			++cursor_index;
+			cursor_index += utf_byte_count;
 			rect_position_it.x += rect_position_it.w;
+
+			String_AddOffset(&s_data_it, utf_byte_count);
 		}
 	}
 
@@ -1306,7 +1305,8 @@ Text_Cursor_Update(
 
 	const s32 width_cursor = 2;
 
-	u64 cursor_index = 0;
+	u64 index_cursor = 0;
+	u64 index_line_x = 0;
 
 	Text_Cursor *cursor = &text_io->cursor;
 
@@ -1372,10 +1372,10 @@ Text_Cursor_Update(
 	FOR(text_io->a_text_lines.count, it_line) {
 		text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
 
-		if (    cursor->data.index_select_start > cursor_index + text_line->s_data.length
-			AND cursor->data.index_select_end   > cursor_index + text_line->s_data.length
+		if (    cursor->data.index_select_start > index_cursor + text_line->s_data.length
+			AND cursor->data.index_select_end   > index_cursor + text_line->s_data.length
 		) {
-			cursor_index += text_line->s_data.length;
+			index_cursor += text_line->s_data.length;
 			rect_position_it.y += rect_position_it.h;
 			continue;
 		}
@@ -1385,14 +1385,19 @@ Text_Cursor_Update(
 
 		bool is_newline_char_once = false;
 
-		FOR(text_line->s_data.length, it_data) {
-			Codepoint codepoint;
+		String s_data_it = S(text_line->s_data);
 
-			s8 character = text_line->s_data.value[it_data];
+		index_line_x = 0;
+
+		while(s_data_it.length) {
+			Codepoint codepoint;
+			s32 utf_byte_count;
+
+			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
 
 			Codepoint_GetDataConditional(
 				text_io->font,
-				character,
+				cp,
 				&codepoint,
 				rect_position_it.x - x_pos_start,
 				codepoint_space.advance
@@ -1400,18 +1405,18 @@ Text_Cursor_Update(
 
 			rect_position_it.w = codepoint.advance;
 
-			bool is_newline_char = (character == '\r' OR character == '\n');
+			bool is_newline_char = (cp == '\r' OR cp == '\n');
 
-			if (cursor->data.index_select_start == cursor_index AND !found_start) {
+			if (cursor->data.index_select_start == index_cursor AND !found_start) {
 				found_start = true;
 			}
 
-			if (cursor->data.index_select_end == cursor_index AND !found_end) {
+			if (cursor->data.index_select_end == index_cursor AND !found_end) {
 				bool is_invalid = Text_Cursor_Move(
 					text_io,
 					rect_position_it,
-					cursor_index,
-					it_data,
+					index_cursor,
+					index_line_x,
 					text_line,
 					&found_start,
 					&found_end
@@ -1444,7 +1449,7 @@ Text_Cursor_Update(
 			if (found_end AND !found_end_once) {
 				if (!is_newline_char_once) {
 					/// update index, if you seek to '\r' and skip to '\n'
-					cursor->data.index_select_end = cursor_index;
+					cursor->data.index_select_end = index_cursor;
 
 					Rect rect_cursor = rect_position_it;
 					Text_Cursor_Render(text_io, rect_cursor, width_cursor);
@@ -1474,10 +1479,14 @@ Text_Cursor_Update(
 				}
 			}
 
-			++cursor_index;
+			index_cursor += utf_byte_count;
+			index_line_x += utf_byte_count;
+
 			rect_position_it.x += rect_position_it.w;
 
 			is_newline_char_once = is_newline_char;
+
+			String_AddOffset(&s_data_it, utf_byte_count);
 		}
 
 		if (it_line + 1 < text_io->a_text_lines.count) {
@@ -1487,13 +1496,13 @@ Text_Cursor_Update(
 	}
 
 	if (!found_end_once) {
-		cursor->data.index_select_end = cursor_index;
+		cursor->data.index_select_end = index_cursor;
 
 		if (text_line) {
 			bool is_invalid = Text_Cursor_Move(
 				text_io,
 				rect_position_it,
-				cursor_index,
+				index_cursor,
 				text_line->s_data.length,
 				text_line,
 				&found_start,
@@ -1569,6 +1578,8 @@ Text_RemoveSelection(
 	return was_selection_removed;
 }
 
+/// @Simplicity
+/// could use a cleanup / rewrite
 instant void
 Text_UpdateInput(
     Text *text_io,
@@ -1639,45 +1650,59 @@ Text_UpdateInput(
 		if (!cursor->is_selecting)
 			cursor->data.index_select_start = cursor->data.index_select_end;
 
+		s32 utf_byte_count = 0;
+
+		u64 cursor_index = cursor->data.index_select_end;
+
+		if (offset_index_x < 0 AND cursor_index)
+			--cursor_index;
+
+		s32 codepoint = String_GetCodepointAtIndex(&text_io->s_data, cursor_index, &utf_byte_count);
+
 		/// character block selection
-		if (    keyboard->pressing[VK_CONTROL]
+		if (    codepoint > 0
+			AND keyboard->pressing[VK_CONTROL]
 			AND offset_index_x != 0
 		) {
-			u64 cursor_index = cursor->data.index_select_end;
-
             if (offset_index_x > 0) {
 				if (cursor_index < text_io->s_data.length) {
-					s32  codepoint = String_GetCodepoint(&text_io->s_data, cursor_index);
 					CODEPOINT_TYPE cp_type = Codepoint_GetType(codepoint);
 
 					while(    cp_type == Codepoint_GetType(codepoint)
 						  AND cursor_index < text_io->s_data.length
 					) {
-						codepoint = String_GetCodepoint(&text_io->s_data, ++cursor_index);
+						cursor_index += utf_byte_count;
+						codepoint = String_GetCodepointAtIndex(&text_io->s_data, cursor_index, &utf_byte_count);
+						Assert(codepoint >= 0);
 					}
 
 					if (cursor_index > 0)
+						/// @UTF
 						cursor->data.index_select_end = cursor_index - 1;
 				}
             }
             else {
 				if (cursor_index) {
-					s32 codepoint = String_GetCodepoint(&text_io->s_data, cursor_index - 1);
+					s32 codepoint = String_GetCodepointAtIndex(&text_io->s_data, cursor_index - 1, &utf_byte_count);
+					Assert(codepoint >= 0);
+
 					CODEPOINT_TYPE cp_type = Codepoint_GetType(codepoint);
 
 					do {
-						codepoint = String_GetCodepoint(&text_io->s_data, --cursor_index - 1);
+						codepoint = String_GetCodepointAtIndex(&text_io->s_data, --cursor_index - 1, &utf_byte_count);
+						Assert(codepoint >= 0);
 					} while(
 							cp_type == Codepoint_GetType(codepoint)
 						AND cursor_index > 0
 					);
 
+					/// @UTF
 					cursor->data.index_select_end = cursor_index + 1;
 				}
             }
 		}
 
-		cursor->move_index_x += offset_index_x;
+		cursor->move_index_x += (offset_index_x * utf_byte_count);
 		cursor->move_index_y += offset_index_y;
 
 		IF_SET(cursor_changed_out) = true;
@@ -1764,8 +1789,18 @@ Text_UpdateInput(
 
 				if (is_char_valid AND can_insert_char) {
 					if (cursor->data.index_select_end + 1 < text_io->s_data.length) {
-						s32 codepoint_current = String_GetCodepoint(&text_io->s_data, cursor->data.index_select_end);
-						s32 codepoint_next    = String_GetCodepoint(&text_io->s_data, cursor->data.index_select_end + 1);
+						s32 utf_byte_count;
+						s32 codepoint_current = String_GetCodepointAtIndex(
+													&text_io->s_data,
+													cursor->data.index_select_end,
+													&utf_byte_count
+												);
+
+						s32 codepoint_next    = String_GetCodepointAtIndex(
+													&text_io->s_data,
+													cursor->data.index_select_end + utf_byte_count,
+													&utf_byte_count
+												);
 
 						/// do not insert a newline seperator between '\r' and '\n'
 						/// in case windows linebreaks would have been used
@@ -1897,4 +1932,14 @@ Text_GetString(
 	Assert(s_data);
 
 	*s_data = &text->s_data;
+}
+
+instant void
+Text_UseWordWrap(
+	Text *text,
+	bool enable
+) {
+	Assert(text);
+
+	text->data.use_word_wrap = enable;
 }

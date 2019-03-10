@@ -145,7 +145,7 @@ Test_Strings(
 		AssertMessage(String_IsEqual(s_data, S("\r\na\n\r" )), "[Test] Insert String failed (2).");
 
 		String_Insert(&s_data, '\b', s_data.length);
-		AssertMessage(String_IsEqual(s_data, S("\r\na\n"   )), "[Test] Insert String failed (3).");
+ 		AssertMessage(String_IsEqual(s_data, S("\r\na\n"   )), "[Test] Insert String failed (3).");
 
 		String_Insert(&s_data, '\b', s_data.length);
 		AssertMessage(String_IsEqual(s_data, S("\r\na"     )), "[Test] Insert String failed (4).");
@@ -157,5 +157,33 @@ Test_Strings(
 		AssertMessage(String_IsEqual(s_data, S(""          )), "[Test] Insert String failed (6).");
 
 		String_Destroy(&s_data);
+    }
+
+    /// UTF-8 tests
+    {
+    	String_Destroy(&s_data);
+
+		String_Append(&s_data, S("録を行銀チ"));
+
+        AssertMessage(String_IsEqual(s_data, S("録を行銀チ")),
+					"[Test] UTF8 String does not match.");
+        AssertMessage(String_IsEqual(s_data, S("録を行銀チ 録を行銀チ"), String_GetLength("録を行銀チ")),
+					"[Test] UTF8 String data does not match (truncated)");
+
+		/// @Note: impossible to remove something before the first character
+		/// String_Insert(&s_data, '\b', 0);
+
+		/// will move to the end of the first codepoint and remove it,
+		/// by removing all bytes 'backwards' until the codepoint starts
+		String_Insert(&s_data, '\b', 1);
+  		AssertMessage(String_IsEqual(s_data, S("を行銀チ")),
+					"[Test] UTF8 Insert String failed (1).");
+
+		/// begin after the last codepoint byte, calc. the amount of
+		/// bytes which represent the codepoint and remove them 'backwards'
+		String_Insert(&s_data, '\b', s_data.length);
+		AssertMessage(String_IsEqual(s_data, S("を行銀")),
+					"[Test] UTF8 Insert String failed (2).");
+
     }
 }
