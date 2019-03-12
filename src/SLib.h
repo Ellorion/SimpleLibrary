@@ -6,6 +6,8 @@
 #define DEBUG_EVENT_STATUS		0
 #define DEBUG_BENCHMARK			0
 
+/// Operating System: Windows
+///
 /// Compiler: g++ (8.2.0) (mingw)
 ///
 /// Linker flags:
@@ -66,6 +68,7 @@
 
 #include <iostream>
 #include <math.h>		/// floor
+#include <winsock.h>
 
 __attribute__((gnu_inline, always_inline))
 __inline__ static void debug_break(void)
@@ -150,6 +153,7 @@ _AssertMessage(
 #endif
 
 #define LOG_DEBUG(text) std::cout << text << std::endl;
+#define LOG_ERROR(text) std::cerr << "[Error] " << text << std::endl
 
 #if SHOW_INFO
 #	define LOG_INFO(_text) std::cout << "Info: " << _text << std::endl;
@@ -276,6 +280,8 @@ IsNumeric(
 #include "core/files.h"
 #include "core/image.h"
 #include "core/map.h"
+#include "core/thread.h"
+#include "core/network.h"
 
 #include "utility/base64.h"
 #include "utility/clipboard.h"

@@ -6,8 +6,6 @@
 	APIENTRY			\
 	WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_text, int nCmdShow)
 
-#define LOG_ERROR(text) std::cerr << "[Error] " << text << std::endl
-
 #define Window_IsCreated(window) (window->hWnd != 0)
 
 #define Window_ReadMessage(_msg, _running, _ptr_window, _is_zooming)				\

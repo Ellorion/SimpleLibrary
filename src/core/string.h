@@ -73,6 +73,27 @@ String_PrintLine(
 	std::cout << std::endl;
 }
 
+instant void
+String_Print(
+	String s_data,
+	u64 length
+) {
+	length = MIN(s_data.length, length);
+
+	FOR(length, it) {
+		std::cout << s_data.value[it];
+	}
+}
+
+instant void
+String_PrintLine(
+	String s_data,
+	u64 length
+) {
+	String_Print(s_data, length);
+	std::cout << std::endl;
+}
+
 /// (temporary) string conversion
 instant String
 S(
