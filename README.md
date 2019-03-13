@@ -1,3 +1,3 @@
 # SimpleLibrary
 
-Simple functions to use with g++
+Simple functions to use with g++ (windows)
