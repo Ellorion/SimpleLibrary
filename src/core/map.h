@@ -10,7 +10,7 @@ template <typename K, typename V>
 struct Map {
 	Array<Pair<K, V>> a_data;
 
-	bool is_key_unique = false;
+	bool is_key_overwriteable = false;
 };
 
 template <typename K, typename V>
@@ -70,7 +70,7 @@ Map_Set(
 	bool found = Map_Find(map, key, &index);
 
 	if (found) {
-		if (!map->is_key_unique) {
+		if (!map->is_key_overwriteable) {
 			Pair<K, V> *t_pair = &ARRAY_IT(map->a_data, index);
 			t_pair->value = value;
 		}

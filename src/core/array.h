@@ -191,6 +191,7 @@ Array_Find(
 	return false;
 }
 
+/// true if found / existed already
 template <typename T>
 instant bool
 Array_FindOrAdd(
@@ -216,6 +217,18 @@ Array_FindOrAdd(
 	}
 
 	return found_element;
+}
+
+template <typename T>
+instant bool
+Array_AddUnique(
+	Array<T> *array_io,
+	T element
+) {
+	Assert(array_io);
+
+	T *t_element_found;
+	return !Array_FindOrAdd(array_io, element, &t_element_found);
 }
 
 /// Returns T, so dynamic memory can still be free'd

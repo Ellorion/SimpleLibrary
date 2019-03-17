@@ -14,6 +14,8 @@
 ///	   [-lcomdlg32]
 ///		-lopengl32
 ///		-lgdi32
+///		-lws2_32
+///		-liphlpapi
 ///
 /// Compiler options:
 ///		-fno-exceptions
@@ -67,8 +69,9 @@
 #include <GL/gl.h>
 
 #include <iostream>
-#include <math.h>		/// floor
+#include <math.h>
 #include <winsock.h>
+#include <iphlpapi.h>
 
 __attribute__((gnu_inline, always_inline))
 __inline__ static void debug_break(void)
@@ -265,6 +268,21 @@ IsNumeric(
 	char character
 ) {
 	return (character >= '0' AND character <= '9');
+}
+
+instant void
+ToHex(
+	const char value,
+	char *hex_high,
+	char *hex_low
+) {
+	Assert(hex_high);
+	assert(hex_low);
+
+	const char *c_hex = "0123456789ABCDEF";
+
+	*hex_high = c_hex[(value >> 4) & 0xF];
+	*hex_low  = c_hex[(value >> 0) & 0xF];
 }
 
 #include "core/memory.h"

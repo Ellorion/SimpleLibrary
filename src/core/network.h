@@ -8,6 +8,19 @@ struct Network {
 };
 
 instant bool
+Network_Init(
+) {
+	WSADATA winsock_data;
+
+	if (WSAStartup(MAKEWORD(2, 2), &winsock_data) != NO_ERROR) {
+		LOG_ERROR("Winsock initialisation failed.");
+		return false;
+	}
+
+	return true;
+}
+
+instant bool
 Network_IsSocketValid(
 	Network *network
 ) {
@@ -37,11 +50,7 @@ Network_Create(
 	Network network = {};
 	network.socket = INVALID_SOCKET;
 
-	WSADATA winsock_data;
-	if (WSAStartup(MAKEWORD(2, 2), &winsock_data) != NO_ERROR) {
-		LOG_ERROR("Winsock initialisation failed.");
-		return network;
-	}
+	Network_Init();
 
 	network.socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -152,4 +161,96 @@ Network_Receive(
 		AssertMessage(false, "Invalid network socket [recv].");
 
 	return recv(network->socket, s_data_io->value, s_data_io->length, 0);
+}
+
+instant String
+Network_GetName(
+	const char *c_ip_address
+) {
+	Assert(c_ip_address);
+
+	IPAddr   ip_address = inet_addr(c_ip_address);
+	hostent *dest_info  = gethostbyaddr((char *)&ip_address, 4, AF_INET);
+
+	String s_result;
+
+ 	if (dest_info)
+		s_result = String_Copy(dest_info->h_name);
+
+	return s_result;
+}
+
+instant String
+Network_GetName(
+) {
+	char c_buffer[1024];
+
+	String s_result;
+
+	if(gethostname(c_buffer, sizeof(c_buffer)) != SOCKET_ERROR) {
+		s_result = String_Copy(c_buffer, String_GetLength(c_buffer));
+		String_Append(&s_result, S("\0", 1));
+	}
+
+	return s_result;
+}
+
+instant String
+Network_GetIPByName(
+	String s_name
+) {
+	String s_ip;
+
+	if (String_EndWith(&s_name, S("\0", 1), false)) {
+		hostent *host = gethostbyname(s_name.value);
+
+		char *c_ip = inet_ntoa(*(in_addr *)host->h_addr);
+
+		/// not by reference
+		/// the return struct takes ownership
+		/// also includes 0-terminator
+		s_ip.value   = c_ip;
+		s_ip.length  = String_GetLength(c_ip) + 1;
+		s_ip.changed = true;
+	}
+
+	return s_ip;
+}
+
+instant String
+Network_GetMAC(
+	String s_ip_address
+) {
+	String s_result;
+
+	if (!String_EndWith(&s_ip_address, S("\0", 1), false))
+		return s_result;
+
+    u64 mac_address[2];
+    u64 mac_address_len = 6;
+
+    IPAddr ip_address = inet_addr(s_ip_address.value);
+
+    s32 request = SendARP(ip_address, 0, mac_address, &mac_address_len);
+
+    if (    request == NO_ERROR
+		AND mac_address_len
+	) {
+        char* mac_address_it = (char*)&mac_address;
+        char c_hex[2];
+
+        FOR(mac_address_len, it) {
+        	ToHex(*mac_address_it, &c_hex[0], &c_hex[1]);
+
+        	String_Append(&s_result, S((char *)&c_hex[0], 1));
+        	String_Append(&s_result, S((char *)&c_hex[1], 1));
+
+        	if (it < mac_address_len - 1)
+				String_Append(&s_result, S("-", 1));
+
+			++mac_address_it;
+        }
+    }
+
+	return s_result;
 }

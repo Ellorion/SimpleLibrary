@@ -571,8 +571,8 @@ Widget_Redraw(
 			layout.padding = 0;
 
 			{
-				Layout_Block *t_block;
 				u64 index_block = 0;
+				Layout_Block *t_block = 0;
 
 				index_block = Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
 
@@ -672,7 +672,7 @@ Widget_Redraw(
 			Layout_Create(&layout, &widget_io->layout_data, false);
 			layout.padding = 0;
 
-			Layout_Block *t_block;
+			Layout_Block *t_block = 0;
 			u64 index_block = Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
 
 			if (!Layout_GetBlock(&layout, index_block, &t_block))
@@ -2204,7 +2204,7 @@ Widget_LoadFile(
 	String_Append(s_data, File_ReadAll(s_filename, true));
 }
 
-instant String*
+instant String *
 Widget_GetTextData(
 	Widget *widget
 ) {
