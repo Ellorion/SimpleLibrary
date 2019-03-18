@@ -275,7 +275,7 @@ Array_FindFirstString(
 
 	FOR_ARRAY(*as_find, it) {
 		String *ts_find = &ARRAY_IT(*as_find, it);
-		s64 t_index_found = String_IndexOf(s_data, *ts_find);
+		s64 t_index_found = String_IndexOf(s_data, *ts_find, 0, true);
 
 		if (t_index_found >= 0) {
 			if (t_index_found < index_lowest) {

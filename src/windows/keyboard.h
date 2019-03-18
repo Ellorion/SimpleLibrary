@@ -17,6 +17,10 @@ struct Keyboard {
     bool is_up				= false;	/// "any" key is up
     bool is_key_sym			= false;	/// key could be translated
     u8   key_states[256]	= {};
+
+    /// to prevent starting an action when app was started with return key,
+    /// since return key would register as (unintended) keyup or trigger event
+    bool enable_return_post_startup = true;
 };
 
 instant void
@@ -30,6 +34,8 @@ Keyboard_Reset(
 	bool pressing[KEYBOARD_KEYCOUNT] = {};
 	bool toggled[KEYBOARD_KEYCOUNT]  = {};
 
+	bool is_enabled = keyboard_out->enable_return_post_startup;
+
 	if (!full_reset) {
 		Memory_Copy(&pressing, &keyboard_out->pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
 		Memory_Copy(&toggled , &keyboard_out->toggled , sizeof(bool) * KEYBOARD_KEYCOUNT);
@@ -41,6 +47,8 @@ Keyboard_Reset(
 		Memory_Copy(&keyboard_out->pressing, &pressing, sizeof(bool) * KEYBOARD_KEYCOUNT);
 		Memory_Copy(&keyboard_out->toggled , &toggled , sizeof(bool) * KEYBOARD_KEYCOUNT);
     }
+
+    keyboard_out->enable_return_post_startup = is_enabled;
 }
 
 instant void
@@ -105,6 +113,11 @@ Keyboard_GetKeySym(
 	}
 }
 
+/// @Info:
+/// 'a' -> msg.wParam                 'A'
+/// 'a' -> keyboard_io->key_sym       'a'
+/// VK_ESCAPE -> msg.wParam           VK_ESCAPE
+/// VK_ESCAPE -> keyboard_io->key_sym '\0'      (invalid)
 instant void
 Keyboard_SetDown(
 	Keyboard *keyboard_io,
@@ -135,10 +148,22 @@ Keyboard_SetUp(
 	Assert(keyboard_io);
 	Assert(msg);
 
-	keyboard_io->key_scan = MapVirtualKey(msg->wParam, 0);
-	keyboard_io->last_key_virtual 	= msg->wParam;
+	if (keyboard_io->enable_return_post_startup) {
+		if (keyboard_io->pressing[VK_RETURN]) {
+			if (msg->wParam == VK_RETURN)
+				keyboard_io->enable_return_post_startup = false;
+
+			return;
+		}
+		else {
+			keyboard_io->enable_return_post_startup = false;
+		}
+	}
 
 	if (keyboard_io->pressing[msg->wParam]) {
+		keyboard_io->key_scan = MapVirtualKey(msg->wParam, 0);
+		keyboard_io->last_key_virtual 		= msg->wParam;
+
 		keyboard_io->down[msg->wParam] 		= false;
 		keyboard_io->up[msg->wParam] 		= true;
 		keyboard_io->pressing[msg->wParam] 	= false;
@@ -147,8 +172,8 @@ Keyboard_SetUp(
 
 		Keyboard_GetKeySym(keyboard_io, msg);
 
-		keyboard_io->is_down 			= false;
-		keyboard_io->is_up				= true;
+		keyboard_io->is_down = false;
+		keyboard_io->is_up	 = true;
 	}
 }
 

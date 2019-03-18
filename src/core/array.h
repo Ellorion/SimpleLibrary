@@ -384,14 +384,14 @@ template <typename T>
 instant void
 Array_Filter(
 	Array<T> *a_data_io,
-	bool (*OnFilterIfTrue) (T value)
+	bool (*OnKeepIfMatch) (T value)
 ) {
 	Assert(a_data_io);
 
 	FOR_ARRAY(*a_data_io, it) {
 		T t_data = ARRAY_IT(*a_data_io, it);
 
-		if (OnFilterIfTrue(t_data)) {
+		if (!OnKeepIfMatch(t_data)) {
 			Array_Remove(a_data_io, it);
 			--it;
 		}
@@ -402,14 +402,14 @@ template <typename T, typename Func>
 instant void
 Array_Filter(
 	Array<T> *a_data_io,
-	Func OnFilterIfTrue
+	Func OnKeepIfMatch
 ) {
 	Assert(a_data_io);
 
 	FOR_ARRAY(*a_data_io, it) {
 		T t_data = ARRAY_IT(*a_data_io, it);
 
-		if (OnFilterIfTrue(t_data)) {
+		if (!OnKeepIfMatch(t_data)) {
 			Array_Remove(a_data_io, it);
 			--it;
 		}
@@ -420,19 +420,19 @@ template <typename T, typename Func>
 instant void
 Array_Filter(
 	Array<T> *a_data_io,
-	Array<Func> a_OnFilterIfTrue
+	Array<Func> a_OnKeepIfMatch
 ) {
 	Assert(a_data_io);
 
 	FOR_ARRAY(*a_data_io, it_data) {
 		T t_data = ARRAY_IT(*a_data_io, it_data);
 
-		FOR_ARRAY(a_OnFilterIfTrue, it_func) {
-			Func OnFilterIfTrue = ARRAY_IT(a_OnFilterIfTrue, it_func);
+		FOR_ARRAY(a_OnKeepIfMatch, it_func) {
+			Func OnKeepIfMatch = ARRAY_IT(a_OnKeepIfMatch, it_func);
 
-			bool result = OnFilterIfTrue(t_data);
+			bool result = OnKeepIfMatch(t_data);
 
-			if (result) {
+			if (!result) {
 				Array_Remove(a_data_io, it_data);
 				--it_data;
 				break;
@@ -446,7 +446,7 @@ instant void
 Array_Filter(
 	Array<T> *a_dest_out,
 	Array<T> *a_source,
-	bool (*OnFilterIfTrue) (T value)
+	bool (*OnKeepIfMatch) (T value)
 ) {
 	Assert(a_source);
 	Assert(a_dest_out);
@@ -456,7 +456,7 @@ Array_Filter(
 	FOR_ARRAY(*a_source, it) {
 		T t_data = ARRAY_IT(*a_source, it);
 
-		if (!OnFilterIfTrue(t_data)) {
+		if (OnKeepIfMatch(t_data)) {
 			Array_Add(a_dest_out, t_data);
 		}
 	}
@@ -467,7 +467,7 @@ instant void
 Array_Filter(
 	Array<T> *a_dest_out,
 	Array<T> *a_source,
-	Func OnFilterIfTrue
+	Func OnKeepIfMatch
 ) {
 	Assert(a_source);
 	Assert(a_dest_out);
@@ -477,7 +477,7 @@ Array_Filter(
 	FOR_ARRAY(*a_source, it) {
 		T t_data = ARRAY_IT(*a_source, it);
 
-		if (!OnFilterIfTrue(t_data)) {
+		if (OnKeepIfMatch(t_data)) {
 			Array_Add(a_dest_out, t_data);
 		}
 	}

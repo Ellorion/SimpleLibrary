@@ -73,7 +73,7 @@ Test_Strings(
 	String_Destroy(&s_buffer);
 
 	String_Append(&s_buffer, S("xxx_test_xxx"));
-	AssertMessage(String_IndexOf(&s_buffer, S("test")) == 4, "[Test] String indexof failed.");
+	AssertMessage(String_IndexOf(&s_buffer, S("test"), 0, true) == 4, "[Test] String indexof failed.");
 	AssertMessage(String_StartWith(&s_buffer, S("xxx_"), true), "[Test] String startwidth failed.");
 
 	long pos_found = 0;
@@ -96,7 +96,7 @@ Test_Strings(
 	String_Destroy(&s_buffer);
 
 	String_Append(&s_buffer, S("aaa_test_bbb"));
-	AssertMessage(String_IndexOfRev(&s_buffer, S("bbb")) == 9, "[Test] String indexofrev failed.");
+	AssertMessage(String_IndexOfRev(&s_buffer, S("bbb"), true) == 9, "[Test] String indexofrev failed.");
 
 	String_Destroy(&s_buffer);
 

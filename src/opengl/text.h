@@ -564,6 +564,9 @@ Text_BuildLines(
 	Assert(as_words);
  	Assert(a_text_line_out);
 
+	Font *font = text->font;
+	u64 advance_space = Codepoint_GetAdvance(font, ' ');
+
 	Text_Line *text_line = 0;
 
  	s32 line_height    = Font_GetLineHeight(text->font);
@@ -593,6 +596,15 @@ Text_BuildLines(
 
 			text_line->s_data.length += ts_word->length;
 
+			u64 advance_word = Codepoint_GetStringAdvance(
+									font,
+									0,
+									advance_space,
+									ts_word
+								);
+
+			text_line->width_pixel += advance_word;
+
 			index_data += ts_word->length;
 
 			if (String_EndWith(ts_word, S("\n"), true)) {
@@ -616,14 +628,12 @@ Text_BuildLines(
 		/// this works without word-wrap (in the code above) due to the lack
 		/// of codepoint data retrieval
 
-		Font *font = text->font;
 		Rect  rect = text->data.rect;
 
 		Rect_AddPadding(&rect, text->data.rect_padding);
 
 		Rect rect_line_current = {rect.x, rect.y, 0, 0};
 
-		u64 advance_space = Codepoint_GetAdvance(font, ' ');
 		s32 line_height = Font_GetLineHeight(font);
 		u64 index_line = 0;
 		bool line_start = true;
@@ -1821,6 +1831,11 @@ Text_UpdateInput(
 					IF_SET(cursor_changed_out) = true;
 
 					Text_Update(text_io);
+
+					/// to trigger on_text_changed event,
+					/// since this would be set to false
+					/// with text_update
+					text_io->s_data.changed = true;
 				}
 			}
 		}

@@ -271,8 +271,8 @@ operator < (
 		if (entry_1.s_name == "..") return false;
 		if (entry_2.s_name == "..") return false;
 
-		long index_1 = String_IndexOfRev(&entry_1.s_name, S("."));
-		long index_2 = String_IndexOfRev(&entry_2.s_name, S("."));
+		long index_1 = String_IndexOfRev(&entry_1.s_name, S("."), true);
+		long index_2 = String_IndexOfRev(&entry_2.s_name, S("."), true);
 
 		u64 length = 0;
 
@@ -294,8 +294,8 @@ operator > (
 		if (entry_1.s_name == "..") return false;
 		if (entry_2.s_name == "..") return false;
 
-		long index_1 = String_IndexOfRev(&entry_1.s_name, S("."));
-		long index_2 = String_IndexOfRev(&entry_2.s_name, S("."));
+		long index_1 = String_IndexOfRev(&entry_1.s_name, S("."), true);
+		long index_2 = String_IndexOfRev(&entry_2.s_name, S("."), true);
 
 		u64 length = 0;
 
@@ -459,7 +459,7 @@ File_GetExtension(
 ) {
 	String s_result;
 
-	s64 pos_ext = String_IndexOfRev(s_data, S("."));
+	s64 pos_ext = String_IndexOfRev(s_data, S("."), true);
 
 	if (!pos_ext) {
 		return s_result;

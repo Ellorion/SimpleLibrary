@@ -58,6 +58,7 @@ struct Widget_Data {
 	bool is_focusable  = true;
 	bool is_scrollable = false;
 	bool is_checkable  = false;
+	bool is_filter_case_sensitive = true;
 
 	bool can_popout_focus_change = false;
 
@@ -424,13 +425,15 @@ Widget_Update(
 	/// using the update function here again, would invalidate that data,
 	/// since the data would definitely have changed
 	if (!Widget_IsListType(widget_io))
-		Text_Update(&widget_io->text);
+		widget_io->events.on_text_change = Text_Update(&widget_io->text);
 
- 	if (widget_io->trigger_autosize){
+ 	if (widget_io->trigger_autosize) {
 		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
 		Text_Data *settings = &widget_io->text.data;
 
-		if (layout_data->auto_width AND settings->content_width) {
+		if (    layout_data->auto_width
+			AND settings->content_width
+		) {
 			s32 width_auto = settings->content_width;
 			Widget_AddBorderSizes(widget_io, &width_auto, 0);
 
@@ -440,7 +443,9 @@ Widget_Update(
 			}
 		}
 
-		if (layout_data->auto_height AND settings->content_height) {
+		if (    layout_data->auto_height
+			AND settings->content_height
+		) {
 			s32 height_auto = settings->content_height;
 			Widget_AddBorderSizes(widget_io, 0, &height_auto);
 
@@ -470,7 +475,7 @@ Widget_Update(
 	}
 
 	if (widget_io->data.s_row_filter.changed) {
-#if 0
+#if 1
 		widget_io->data.as_filter_data.by_reference = true;
 
 		Array_Filter(
@@ -478,7 +483,12 @@ Widget_Update(
 			&widget_io->data.as_row_data,
 
 			[&](String s_value) {
-				return (String_IndexOf(&s_value, widget_io->data.s_row_filter) >= 0);
+				return (String_IndexOf(
+							&s_value,
+							widget_io->data.s_row_filter,
+							0,
+							widget_io->data.is_filter_case_sensitive) >= 0
+						);
 			}
 		);
 #else
@@ -491,7 +501,9 @@ Widget_Update(
 				String *ts_data = &ARRAY_IT(widget_io->data.as_row_data, it_row);
 
 				if (String_IndexOf(	ts_data,
-									widget_io->data.s_row_filter) >= 0
+									widget_io->data.s_row_filter,
+									0,
+									widget_io->data.is_filter_case_sensitive) >= 0
 				) {
 					Array_Add(&widget_io->data.as_filter_data, *ts_data);
 				}
@@ -855,7 +867,8 @@ Widget_Render(
 				rect_text->y += height_row_step;
 				widget_io->rect_content.h += height_row_step;
 
-				ts_data->changed = false;
+				if (ts_data->changed)
+					ts_data->changed = false;
 			}
 
 			if (widget_io->rect_content.h) {
@@ -1436,7 +1449,13 @@ Widget_GetSelectedRow(
 	if (!widget->data.as_row_data.count)
 		return;
 
-	*s_data_out = ARRAY_IT(widget->data.as_row_data, widget->data.active_row_id);
+	if (widget->data.as_filter_data.count) {
+		*s_data_out = ARRAY_IT(widget->data.as_filter_data, widget->data.active_row_id);
+	}
+	else {
+		if (String_IsEmpty(&widget->data.s_row_filter))
+			*s_data_out = ARRAY_IT(widget->data.as_row_data   , widget->data.active_row_id);
+	}
 }
 
 instant String
@@ -1609,11 +1628,15 @@ Widget_CreateLabel(
 	if (!rect_box.w) {
 		rect_box.w = font->size;
 		Widget_AddBorderSizes(&t_widget, &rect_box.w, 0);
+
+		t_widget.layout_data.settings.auto_width = true;
 	}
 
 	if (!rect_box.h) {
 		rect_box.h = Font_GetLineHeight(font);
 		Widget_AddBorderSizes(&t_widget, 0, &rect_box.h);
+
+		t_widget.layout_data.settings.auto_height = true;
 	}
 
 	t_widget.type         = WIDGET_LABEL;
@@ -1621,8 +1644,6 @@ Widget_CreateLabel(
 	t_widget.window       = window;
 
 	t_widget.layout_data.settings.rect = rect_box;
-	t_widget.layout_data.settings.auto_height = true;
-	t_widget.layout_data.settings.auto_width  = true;
 
 	t_widget.data.is_focusable = false;
 
@@ -1909,7 +1930,8 @@ instant Widget
 Widget_CreateTextBox(
 	Window *window,
 	Font *font,
-	Rect rect_box
+	Rect rect_box,
+	bool is_multiline
 ) {
 	Widget t_widget = {};
 
@@ -1942,7 +1964,12 @@ Widget_CreateTextBox(
 	t_widget.text.data.rect = rect_box;
 	t_widget.text.data.is_editable = true;
 
-	t_widget.text.allow_tab_input = true;
+	if (is_multiline) {
+		t_widget.text.allow_tab_input = true;
+	}
+	else {
+		t_widget.text.data.use_no_linebreak = true;
+	}
 
 	return t_widget;
 }
@@ -2119,7 +2146,7 @@ Widget_CreateComboBox(
 	t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_width = true;
 
-	Widget wg_text   = Widget_CreateTextBox(window, font, {});
+	Widget wg_text   = Widget_CreateTextBox(window, font, {}, false);
 	Widget wg_button = Widget_CreateButton( window, font, {}, S("+"));
 	Widget wg_list   = Widget_CreateListBox(window, font, {0, 0, 0, combo_height});
 

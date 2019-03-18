@@ -230,7 +230,10 @@ String_Insert(
 	String s_dest_io_it = S(*s_dest_io);
 
 	String s_buffer;
-	String_Append(&s_buffer, s_dest_io_it, index_start);
+
+	if (index_start)
+		String_Append(&s_buffer, s_dest_io_it, index_start);
+
  	String_Append(&s_buffer, s_source);
 
 	String_AddOffset(&s_dest_io_it, index_start);
@@ -385,18 +388,20 @@ instant bool
 String_IsEqual(
 	const char *c_first,
 	const char *c_second,
-	u64 length = 0
+	u64 length = 0,
+	bool is_case_sensitive = true
 ) {
-	return (String_Compare(S(c_first), S(c_second), length, true) == 0);
+	return (String_Compare(S(c_first), S(c_second), length, is_case_sensitive) == 0);
 }
 
 instant bool
 String_IsEqual(
 	String s_first,
 	String s_second,
-	u64 length = 0
+	u64 length = 0,
+	bool is_case_sensitive = true
 ) {
-	return (String_Compare(s_first, s_second, length, true) == 0);
+	return (String_Compare(s_first, s_second, length, is_case_sensitive) == 0);
 }
 
 instant String
@@ -442,7 +447,8 @@ instant s64
 String_IndexOf(
 	String *s_data,
 	String  s_key,
-	s64 index_start = 0
+	s64 index_start_opt,
+	bool is_case_sensitive
 ) {
 	Assert(s_data);
 
@@ -456,11 +462,11 @@ String_IndexOf(
 
 	u64 length_data = s_data->length;
 
-	if (index_start < 0)
-		index_start = 0;
+	if (index_start_opt < 0)
+		index_start_opt = 0;
 
-	FOR_START(index_start, length_data, index) {
-		if (String_IsEqual(s_data->value + index, s_key.value, s_key.length)) {
+	FOR_START(index_start_opt, length_data, index) {
+		if (String_IsEqual(s_data->value + index, s_key.value, s_key.length, is_case_sensitive)) {
 			return index;
 		}
 	}
@@ -472,6 +478,7 @@ instant s64
 String_IndexOfRev(
 	String *s_data,
 	String  s_key,
+	bool is_case_sensitive,
 	s64 index_start = -1
 ) {
 	int result = -1;
@@ -492,7 +499,7 @@ String_IndexOfRev(
 		index_start = (s64)s_data->length - 1;
 
 	for(s64 it = index_start; it >= 0; --it) {
-		if (String_IsEqual(s_data->value + it, s_key.value, s_key.length)) {
+		if (String_IsEqual(s_data->value + it, s_key.value, s_key.length, is_case_sensitive)) {
 			return it;
 		}
 	}
@@ -521,7 +528,7 @@ String_Find(
 ) {
 	Assert(s_data);
 
-	s64 t_index_found = String_IndexOf(s_data, s_find, index_start);
+	s64 t_index_found = String_IndexOf(s_data, s_find, index_start, true);
 
 	if (t_index_found < 0) {
 		t_index_found = s_data->length - index_start;
@@ -548,7 +555,7 @@ String_FindRev(
 ) {
 	Assert(s_data);
 
-	s64 t_pos_found = String_IndexOfRev(s_data, s_find);
+	s64 t_pos_found = String_IndexOfRev(s_data, s_find, true);
 
 	if (t_pos_found < 0) {
 		if (pos_found) *pos_found = t_pos_found;
@@ -764,12 +771,12 @@ String_Cut(
 	s64 start = 0, end = 0;
 
 	while (true) {
-		start = String_IndexOf(s_data_io, s_start);
+		start = String_IndexOf(s_data_io, s_start, 0, true);
 
 		if (start < 0)
 			break;
 
-		end = String_IndexOf(s_data_io, s_end, start);
+		end = String_IndexOf(s_data_io, s_end, start, true);
 
 		if (end > start)
 			String_Remove(s_data_io, start, end + s_end.length);
