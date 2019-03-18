@@ -7,6 +7,16 @@ struct Network {
 	SOCKET socket;
 };
 
+struct Network_Info {
+	String s_name_device;
+	String s_name_adapter;
+	String s_ip;
+	String s_ip_mask;
+	String s_gateway_ip;
+	String s_gateway_mask;
+	String s_mac;
+};
+
 instant bool
 Network_Init(
 ) {
@@ -218,6 +228,31 @@ Network_GetIPByName(
 }
 
 instant String
+Network_ConvertToMAC(
+	u8  *mac_address,
+	u64  mac_address_length
+) {
+	String s_result;
+
+	char* mac_address_it = (char *)mac_address;
+	char  c_hex[2];
+
+	FOR(mac_address_length, it) {
+		ToHex(*mac_address_it, &c_hex[0], &c_hex[1]);
+
+		String_Append(&s_result, S((char *)&c_hex[0], 1));
+		String_Append(&s_result, S((char *)&c_hex[1], 1));
+
+		if (it < mac_address_length - 1)
+			String_Append(&s_result, S("-", 1));
+
+		++mac_address_it;
+	}
+
+	return s_result;
+}
+
+instant String
 Network_GetMAC(
 	String s_ip_address
 ) {
@@ -233,24 +268,96 @@ Network_GetMAC(
 
     s32 request = SendARP(ip_address, 0, mac_address, &mac_address_len);
 
-    if (    request == NO_ERROR
-		AND mac_address_len
-	) {
-        char* mac_address_it = (char*)&mac_address;
-        char c_hex[2];
-
-        FOR(mac_address_len, it) {
-        	ToHex(*mac_address_it, &c_hex[0], &c_hex[1]);
-
-        	String_Append(&s_result, S((char *)&c_hex[0], 1));
-        	String_Append(&s_result, S((char *)&c_hex[1], 1));
-
-        	if (it < mac_address_len - 1)
-				String_Append(&s_result, S("-", 1));
-
-			++mac_address_it;
-        }
+    if (request == NO_ERROR AND mac_address_len) {
+        s_result = Network_ConvertToMAC((u8 *)&mac_address, mac_address_len);
     }
 
 	return s_result;
+}
+
+instant Network_Info
+Network_GetInfo(
+) {
+	Network_Info info;
+	info.s_name_device = Network_GetName();
+	info.s_ip          = Network_GetIPByName(info.s_name_device);
+	info.s_mac         = Network_GetMAC(info.s_ip);
+
+	u64 len_buffer;
+	GetAdaptersInfo(0, &len_buffer);
+
+	IP_ADAPTER_INFO *adapter_info = (IP_ADAPTER_INFO *)Memory_Create(char, len_buffer);
+	IP_ADAPTER_INFO *adapter_info_it;
+
+	GetAdaptersInfo(adapter_info, &len_buffer);
+
+	adapter_info_it = adapter_info;
+
+	while(adapter_info_it) {
+		String s_adapter_mac = Network_ConvertToMAC(adapter_info_it->Address, adapter_info_it->AddressLength);
+
+		if (!String_IsEqual(info.s_mac, s_adapter_mac)) {
+			adapter_info_it = adapter_info_it->Next;
+			String_Destroy(&s_adapter_mac);
+			continue;
+		}
+
+		info.s_name_adapter = String_Copy(adapter_info_it->Description);
+		info.s_ip_mask      = String_Copy(adapter_info_it->IpAddressList.IpMask.String);
+		info.s_gateway_ip   = String_Copy(adapter_info_it->GatewayList.IpAddress.String);
+		info.s_gateway_mask = String_Copy(adapter_info_it->GatewayList.IpMask.String);
+
+		String_Append(&info.s_gateway_ip, S("\0", 1));
+
+		String_Destroy(&s_adapter_mac);
+		break;
+	}
+
+	Memory_Free(adapter_info);
+
+	return info;
+}
+
+instant void
+Network_DestroyInfo(
+	Network_Info *info
+) {
+	Assert(info);
+
+	String_Destroy(&info->s_gateway_ip);
+	String_Destroy(&info->s_gateway_mask);
+	free(info->s_ip.value);
+	String_Destroy(&info->s_ip_mask);
+	String_Destroy(&info->s_mac);
+	String_Destroy(&info->s_name_adapter);
+	String_Destroy(&info->s_name_device);
+
+	info->s_ip = {};
+	info->s_ip.changed = true;
+}
+
+instant void
+Network_PrintInfo(
+	Network_Info *info
+) {
+	Assert(info);
+
+	String_Print(S("Name:\t\t"));
+	String_PrintLine(info->s_name_device);
+
+	String_Print(S("IP:\t\t"));
+	String_Print(info->s_ip);
+	String_Print(S("- "));
+	String_PrintLine(info->s_ip_mask);
+
+	String_Print(S("MAC:\t\t"));
+	String_PrintLine(info->s_mac);
+
+	String_Print(S("Adapter:\t"));
+	String_PrintLine(info->s_name_adapter);
+
+	String_Print(S("Gateway:\t"));
+	String_Print(info->s_gateway_ip);
+	String_Print(S("- "));
+	String_PrintLine(info->s_gateway_mask);
 }
