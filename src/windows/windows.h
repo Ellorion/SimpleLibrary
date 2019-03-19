@@ -316,7 +316,6 @@ Window_UpdateAndResetInput(
 	SwapBuffers(window->hDC);
 
 	Mouse_Reset(window->mouse);
-
 	Keyboard_Reset(window->keyboard, false);
 }
 

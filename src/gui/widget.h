@@ -116,7 +116,7 @@ struct Widget {
 	/// Rendering
 	Text   text;
 	Vertex vertex_rect;
-	Vertex vertex_rect_static;
+	Vertex vertex_rect_sublayer; /// f.e. hover, check-status (color changes)
 
 	/// Layout / Size
 	Layout_Data layout_data;
@@ -355,8 +355,8 @@ Widget_AddBorderSizes(
 		if (widget->type != WIDGET_CHECKBOX)
 			*min_width_io += widget->data.border_size << 1;
 
-		*min_width_io +=   widget->text.data.rect_margin.x
-					  + widget->text.data.rect_margin.w;
+		*min_width_io += widget->text.data.rect_margin.x
+					  +  widget->text.data.rect_margin.w;
 	}
 
 	if (min_height_io) {
@@ -367,8 +367,8 @@ Widget_AddBorderSizes(
 		if (widget->type != WIDGET_CHECKBOX)
 			*min_height_io += widget->data.border_size << 1;
 
-		*min_height_io +=  widget->text.data.rect_margin.y
-					  + widget->text.data.rect_margin.h;
+		*min_height_io += widget->text.data.rect_margin.y
+					   +  widget->text.data.rect_margin.h;
 	}
 }
 
@@ -394,131 +394,6 @@ Widget_SetFocus(
 		widget_io->data.is_popout = true;
 }
 
-instant bool
-Widget_Update(
-	Widget *widget_io
-) {
-	Assert(widget_io);
-
-	bool result = false;
-
-	LOG_STATUS("Update: " << widget_io->type << " ");
-
-	if (widget_io->a_subwidgets.count) {
-		LOG_STATUS("- Subwidgets: " << widget_io->a_subwidgets.count << " ");
-		LOG_STATUS("\n----------------------\n");
-	}
-
-	FOR_ARRAY(widget_io->a_subwidgets, it) {
-		Widget *t_widget = &ARRAY_IT(widget_io->a_subwidgets, it);
-		Widget_Update(t_widget);
-	}
-
-	if (widget_io->a_subwidgets.count) {
-		LOG_STATUS("----------------------");
-		LOG_STATUS("\nResume update: " << widget_io->type << " ");
-	}
-
-	/// text needs to be processed at least once when no input in handled,
-	/// but do NOT do it for lists. lists take the list data and pass each row
-	/// through the text struct to generate text + positions.
-	/// using the update function here again, would invalidate that data,
-	/// since the data would definitely have changed
-	if (!Widget_IsListType(widget_io))
-		widget_io->events.on_text_change = Text_Update(&widget_io->text);
-
- 	if (widget_io->trigger_autosize) {
-		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
-		Text_Data *settings = &widget_io->text.data;
-
-		if (    layout_data->auto_width
-			AND settings->content_width
-		) {
-			s32 width_auto = settings->content_width;
-			Widget_AddBorderSizes(widget_io, &width_auto, 0);
-
-			if (layout_data->rect.w != width_auto) {
-				layout_data->rect.w  = width_auto;
-				result = true;
-			}
-		}
-
-		if (    layout_data->auto_height
-			AND settings->content_height
-		) {
-			s32 height_auto = settings->content_height;
-			Widget_AddBorderSizes(widget_io, 0, &height_auto);
-
-			if (layout_data->rect.h != height_auto) {
-				layout_data->rect.h  = height_auto;
-				result = true;
-			}
-		}
-
-		widget_io->trigger_autosize = false;
-	}
-
-	if (widget_io->trigger_popout) {
-		widget_io->data.is_popout = !widget_io->data.is_popout;
-		widget_io->trigger_popout = false;
-
-		if (widget_io->data.can_popout_focus_change) {
-			if (widget_io->data.is_popout) {
-				Widget_SetFocus(widget_io);
-			}
-			else {
-				if (widget_io->widget_focus_on_popout) {
-					Widget_SetFocus(widget_io->widget_focus_on_popout);
-				}
-			}
-		}
-	}
-
-	if (widget_io->data.s_row_filter.changed) {
-#if 1
-		widget_io->data.as_filter_data.by_reference = true;
-
-		Array_Filter(
-			&widget_io->data.as_filter_data,
-			&widget_io->data.as_row_data,
-
-			[&](String s_value) {
-				return (String_IndexOf(
-							&s_value,
-							widget_io->data.s_row_filter,
-							0,
-							widget_io->data.is_filter_case_sensitive) >= 0
-						);
-			}
-		);
-#else
-		Array_Clear(&widget_io->data.as_filter_data);
-		widget_io->data.as_filter_data.by_reference = true;
-		widget_io->data.active_row_id = 0;
-
-		if (widget_io->data.s_row_filter.length) {
-			FOR_ARRAY(widget_io->data.as_row_data, it_row) {
-				String *ts_data = &ARRAY_IT(widget_io->data.as_row_data, it_row);
-
-				if (String_IndexOf(	ts_data,
-									widget_io->data.s_row_filter,
-									0,
-									widget_io->data.is_filter_case_sensitive) >= 0
-				) {
-					Array_Add(&widget_io->data.as_filter_data, *ts_data);
-				}
-			}
-		}
-#endif // 0
-
-		widget_io->data.s_row_filter.changed = false;
-	}
-
-	LOG_STATUS("completed\n");
-
-	return result;
-}
-
 instant void
 Widget_Redraw(
 	Widget *widget_io
@@ -532,9 +407,9 @@ Widget_Redraw(
 
 	Rect rect_box =  widget_io->layout_data.settings.rect;
 
-	/// static rect init
+	/// rect sublayer init
 	/// -----------------------------------------------------------------------
-	Vertex *t_vertex_static = &widget_io->vertex_rect_static;
+	Vertex *t_vertex_static = &widget_io->vertex_rect_sublayer;
 
 	if (!t_vertex_static->array_id)
 		Vertex_Create(t_vertex_static);
@@ -734,6 +609,138 @@ Widget_InvalidateBackground(
 	Widget_Redraw(widget_io);
 }
 
+instant bool
+Widget_Update(
+	Widget *widget_io
+) {
+	Assert(widget_io);
+
+	bool result = false;
+
+	LOG_STATUS("Update: " << widget_io->type << " ");
+
+	if (widget_io->a_subwidgets.count) {
+		LOG_STATUS("- Subwidgets: " << widget_io->a_subwidgets.count << " ");
+		LOG_STATUS("\n----------------------\n");
+	}
+
+	FOR_ARRAY(widget_io->a_subwidgets, it) {
+		Widget *t_widget = &ARRAY_IT(widget_io->a_subwidgets, it);
+		Widget_Update(t_widget);
+	}
+
+	if (widget_io->a_subwidgets.count) {
+		LOG_STATUS("----------------------");
+		LOG_STATUS("\nResume update: " << widget_io->type << " ");
+	}
+
+	/// text needs to be processed at least once when no input in handled,
+	/// but do NOT do it for lists. lists take the list data and pass each row
+	/// through the text struct to generate text + positions.
+	/// using the update function here again, would invalidate that data,
+	/// since the data would definitely have changed
+	if (!Widget_IsListType(widget_io)) {
+		if (Widget_HasChanged(widget_io, true)) {
+			/// margin, padding, aso. could change,
+			/// which would be needed for trigger_autosize
+			Widget_InvalidateBackground(widget_io);
+		}
+
+		widget_io->events.on_text_change = Text_Update(&widget_io->text);
+	}
+
+ 	if (widget_io->trigger_autosize) {
+		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
+		Text_Data *settings = &widget_io->text.data;
+
+		if (    layout_data->auto_width
+			AND settings->content_width
+		) {
+			s32 width_auto = settings->content_width;
+			Widget_AddBorderSizes(widget_io, &width_auto, 0);
+
+			if (layout_data->rect.w != width_auto) {
+				layout_data->rect.w  = width_auto;
+				result = true;
+			}
+		}
+
+		if (    layout_data->auto_height
+			AND settings->content_height
+		) {
+			s32 height_auto = settings->content_height;
+			Widget_AddBorderSizes(widget_io, 0, &height_auto);
+
+			if (layout_data->rect.h != height_auto) {
+				layout_data->rect.h  = height_auto;
+				result = true;
+			}
+		}
+
+		widget_io->trigger_autosize = false;
+	}
+
+	if (widget_io->trigger_popout) {
+		widget_io->data.is_popout = !widget_io->data.is_popout;
+		widget_io->trigger_popout = false;
+
+		if (widget_io->data.can_popout_focus_change) {
+			if (widget_io->data.is_popout) {
+				Widget_SetFocus(widget_io);
+			}
+			else {
+				if (widget_io->widget_focus_on_popout) {
+					Widget_SetFocus(widget_io->widget_focus_on_popout);
+				}
+			}
+		}
+	}
+
+	if (widget_io->data.s_row_filter.changed) {
+#if 1
+		widget_io->data.as_filter_data.by_reference = true;
+
+		Array_Filter(
+			&widget_io->data.as_filter_data,
+			&widget_io->data.as_row_data,
+
+			[&](String s_value) {
+				return (String_IndexOf(
+							&s_value,
+							widget_io->data.s_row_filter,
+							0,
+							widget_io->data.is_filter_case_sensitive) >= 0
+						);
+			}
+		);
+#else
+		Array_Clear(&widget_io->data.as_filter_data);
+		widget_io->data.as_filter_data.by_reference = true;
+		widget_io->data.active_row_id = 0;
+
+		if (widget_io->data.s_row_filter.length) {
+			FOR_ARRAY(widget_io->data.as_row_data, it_row) {
+				String *ts_data = &ARRAY_IT(widget_io->data.as_row_data, it_row);
+
+				if (String_IndexOf(	ts_data,
+									widget_io->data.s_row_filter,
+									0,
+									widget_io->data.is_filter_case_sensitive) >= 0
+				) {
+					Array_Add(&widget_io->data.as_filter_data, *ts_data);
+				}
+			}
+		}
+#endif // 0
+
+		widget_io->data.s_row_filter.changed = false;
+	}
+
+	LOG_STATUS("completed\n");
+
+	return result;
+}
+
 instant void
 Widget_GetListArrayFiltered(
 	Widget *widget,
@@ -773,15 +780,15 @@ Widget_Render(
 			return widget_io;
 		}
 
-		if (Widget_HasChanged(widget_io, true)) {
-			Widget_InvalidateBackground(widget_io);
-		}
-
-		if (widget_io->vertex_rect_static.a_attributes.count) {
+		/// for input changing rects (hover, checked, aso.)
+		if (widget_io->vertex_rect_sublayer.a_attributes.count) {
 			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
-			Rect_Render(shader_set, &widget_io->vertex_rect_static);
+			Rect_Render(shader_set, &widget_io->vertex_rect_sublayer);
 		}
 
+		/// - draws rects
+		/// - draws rects beneath assigned texture, in case it is
+		///   rendered smaller to keep aspect ratio
 		if (widget_io->vertex_rect.a_attributes.count) {
 			ShaderSet_Use(shader_set, SHADER_PROG_RECT);
 			Rect_Render(shader_set, &widget_io->vertex_rect);
@@ -887,7 +894,7 @@ Widget_Render(
 
 		/// static rects
 		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
-		Rect_Render(shader_set, &widget_io->vertex_rect_static);
+		Rect_Render(shader_set, &widget_io->vertex_rect_sublayer);
 
 		/// dynamic rects
 		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
@@ -950,7 +957,7 @@ Widget_Destroy(
 
 	Text_Destroy(&widget_out->text);
 	Vertex_Destroy(&widget_out->vertex_rect);
-	Vertex_Destroy(&widget_out->vertex_rect_static);
+	Vertex_Destroy(&widget_out->vertex_rect_sublayer);
 }
 
 instant void
@@ -964,7 +971,7 @@ Widget_Destroy(
 
 		Text_Destroy(&t_widget->text);
 		Vertex_Destroy(&t_widget->vertex_rect);
-		Vertex_Destroy(&t_widget->vertex_rect_static);
+		Vertex_Destroy(&t_widget->vertex_rect_sublayer);
     }
 }
 
@@ -1860,7 +1867,8 @@ Widget_RedrawNumberPickerButton(
 ) {
 	Assert(widget_io);
 
-	Vertex *t_vertex = &widget_io->vertex_rect_static;
+	/// @Investigate
+	Vertex *t_vertex = &widget_io->vertex_rect_sublayer;
 	Rect    rect_box =  widget_io->layout_data.settings.rect;
 
 	if (!t_vertex->array_id) Vertex_Create(t_vertex);
