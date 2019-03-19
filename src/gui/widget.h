@@ -48,6 +48,7 @@ struct Widget_Data {
 	Color32 color_outline          = {0.8f, 0.8f, 0.8f, 1.0f};
 	Color32 color_outline_selected = {1.0f, 0.0f, 0.0f, 1.0f};
 	Color32 color_outline_inactive = {0.5f, 0.5f, 1.0f, 1.0f};
+	Color32 color_outline_checked  = {0.5f, 0.5f, 1.0f, 1.0f};
 	Color32 color_progress         = {0.5f, 0.5f, 1.0f, 1.0f};
 
 	u64  active_row_id = 0;
@@ -550,7 +551,7 @@ Widget_Redraw(
 
 			if (widget_io->data.is_checked) {
 				Rect_Resize(&rect_check, -1);
-				Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_outline_selected);
+				Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_outline_checked);
 			}
 		} break;
 
@@ -1768,7 +1769,7 @@ Widget_CreateCheckBox(
 
 	String_Append(&t_widget.text.s_data, s_data);
 
-	t_widget.text.data.rect_padding = {2, 2, 2, 2};
+	t_widget.text.data.rect_padding = {1, 1, 3, 1};
 
 	t_widget.trigger_autosize = true;
 
