@@ -220,22 +220,22 @@ Test_Arrays(
 	}
 
 	{
-		typedef bool (*OnFilterIfTrue)(s64);
+		typedef bool (*OnKeepIfMatch)(s64);
 
 		Array<s64> a_numbers;
 		Array_AddRange(&a_numbers, 1, 30);
 
 		/// useable variants
-		OnFilterIfTrue   fn_2 =       [](s64 value)         { return value % 2 == 0; };
-		bool           (*fn_3)(s64) = [](s64 value)         { return value % 3 == 0; };
-		auto             fn_5 =       [](s64 value) -> bool { return value % 5 == 0; };
+		OnKeepIfMatch   fn_2 =       [](s64 value)         { return value % 2 != 0; };
+		bool          (*fn_3)(s64) = [](s64 value)         { return value % 3 != 0; };
+		auto            fn_5 =       [](s64 value) -> bool { return value % 5 != 0; };
 
-		Array<OnFilterIfTrue> a_filters;
+		Array<OnKeepIfMatch> a_filters;
 		Array_Add(&a_filters, fn_2);
 		Array_Add(&a_filters, fn_3);
 
 		/// does not work without casting
-		Array_Add(&a_filters, (OnFilterIfTrue)fn_5);
+		Array_Add(&a_filters, (OnKeepIfMatch)fn_5);
 
 		Array_Filter(&a_numbers, a_filters);
 
@@ -270,15 +270,15 @@ Test_Arrays(
 		Array<s64> a_numbers;
 		Array_AddRange(&a_numbers, 1, 30);
 
-		bool (*OnFilterIfTrue)(s64) = [](s64 value) {
-			if (value % 2 == 0)  return true;
-			if (value % 3 == 0)  return true;
-			if (value % 5 == 0)  return true;
+		bool (*OnKeepIfMatch)(s64) = [](s64 value) {
+			if (value % 2 == 0)  return false;
+			if (value % 3 == 0)  return false;
+			if (value % 5 == 0)  return false;
 
-			return false;
+			return true;
 		};
 
-		Array_Filter(&a_numbers, OnFilterIfTrue);
+		Array_Filter(&a_numbers, OnKeepIfMatch);
 
 		s32 counter = 0;
 
@@ -311,15 +311,15 @@ Test_Arrays(
 		Array<s64> a_numbers;
 		Array_AddRange(&a_numbers, 1, 30);
 
-		auto OnFilterIfTrue = [](s64 value) -> bool {
-			if (value % 2 == 0)  return true;
-			if (value % 3 == 0)  return true;
-			if (value % 5 == 0)  return true;
+		auto OnKeepIfMatch = [](s64 value) -> bool {
+			if (value % 2 == 0)  return false;
+			if (value % 3 == 0)  return false;
+			if (value % 5 == 0)  return false;
 
-			return false;
+			return true;
 		};
 
-		Array_Filter(&a_numbers, OnFilterIfTrue);
+		Array_Filter(&a_numbers, OnKeepIfMatch);
 
 		s32 counter = 0;
 
@@ -353,15 +353,15 @@ Test_Arrays(
 		Array_AddRange(&a_numbers, 1, 30);
 
 		/// auto function parameter variance
-		auto OnFilterIfTrue = [](auto value) -> bool {
-			if (value % 2 == 0)  return true;
-			if (value % 3 == 0)  return true;
-			if (value % 5 == 0)  return true;
+		auto OnKeepIfMatch = [](auto value) -> bool {
+			if (value % 2 == 0)  return false;
+			if (value % 3 == 0)  return false;
+			if (value % 5 == 0)  return false;
 
-			return false;
+			return true;
 		};
 
-		Array_Filter(&a_numbers, OnFilterIfTrue);
+		Array_Filter(&a_numbers, OnKeepIfMatch);
 
 		s32 counter = 0;
 
@@ -395,15 +395,15 @@ Test_Arrays(
 		Array_AddRange(&a_numbers, 1, 30);
 
 		/// auto function parameter variance
-		auto OnFilterIfTrue = [](s64 value) {
-			if (value % 2 == 0)  return true;
-			if (value % 3 == 0)  return true;
-			if (value % 5 == 0)  return true;
+		auto OnKeepIfMatch = [](s64 value) {
+			if (value % 2 == 0)  return false;
+			if (value % 3 == 0)  return false;
+			if (value % 5 == 0)  return false;
 
-			return false;
+			return true;
 		};
 
-		Array_Filter(&a_numbers, OnFilterIfTrue);
+		Array_Filter(&a_numbers, OnKeepIfMatch);
 
 		s32 counter = 0;
 
@@ -437,15 +437,15 @@ Test_Arrays(
 		Array_AddRange(&a_numbers, 1, 30);
 
 		/// auto function parameter variance
-		auto OnFilterIfTrue = [](auto value) {
-			if (value % 2 == 0)  return true;
-			if (value % 3 == 0)  return true;
-			if (value % 5 == 0)  return true;
+		auto OnKeepIfMatch = [](auto value) {
+			if (value % 2 == 0)  return false;
+			if (value % 3 == 0)  return false;
+			if (value % 5 == 0)  return false;
 
-			return false;
+			return true;
 		};
 
-		Array_Filter(&a_numbers, OnFilterIfTrue);
+		Array_Filter(&a_numbers, OnKeepIfMatch);
 
 		s32 counter = 0;
 
@@ -480,11 +480,11 @@ Test_Arrays(
 
 		Array_Filter(&a_numbers,
 			[](s64 value) {
-				if (value % 2 == 0)  return true;
-				if (value % 3 == 0)  return true;
-				if (value % 5 == 0)  return true;
+				if (value % 2 == 0)  return false;
+				if (value % 3 == 0)  return false;
+				if (value % 5 == 0)  return false;
 
-				return false;
+				return true;
 			}
 		);
 
