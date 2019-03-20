@@ -57,6 +57,34 @@ Sort_Quick(
 		AssertMessage(false, "[Sort] Unknown sort type.");
 	}
 
+	/// advance pivot, if nothing was swapped
+	/// -> early out for already sorted data
+	if (pivot == begin_io) {
+		if (type == SORT_ORDER_ASCENDING) {
+			while(pivot < end_io) {
+				if (*pivot > *(pivot + 1))
+					break;
+
+				++pivot;
+			}
+		}
+		else
+		if (type == SORT_ORDER_DESCENDING) {
+			while(pivot < end_io) {
+				if (*pivot < *(pivot + 1))
+					break;
+
+				++pivot;
+			}
+		}
+
+		if (pivot == end_io)
+			return;
+
+		Sort_Quick(pivot, end_io, type);
+		return;
+	}
+
     if (begin_io < pivot)  Sort_Quick(begin_io	, pivot - 1, type);
 	if (end_io   > pivot)  Sort_Quick(pivot + 1	, end_io,	 type);
 }
