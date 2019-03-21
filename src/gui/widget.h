@@ -1838,7 +1838,7 @@ Widget_UpdateInputNumberPicker(
 			if (widget->events.on_trigger) {
 				Widget_Slide *t_slide = &widget_parent_io->slide;
 
-				t_slide->value = ToInt(&tw_label->text.s_data);
+				t_slide->value = ToInt(tw_label->text.s_data);
 
 				if (sub_index == 1) {
 					if (t_slide->value - t_slide->step >= t_slide->start)

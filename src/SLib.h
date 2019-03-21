@@ -285,10 +285,23 @@ ToHex(
 	*hex_low  = c_hex[(value >> 0) & 0xF];
 }
 
+
 #include "core/memory.h"
+#include "core/string.h"
+
+instant s32
+ToInt(
+	String s_data
+) {
+	char *c_data = String_CreateCBufferCopy(s_data);
+	s32 result = atoi(c_data);
+	Memory_Free(c_data);
+
+	return result;
+}
+
 #include "core/time.h"
 #include "core/sort.h"
-#include "core/string.h"
 #include "core/array.h"
 #include "core/rect.h"
 #include "core/parser.h"
@@ -359,19 +372,6 @@ ToCString(
 		buffer[len] = 0;
 
 	return buffer;
-}
-
-instant s32
-ToInt(
-	String *s_data
-) {
-	Assert(s_data);
-
-	char *c_data = String_CreateCBufferCopy(*s_data);
-	s32 result = atoi(c_data);
-	Memory_Free(c_data);
-
-	return result;
 }
 
 #include "gui/layout.h"

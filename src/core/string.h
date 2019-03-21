@@ -333,6 +333,19 @@ String_CreateBuffer(
 	s_buffer_out->is_reference = is_reference;
 }
 
+instant String
+String_CreateBuffer(
+	u32 buffer_size
+) {
+	String s_buffer_out = {};
+
+	String_Resize(&s_buffer_out, buffer_size);
+	s_buffer_out.length  = buffer_size;
+	s_buffer_out.changed = true;
+
+	return s_buffer_out;
+}
+
 instant char
 String_ToLower(
 	char value

@@ -3,8 +3,47 @@
 /// Server: socket() -> bind() -> listen() -> accept() |-> send()/recv() -> close()
 /// Client: socket() -> connect()                      |-> send()/recv() -> close()
 
+/// Usage HTTP Request / Response:
+//	String s_ip = S("127.0.0.1");
+//	Network network = Network_Connect(s_ip.value, 80);
+//
+//	Network_HTTP_Request(&network, s_ip, S("/"));
+//
+//	String s_header;
+//	bool success = Network_HTTP_GetResponse(&network, &s_header);
+//
+//	String_Print(s_header);
+//
+//	String s_buffer;
+//	while(success) {
+//		success = Network_HTTP_GetResponse(&network, &s_buffer);
+//
+//		String_Print(s_buffer);
+//	}
+//
+//	Network_Close(&network);
+
+enum NETWORK_HTTP_STAGE {
+	NETWORK_HTTP_STAGE_IDLE = 0,
+	NETWORK_HTTP_STAGE_REQUESTED,
+	NETWORK_HTTP_STAGE_RESPONSED_HEADER,
+	NETWORK_HTTP_STAGE_RESPONSED_DATA,
+	NETWORK_HTTP_STAGE_ERROR,
+};
+
 struct Network {
 	SOCKET socket;
+
+	struct HTTP {
+		u16    packet_size    = 1024;
+		u16    response_code  = 0;
+		s32    header_size    = 0;
+		s32    bytes_received = 0;
+		String s_buffer_chunk;
+
+		NETWORK_HTTP_STAGE stage = NETWORK_HTTP_STAGE_IDLE;
+		bool   is_receiving   = false;
+	} HTTP;
 };
 
 struct Network_Info {
@@ -161,16 +200,16 @@ Network_Send(
 instant s32
 Network_Receive(
 	Network *network,
-	String *s_data_io
+	String  *s_buffer_out
 ) {
 	Assert(network);
-	Assert(s_data_io);
-	Assert(s_data_io->length);
+	Assert(s_buffer_out);
+	Assert(s_buffer_out->length);
 
 	if (!Network_IsSocketValid(network))
 		AssertMessage(false, "Invalid network socket [recv].");
 
-	return recv(network->socket, s_data_io->value, s_data_io->length, 0);
+	return recv(network->socket, s_buffer_out->value, s_buffer_out->length, 0);
 }
 
 instant String
@@ -360,4 +399,119 @@ Network_PrintInfo(
 	String_Print(info->s_gateway_ip);
 	String_Print(S("- "));
 	String_PrintLine(info->s_gateway_mask);
+}
+
+instant bool
+Network_HTTP_Request(
+	Network *network,
+	String   s_ip,
+	String   s_path
+) {
+	Assert(network);
+
+	if (   network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
+		OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_DATA
+	) {
+		return false;
+	}
+
+	String s_request;
+	String_Append(&s_request, S("GET /"));
+	String_Append(&s_request, s_path);
+	String_Append(&s_request, S(" HTTP/1.1\r\n"));
+	String_Append(&s_request, S("Host: "));
+	String_Append(&s_request, s_ip);
+	String_Append(&s_request, S("\r\n"));
+
+	String_Append(&s_request, S("\r\n\r\n"));
+
+	Network_Send(network, s_request);
+
+	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
+
+	return true;
+}
+
+instant bool
+Network_HTTP_GetResponse(
+	Network *network,
+	String  *s_response_out
+) {
+	Assert(network);
+	Assert(s_response_out);
+
+	if (!(   network->HTTP.stage == NETWORK_HTTP_STAGE_REQUESTED
+		  OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
+		  OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_DATA)
+	) {
+		String_Clear(s_response_out);
+		return false;
+	}
+
+	if (network->HTTP.s_buffer_chunk.length < network->HTTP.packet_size)
+		String_CreateBuffer(&network->HTTP.s_buffer_chunk, network->HTTP.packet_size, false);
+
+	if (!network->HTTP.is_receiving) {
+		/// get http response header
+		network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
+
+		String s_header_end_id = S("\r\n\r\n");
+		network->HTTP.header_size = String_IndexOf(&network->HTTP.s_buffer_chunk, s_header_end_id, 0, true);
+
+		String_Destroy(s_response_out);
+
+		if (network->HTTP.header_size < 0) {
+			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+			return false;
+		}
+
+		network->HTTP.header_size += s_header_end_id.length;
+
+		/// return http header
+		*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.header_size);
+
+		String s_http_code = String_GetDelimiterSection(s_response_out, S(" "), 1, true);
+		network->HTTP.response_code = ToInt(s_http_code);
+		String_Destroy(&s_http_code);
+
+		if (network->HTTP.response_code != 200) {
+			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+			return false;
+		}
+
+		network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_HEADER;
+		network->HTTP.is_receiving = true;
+	}
+	else {
+		if (    network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
+			AND network->HTTP.bytes_received > network->HTTP.header_size
+		) {
+			/// get content chunk, which was sent with the header,
+			/// instead of requesting more needed chunks prematurely
+			String_AddOffset(&network->HTTP.s_buffer_chunk, network->HTTP.header_size);
+
+			String_Destroy(s_response_out);
+			*s_response_out = S(network->HTTP.s_buffer_chunk);
+
+			String_AddOffset(&network->HTTP.s_buffer_chunk, -network->HTTP.header_size);
+
+			network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
+		}
+		else {
+			network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
+
+			String_Destroy(s_response_out);
+			*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.bytes_received);
+
+			/// last chunk, if buffer is not fully filled
+			network->HTTP.is_receiving = ((u64)network->HTTP.bytes_received == network->HTTP.s_buffer_chunk.length);
+
+			if (network->HTTP.is_receiving)
+				network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
+			else
+				network->HTTP.stage = NETWORK_HTTP_STAGE_IDLE;
+		}
+	}
+
+	return network->HTTP.is_receiving;
 }
