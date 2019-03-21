@@ -7,14 +7,15 @@
 //	String s_ip = S("127.0.0.1");
 //	Network network = Network_Connect(s_ip.value, 80);
 //
-//	Network_HTTP_Request(&network, s_ip, S("/"));
+//	if (!Network_HTTP_Request(&network, s_ip, S("/")))
+//		return 0;
 //
 //	String s_header;
+//	String s_buffer;
 //	bool success = Network_HTTP_GetResponse(&network, &s_header);
 //
 //	String_Print(s_header);
 //
-//	String s_buffer;
 //	while(success) {
 //		success = Network_HTTP_GetResponse(&network, &s_buffer);
 //
@@ -32,7 +33,7 @@ enum NETWORK_HTTP_STAGE {
 };
 
 struct Network {
-	SOCKET socket;
+	SOCKET socket = INVALID_SOCKET;
 
 	struct HTTP {
 		u16    packet_size    = 1024;
@@ -96,12 +97,10 @@ Network_Close(
 instant Network
 Network_Create(
 ) {
-	Network network = {};
-	network.socket = INVALID_SOCKET;
-
 	Network_Init();
 
-	network.socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	Network network = {};
+	network.socket  = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (network.socket == INVALID_SOCKET)
 		LOG_ERROR("Network socket is invalid.");
@@ -184,17 +183,21 @@ Network_WaitForConnection(
 		LOG_WARNING("New socket connection failed: " << network_connection_out->socket);
 }
 
-instant void
+instant bool
 Network_Send(
 	Network *network,
 	String s_data
 ) {
 	Assert(network);
 
-	if (!Network_IsSocketValid(network))
-		AssertMessage(false, "Invalid network socket [send].");
+	if (!Network_IsSocketValid(network)) {
+		LOG_ERROR("Invalid network socket [send].");
+		return false;
+	}
 
 	send(network->socket, s_data.value, s_data.length, 0);
+
+	return true;
 }
 
 instant s32
@@ -206,8 +209,10 @@ Network_Receive(
 	Assert(s_buffer_out);
 	Assert(s_buffer_out->length);
 
-	if (!Network_IsSocketValid(network))
-		AssertMessage(false, "Invalid network socket [recv].");
+	if (!Network_IsSocketValid(network)) {
+		LOG_ERROR("Invalid network socket [recv].");
+		return 0;
+	}
 
 	return recv(network->socket, s_buffer_out->value, s_buffer_out->length, 0);
 }
@@ -415,6 +420,8 @@ Network_HTTP_Request(
 		return false;
 	}
 
+	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
+
 	String s_request;
 	String_Append(&s_request, S("GET /"));
 	String_Append(&s_request, s_path);
@@ -425,11 +432,7 @@ Network_HTTP_Request(
 
 	String_Append(&s_request, S("\r\n\r\n"));
 
-	Network_Send(network, s_request);
-
-	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
-
-	return true;
+	return Network_Send(network, s_request);
 }
 
 instant bool
@@ -454,6 +457,11 @@ Network_HTTP_GetResponse(
 	if (!network->HTTP.is_receiving) {
 		/// get http response header
 		network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
+
+		if (!network->HTTP.bytes_received) {
+			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+			return false;
+		}
 
 		String s_header_end_id = S("\r\n\r\n");
 		network->HTTP.header_size = String_IndexOf(&network->HTTP.s_buffer_chunk, s_header_end_id, 0, true);
@@ -499,6 +507,11 @@ Network_HTTP_GetResponse(
 		}
 		else {
 			network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
+
+			if (!network->HTTP.bytes_received) {
+				network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+				return false;
+			}
 
 			String_Destroy(s_response_out);
 			*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.bytes_received);
