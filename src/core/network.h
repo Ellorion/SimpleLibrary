@@ -97,9 +97,11 @@ Network_Close(
 instant Network
 Network_Create(
 ) {
-	Network_Init();
-
 	Network network = {};
+
+	if (!Network_Init())
+		return network;
+
 	network.socket  = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (network.socket == INVALID_SOCKET)
@@ -139,19 +141,47 @@ Network_Listen(
 	return network;
 }
 
+instant String
+Network_GetIPByName(
+	String s_name
+) {
+	String s_ip;
+
+	hostent *host = gethostbyname(s_name.value);
+
+	char *c_ip = inet_ntoa(*(in_addr *)host->h_addr);
+
+	/// not by reference
+	/// the return struct takes ownership
+	/// also includes 0-terminator
+	s_ip.value   = c_ip;
+	s_ip.length  = String_GetLength(c_ip) + 1;
+	s_ip.changed = true;
+
+	return s_ip;
+}
+
 instant Network
 Network_Connect(
-	const char* c_ip_addres,
+	const char* c_host_adress,
 	u16 port
 ) {
-	Assert(c_ip_addres);
+	Assert(c_host_adress);
+
+	Network network = Network_Create();
+
+ 	String s_ip_address = Network_GetIPByName(S(c_host_adress));
+
+	if (String_IsEmpty(&s_ip_address)) {
+		LOG_ERROR("IP loopup failed.");
+		Network_Close(&network);
+		return network;
+	}
 
 	sockaddr_in socket_addr;
 	socket_addr.sin_family      = AF_INET;
-	socket_addr.sin_addr.s_addr = inet_addr(c_ip_addres);
+	socket_addr.sin_addr.s_addr = inet_addr(s_ip_address.value);
 	socket_addr.sin_port        = htons(port);
-
-	Network network = Network_Create();
 
 	s32 result = connect(network.socket, (SOCKADDR *)&socket_addr, sizeof(socket_addr));
 
@@ -247,28 +277,6 @@ Network_GetName(
 	}
 
 	return s_result;
-}
-
-instant String
-Network_GetIPByName(
-	String s_name
-) {
-	String s_ip;
-
-	if (String_EndWith(&s_name, S("\0", 1), false)) {
-		hostent *host = gethostbyname(s_name.value);
-
-		char *c_ip = inet_ntoa(*(in_addr *)host->h_addr);
-
-		/// not by reference
-		/// the return struct takes ownership
-		/// also includes 0-terminator
-		s_ip.value   = c_ip;
-		s_ip.length  = String_GetLength(c_ip) + 1;
-		s_ip.changed = true;
-	}
-
-	return s_ip;
 }
 
 instant String
@@ -496,12 +504,11 @@ Network_HTTP_GetResponse(
 		) {
 			/// get content chunk, which was sent with the header,
 			/// instead of requesting more needed chunks prematurely
-			String_AddOffset(&network->HTTP.s_buffer_chunk, network->HTTP.header_size);
+			String s_remaining_chunk = S(network->HTTP.s_buffer_chunk);
+			String_AddOffset(&s_remaining_chunk, network->HTTP.header_size);
 
 			String_Destroy(s_response_out);
-			*s_response_out = S(network->HTTP.s_buffer_chunk);
-
-			String_AddOffset(&network->HTTP.s_buffer_chunk, -network->HTTP.header_size);
+			*s_response_out = s_remaining_chunk;
 
 			network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
 		}
