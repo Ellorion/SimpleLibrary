@@ -12,22 +12,22 @@
 	while (PeekMessage(&_msg, _ptr_window->hWnd, 0, 0, PM_REMOVE)) {				\
 		if (Mouse_Update(_ptr_window->mouse, _ptr_window, &_msg))	continue;		\
 		if (Keyboard_Update(_ptr_window->keyboard, &_msg))          continue;		\
-																	\
-		switch (msg.message) {										\
-			case WINDOW_CLOSE: {									\
-				msg.wParam = 0;										\
-				running = false;									\
-			} break;												\
-																	\
-			case WINDOW_RESIZE: {									\
-				OpenGL_AdjustScaleViewport(window, _is_zooming);	\
-			} break;												\
-																	\
-			default: {												\
-				TranslateMessage(&_msg);							\
-				DispatchMessage(&_msg);								\
-			}														\
-		}															\
+																		\
+		switch (_msg.message) {											\
+			case WINDOW_CLOSE: {										\
+				_msg.wParam = 0;										\
+				_running = false;										\
+			} break;													\
+																		\
+			case WINDOW_RESIZE: {										\
+				OpenGL_AdjustScaleViewport(_ptr_window, _is_zooming);	\
+			} break;													\
+																		\
+			default: {													\
+				TranslateMessage(&_msg);								\
+				DispatchMessage(&_msg);									\
+			}															\
+		}																\
 	}
 
 instant bool
@@ -92,6 +92,7 @@ static const char *class_name = "OpenGL";
 struct Mouse;
 struct Keyboard;
 
+/// "external" event pass-through
 #define WINDOW_CLOSE	WM_USER+0001
 #define WINDOW_RESIZE	WM_USER+0002
 
@@ -112,8 +113,8 @@ struct Window {
 	float        scale_y      = 1;
 };
 
-LONG WINAPI WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	switch (uMsg) {
+LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
+	switch (uMessage) {
 		case WM_ACTIVATE: {
 		} break;
 
@@ -136,7 +137,7 @@ LONG WINAPI WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		 } break;
 	}
 
-	return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	return DefWindowProc(hWnd, uMessage, wParam, lParam);
 }
 
 instant void

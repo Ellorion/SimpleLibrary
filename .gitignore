@@ -20,6 +20,7 @@
 
 # Test-Application
 main.cpp
+crafting.cpp
 
 # Others
 *.dat
