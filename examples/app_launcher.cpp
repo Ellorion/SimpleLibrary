@@ -174,14 +174,32 @@ Window_HandleEvents(
 	ShaderSet_Destroy(&shader_set);
 }
 
-int main() {
+APPLICATION_MAIN {
+	bool hide_window_startup = false;
+
+	/// parse command line arguments
+	Parser parser_args = Parser_Load(S(_cmd_text));
+
+	String s_command_arg;
+	while(Parser_IsRunning(&parser_args)) {
+		Parser_GetString(&parser_args, &s_command_arg, PARSER_MODE_SEEK);
+
+		if (s_command_arg == "/minimize") {
+			hide_window_startup = true;
+		}
+	}
+
 	Window window;
 
 	Keyboard keyboard;
 	Mouse    mouse;
 
 	Window_Create(&window, "Application-Launcher", 512, 512 / 16 * 9, 32, &keyboard, &mouse);
-	Window_Show(&window);
+
+	if (hide_window_startup)
+		Window_Hide(&window);
+	else
+		Window_Show(&window);
 
 	OpenGL_Init(&window);
 	OpenGL_SetVSync(&window, true);
