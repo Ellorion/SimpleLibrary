@@ -2,6 +2,7 @@
 
 struct Parser {
 	String s_data;
+	bool skip_whitespace_and_comments = true;
 
 	bool has_error = false;
 	String s_error;
@@ -13,27 +14,27 @@ enum PARSER_MODE_TYPE {
 };
 
 instant bool
-Parser_IsRunning(
-	Parser *parser
-) {
-	Assert(parser);
-
-	if (parser->has_error)
-		return false;
-
-	if (parser->s_data.length <= 0)
-		return false;
-
-	return true;
-}
-
-instant bool
 Parser_HasError(
 	Parser *parser
 ) {
 	Assert(parser);
 
 	return parser->has_error;
+}
+
+instant bool
+Parser_IsRunning(
+	Parser *parser
+) {
+	Assert(parser);
+
+	if (Parser_HasError(parser))
+		return false;
+
+	if (parser->s_data.length <= 0)
+		return false;
+
+	return true;
 }
 
 instant void
@@ -55,7 +56,7 @@ Parser_SkipUntilToken(
 ) {
     Assert(parser_io);
 
-    bool is_comment    = false;
+    bool is_comment = false;
 
     while(Parser_IsRunning(parser_io)) {
 		char ch = parser_io->s_data.value[0];
@@ -102,15 +103,18 @@ Parser_Destroy(
 
 instant Parser
 Parser_Load(
-	String s_data
+	String s_data,
+	bool skip_whitespace_and_comments = true
 ) {
 	Parser parser = {};
 
 	parser.s_data         = s_data;
 	parser.s_data.changed = true;
 	parser.s_data.is_reference = true;
+	parser.skip_whitespace_and_comments = skip_whitespace_and_comments;
 
-	Parser_SkipUntilToken(&parser);
+	if (parser.skip_whitespace_and_comments)
+		Parser_SkipUntilToken(&parser);
 
 	return parser;
 }
@@ -139,7 +143,9 @@ Parser_IsString(
 	}
 
 	Parser_AddOffset(parser_io, s_data.length);
-	Parser_SkipUntilToken(parser_io);
+
+	if (parser_io->skip_whitespace_and_comments)
+		Parser_SkipUntilToken(parser_io);
 }
 
 instant void
@@ -174,7 +180,9 @@ Parser_GetString(
 
 	if (type == PARSER_MODE_SEEK) {
 		Parser_AddOffset(parser_io, index_found + s_until_match.length);
-		Parser_SkipUntilToken(parser_io);
+
+		if (parser_io->skip_whitespace_and_comments)
+			Parser_SkipUntilToken(parser_io);
 	}
 }
 
@@ -216,7 +224,9 @@ Parser_GetString(
 		if (type == PARSER_MODE_SEEK) {
 			/// include ending "\""
 			Parser_AddOffset(parser_io, index_found + 1);
-			Parser_SkipUntilToken(parser_io);
+
+			if (parser_io->skip_whitespace_and_comments)
+				Parser_SkipUntilToken(parser_io);
 		}
 
 		return;
@@ -247,8 +257,10 @@ Parser_GetString(
 	if (type == PARSER_MODE_PEEK)
 		Parser_AddOffset(parser_io, -s_data_out->length);
 	else
-	if (type == PARSER_MODE_SEEK)
-		Parser_SkipUntilToken(parser_io);
+	if (type == PARSER_MODE_SEEK) {
+		if (parser_io->skip_whitespace_and_comments)
+			Parser_SkipUntilToken(parser_io);
+	}
 }
 
 instant void
@@ -272,7 +284,9 @@ Parser_GetBoolean(
 
 		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
-			Parser_SkipUntilToken(parser_io);
+
+			if (parser_io->skip_whitespace_and_comments)
+				Parser_SkipUntilToken(parser_io);
 
 			*is_true_out = false;
 			return;
@@ -289,7 +303,9 @@ Parser_GetBoolean(
 
 		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
-			Parser_SkipUntilToken(parser_io);
+
+			if (parser_io->skip_whitespace_and_comments)
+				Parser_SkipUntilToken(parser_io);
 
 			*is_true_out = true;
 			return;
@@ -367,7 +383,8 @@ Parser_GetNumber(
 		return;
 	}
 
-	Parser_SkipUntilToken(parser_io);
+	if (parser_io->skip_whitespace_and_comments)
+		Parser_SkipUntilToken(parser_io);
 }
 
 instant bool
@@ -405,13 +422,19 @@ Parser_GetSectionName(
 }
 
 instant bool
-Parser_CanTokenize(
+Parser_Token_CanTokenize(
 	char character
 ) {
-	if (    character <   48
-		OR (character >=  58 AND character <=  64)
-		OR (character >=  91 AND character <=  96)
-		OR (character >= 123 AND character <= 127)
+	#define INCL(_value, _min, _max) \
+		((_min) <= (_value) AND (_value) <= (_max))
+
+	if (   INCL(character,   0,  44)
+		OR INCL(character,  46,  47)
+		OR INCL(character,  58,  64)
+		OR INCL(character,  91,  91)
+		OR INCL(character,  93,  94)
+		OR INCL(character,  96,  96)
+		OR INCL(character, 123, 127)
 	) {
 		return false;
 	}
@@ -420,7 +443,7 @@ Parser_CanTokenize(
 }
 
 instant void
-Parser_PeekToken(
+Parser_Token_Peek(
 	Parser *parser,
 	String *s_token_out
 ) {
@@ -430,7 +453,8 @@ Parser_PeekToken(
 	if (Parser_HasError(parser))
 		return;
 
-	Parser_SkipUntilToken(parser);
+	if (parser->skip_whitespace_and_comments)
+		Parser_SkipUntilToken(parser);
 
 	String s_data_it = S(parser->s_data);
 
@@ -444,10 +468,10 @@ Parser_PeekToken(
 		if (s_data_it.length == 1)
 			break;
 
-		if (!Parser_CanTokenize(s_data_it.value[0]))
+		if (!Parser_Token_CanTokenize(s_data_it.value[0]))
 			break;
 
-		if (!Parser_CanTokenize(s_data_it.value[1]))
+		if (!Parser_Token_CanTokenize(s_data_it.value[1]))
 			break;
 
 		String_AddOffset(&s_data_it, 1);
@@ -455,19 +479,19 @@ Parser_PeekToken(
 }
 
 instant void
-Parser_GetToken(
+Parser_Token_Get(
     Parser *parser,
     String *s_token_out
 ) {
 	if (Parser_HasError(parser))
 		return;
 
-	Parser_PeekToken(parser, s_token_out);
+	Parser_Token_Peek(parser, s_token_out);
 	Parser_AddOffset(parser, s_token_out->length);
 }
 
 instant bool
-Parser_IsToken(
+Parser_Token_IsMatch(
 	Parser *parser,
 	String  s_token
 ) {
@@ -477,7 +501,7 @@ Parser_IsToken(
 		return false;
 
 	String ts_token;
-	Parser_PeekToken(parser, &ts_token);
+	Parser_Token_Peek(parser, &ts_token);
 
 	if (!(s_token == ts_token)) {
 		parser->has_error = true;

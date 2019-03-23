@@ -10,9 +10,9 @@
 #define WINDOW_TRAY_ICON_HIDE	WM_USER+0006
 #define WINDOW_TRAY_ICON_CREATE WM_USER+0007
 
-#define Windows_Main 	\
-	APIENTRY			\
-	WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_text, int nCmdShow)
+#define APPLICATION_MAIN 	\
+	APIENTRY				\
+	WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, LPSTR _cmd_text, int _cmd_show)
 
 #define Window_IsCreated(window) (window->hWnd != 0)
 
