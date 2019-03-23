@@ -79,7 +79,7 @@ Tree_Print(
 	}
 
 	if (level != 0)
-		String_Print(&tree->s_name);
+		String_Print(tree->s_name);
 	else
 		std::cout << "- root -";
 

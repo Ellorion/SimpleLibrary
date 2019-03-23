@@ -30,8 +30,7 @@ int main() {
 	Thread thread = Thread_Create(&port, Thread_Listener);
 	Thread_Execute(&thread);
 
-	Network network = Network_Create();
-	Network_Connect(&network, "127.0.0.1", port);
+	Network network = Network_Connect("127.0.0.1", port);
 
 	u32 counter = 5;
 

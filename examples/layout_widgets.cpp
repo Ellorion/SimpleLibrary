@@ -68,7 +68,7 @@ Window_HandleEvents(
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window, false);
+		Window_ReadMessage(window, &msg, &running, false);
 		OpenGL_AdjustScaleViewport(window);
 
 		Layout_Rearrange(&layout, {0, 0, window->width, window->height});

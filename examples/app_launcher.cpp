@@ -15,6 +15,10 @@ Window_HandleEvents(
 	MSG msg;
 	bool running = true;
 
+	/// @Info: "tray.ico" has to be in app-folder before startup,
+	///        to support the tray-icon system
+	window->icon.always_visible = true;
+
 	ShaderSet shader_set = ShaderSet_Create(window);
 
 	OpenGL_SetBlending(true);
@@ -38,7 +42,6 @@ Window_HandleEvents(
 		return;
 	}
 
-	Widget wg_exit           = Widget_CreateButton(  window, &font_16, {}, S("Exit (Esc)"));
 	Widget wg_exit_on_launch = Widget_CreateCheckBox(window, &font_20, {}, S("Exit on launch"), true);
 	Widget wg_list           = Widget_CreateListBox( window, &font_20, {});
 	Widget wg_filter_label   = Widget_CreateLabel(   window, &font_20, {}, S("Filter:"));
@@ -56,18 +59,14 @@ Window_HandleEvents(
 	Array_Add(&ap_widgets, &wg_filter_label);
 	Array_Add(&ap_widgets, &wg_filter_data);
 	Array_Add(&ap_widgets, &wg_exit_on_launch);
-	Array_Add(&ap_widgets, &wg_exit);
 
 	Layout layout;
 	Layout_Create(&layout, {0, 0, window->width, window->height}, true);
 	{
-		Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT);
-		Layout_Add(&layout, &wg_exit_on_launch);
-		Layout_Add(&layout, &wg_exit);
-
 		Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT, 1);
 		Layout_Add(&layout, &wg_filter_label);
 		Layout_Add(&layout, &wg_filter_data);
+		Layout_Add(&layout, &wg_exit_on_launch);
 
 		Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
 		Layout_Add(&layout, &wg_list);
@@ -85,7 +84,7 @@ Window_HandleEvents(
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window, false);
+		Window_ReadMessage(window, &msg, &running, false);
 		OpenGL_AdjustScaleViewport(window, false);
 		Layout_Rearrange(&layout, window);
 
@@ -161,10 +160,6 @@ Window_HandleEvents(
 					running = false;
 			}
 		}
-
-		/// exit program
-		if (wg_exit.events.on_trigger)
-			running = false;
 
 		/// Render
 		/// ===================================================================

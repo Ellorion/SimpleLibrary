@@ -118,7 +118,7 @@ Config_Parse(
 					Parser_GetNumber(&parser_config, &s_data);
 
 					if (!Parser_HasError(&parser_config)) {
-						config->basic.font_size = ToInt(&s_data);
+						config->basic.font_size = ToInt(s_data);
 					}
 				}
 				else
@@ -205,7 +205,7 @@ Window_HandleEvents(Window *window) {
 		msg = {};
 
 		/// events
-		Window_ReadMessage(msg, running, window, false);
+		Window_ReadMessage(window, &msg, &running, false);
 
 		/// scaling behavior
 		OpenGL_AdjustScaleViewport(window, is_zooming);

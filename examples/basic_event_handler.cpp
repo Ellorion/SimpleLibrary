@@ -8,6 +8,8 @@ Window_HandleEvents(
 	MSG msg;
 	bool running = true;
 
+	window->icon.always_visible = true;
+
 	ShaderSet  shader_set = ShaderSet_Create(window);
 	Keyboard  *keyboard   = window->keyboard;
 	Font       font       = Font_Load(S("default.ttf"), 16);
@@ -24,7 +26,7 @@ Window_HandleEvents(
 
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(msg, running, window, false);
+		Window_ReadMessage(window, &msg, &running, false);
 
 		if (keyboard->up[VK_ESCAPE])
 			running = false;
@@ -44,7 +46,7 @@ int main() {
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window_Create(&window, "Demo-Application", 800, 480, 32, &keyboard, &mouse);
+	Window_Create(&window, "Demo-Application", 512, 512 / 16 * 9, 32, &keyboard, &mouse);
 	Window_Show(&window);
 
 	OpenGL_Init(&window);

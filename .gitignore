@@ -28,6 +28,7 @@ crafting.cpp
 *.ini
 *.bat
 *.cfg
+*.ico
 
 # Object directory
 obj/

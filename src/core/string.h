@@ -439,6 +439,23 @@ String_Copy(
 	return s_result;
 }
 
+instant void
+String_CopyBuffer(
+	const char *c_dest,
+	String      s_source,
+	s64         c_length = -1
+) {
+	Assert(c_dest);
+
+	if (c_length == 0)
+		Memory_Copy(c_dest, "\0", 1);
+	else
+	if (c_length  < 0)
+		Memory_Copy(c_dest, s_source.value, s_source.length);
+	else
+		Memory_Copy(c_dest, s_source.value, MIN((u64)c_length, s_source.length));
+}
+
 instant String
 String_Copy(
 	String s_data

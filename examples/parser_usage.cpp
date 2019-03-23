@@ -21,28 +21,28 @@ int main() {
 
 	Parser_GetString(&parser, &s_option, S(":"));
 	Parser_GetString(&parser, &s_path);
-	String_Print(&s_option);
-	String_PrintLine(&s_path);
+	String_Print(s_option);
+	String_PrintLine(s_path);
 
 	Parser_GetString(&parser, &s_word);
-	String_PrintLine(&s_word);
+	String_PrintLine(s_word);
 
 	Parser_GetString(&parser, &s_word);
-	String_PrintLine(&s_word);
+	String_PrintLine(s_word);
 
 	Parser_GetString(&parser, &s_option, S(":"));
-	String_PrintLine(&s_option);
+	String_PrintLine(s_option);
 
 	Parser_GetBoolean(&parser, &is_true);
 
 	Parser_GetNumber(&parser, &s_number);
-	String_PrintLine(&s_number);
+	String_PrintLine(s_number);
 
 	Parser_GetNumber(&parser, &s_number);
-	String_PrintLine(&s_number);
+	String_PrintLine(s_number);
 
 	if (Parser_HasError(&parser))
-		String_PrintLine(&parser.s_error);
+		String_PrintLine(parser.s_error);
 
 	return 0;
 }

@@ -2,33 +2,19 @@
 
 #include <shlobj.h>
 
+#define WINDOW_CLOSE	 		WM_USER+0001
+#define WINDOW_RESIZE	 		WM_USER+0002
+#define WINDOW_TRAY_ICON 		WM_USER+0003
+#define WINDOW_TRAY_ICON_ID 	WM_USER+0004
+#define WINDOW_TRAY_ICON_SHOW	WM_USER+0005
+#define WINDOW_TRAY_ICON_HIDE	WM_USER+0006
+#define WINDOW_TRAY_ICON_CREATE WM_USER+0007
+
 #define Windows_Main 	\
 	APIENTRY			\
 	WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_text, int nCmdShow)
 
 #define Window_IsCreated(window) (window->hWnd != 0)
-
-#define Window_ReadMessage(_msg, _running, _ptr_window, _is_zooming)				\
-	while (PeekMessage(&_msg, _ptr_window->hWnd, 0, 0, PM_REMOVE)) {				\
-		if (Mouse_Update(_ptr_window->mouse, _ptr_window, &_msg))	continue;		\
-		if (Keyboard_Update(_ptr_window->keyboard, &_msg))          continue;		\
-																		\
-		switch (_msg.message) {											\
-			case WINDOW_CLOSE: {										\
-				_msg.wParam = 0;										\
-				_running = false;										\
-			} break;													\
-																		\
-			case WINDOW_RESIZE: {										\
-				OpenGL_AdjustScaleViewport(_ptr_window, _is_zooming);	\
-			} break;													\
-																		\
-			default: {													\
-				TranslateMessage(&_msg);								\
-				DispatchMessage(&_msg);									\
-			}															\
-		}																\
-	}
 
 instant bool
 Dialog_OpenFile(
@@ -92,10 +78,6 @@ static const char *class_name = "OpenGL";
 struct Mouse;
 struct Keyboard;
 
-/// "external" event pass-through
-#define WINDOW_CLOSE	WM_USER+0001
-#define WINDOW_RESIZE	WM_USER+0002
-
 struct Window {
 	const char  *title	 	  = 0;
 	HWND   		 hWnd         = 0;
@@ -111,11 +93,20 @@ struct Window {
 	Mouse       *mouse        = 0;
 	float        scale_x      = 1;
 	float        scale_y      = 1;
+
+	struct Icon {
+		bool enable                     = true;
+		bool minimize_to                = true;
+		bool always_visible             = false;
+		NOTIFYICONDATA notify_icon_data = {};
+	} icon;
 };
 
 LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
 	switch (uMessage) {
-		case WM_ACTIVATE: {
+		case WM_CREATE: {
+			PostMessage(hWnd, WINDOW_TRAY_ICON_CREATE, wParam, lParam);
+			return 0;
 		} break;
 
 		case WM_CLOSE: {
@@ -131,9 +122,30 @@ LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
 		case WM_SYSCOMMAND: {
 			switch (wParam) {
 				case SC_SCREENSAVE:
-				case SC_MONITORPOWER:
-				return 0;
+				case SC_MONITORPOWER: {
+					return 0;
+				} break;
+
+				case SC_MINIMIZE: {
+					PostMessage(hWnd, WINDOW_TRAY_ICON_SHOW, wParam, lParam);
+					return 0;
+				} break;
 			}
+		 } break;
+
+		 case WINDOW_TRAY_ICON: {
+		 	switch (wParam) {
+		 		case WINDOW_TRAY_ICON_ID: {
+		 			if (   lParam == WM_LBUTTONUP
+						OR lParam == WM_RBUTTONUP
+					) {
+		 				PostMessage(hWnd, WINDOW_TRAY_ICON_HIDE, wParam, lParam);
+						return 0;
+		 			}
+
+		 		} break;
+		 	}
+
 		 } break;
 	}
 
@@ -144,6 +156,11 @@ instant void
 Window_Destroy(
 	Window *window_io
 ) {
+	if (window_io->icon.notify_icon_data.hWnd) {
+		Shell_NotifyIcon(	NIM_DELETE,
+							&window_io->icon.notify_icon_data);
+	}
+
 	if (window_io->isFullscreen) {
 		ChangeDisplaySettings(0, 0);
 	}
@@ -287,21 +304,20 @@ Window_Create(
 	if (keyboard)
 		window_out->keyboard = keyboard;
 
+	if (File_Exists(S("tray.ico"))) {
+		NOTIFYICONDATA *nid   = &window_out->icon.notify_icon_data;
+
+		nid->cbSize           = sizeof(NOTIFYICONDATA);
+		nid->hWnd             = window_out->hWnd;
+		nid->uID              = WINDOW_TRAY_ICON_ID;
+		nid->uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+		nid->uCallbackMessage = WINDOW_TRAY_ICON;
+		nid->hIcon            = (HICON)LoadImage(0, TEXT("tray.ico"), IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
+
+		String_CopyBuffer(nid->szTip, S("Green man.. here's looking at ya!"), 63);
+	}
+
 	return true;
-}
-
-/// nCmdShow = 10 => Normal window size (not min/max)
-instant void
-Window_Show(
-	Window *window,
-	int nCmdShow = 10
-) {
-	Assert(window);
-
-	ShowWindow(window->hWnd, nCmdShow);
-
-	SetForegroundWindow(window->hWnd);
-	SetFocus(window->hWnd);
 }
 
 instant void Mouse_Reset(Mouse *mouse);
@@ -441,4 +457,119 @@ Window_UnAdjustRect(
 		rect_io->bottom -= t_rect.bottom;
 	}
 	return success;
+}
+
+/// nCmdShow = 10 => Normal window size (not min/max)
+/// returns true, if tray icon changed
+instant bool
+Window_Show(
+	Window *window,
+	int nCmdShow = 10
+) {
+	Assert(window);
+
+	ShowWindow(window->hWnd, nCmdShow);
+
+	SetForegroundWindow(window->hWnd);
+	SetFocus(window->hWnd);
+
+	if (!window->icon.enable)                 return false;
+	if (!window->icon.notify_icon_data.hWnd)  return false;
+	if ( window->icon.always_visible)         return false;
+	if (!window->icon.minimize_to)            return false;
+
+	Shell_NotifyIcon(	NIM_DELETE,
+						&window->icon.notify_icon_data);
+
+	return true;
+}
+
+/// return false as decider to trigger DefWindowProc instead
+instant bool
+Window_Hide(
+	Window *window
+) {
+	if (!window->icon.enable)                 return false;
+	if (!window->icon.notify_icon_data.hWnd)  return false;
+
+	Shell_NotifyIcon(	NIM_ADD,
+						&window->icon.notify_icon_data);
+
+	if (window->icon.minimize_to) {
+		ShowWindow(window->hWnd, SW_HIDE);
+		return true;
+	}
+
+	return false;
+}
+
+instant bool
+Mouse_Update(Mouse *, Window *, MSG *);
+
+instant bool
+Keyboard_Update(Keyboard *, MSG *);
+
+instant bool
+OpenGL_AdjustScaleViewport(Window *, bool);
+
+instant void
+Window_ReadMessage(
+	Window *window_io,
+	MSG    *msg,
+	bool   *is_running_io,
+	bool    is_zooming
+) {
+	Assert(window_io);
+	Assert(msg);
+	Assert(is_running_io);
+
+	while (PeekMessage(msg, window_io->hWnd, 0, 0, PM_REMOVE)) {
+		if (Mouse_Update(window_io->mouse, window_io, msg))	continue;
+		if (Keyboard_Update(window_io->keyboard, msg))      continue;
+
+		switch (msg->message) {
+			case WINDOW_CLOSE: {
+				msg->wParam = 0;
+				*is_running_io = false;
+			} break;
+
+			case WINDOW_RESIZE: {
+				OpenGL_AdjustScaleViewport(window_io, is_zooming);
+			} break;
+
+			case WINDOW_TRAY_ICON_CREATE: {
+				if (    window_io->icon.enable
+					AND window_io->icon.notify_icon_data.hWnd
+				) {
+					/// if icon is available, enabled and app is not
+					/// supposed to mimimize to tray, the tray icon
+					/// behaves as if it would always be visible
+					if (    window_io->icon.always_visible
+						OR !window_io->icon.minimize_to
+					) {
+						Shell_NotifyIcon(	NIM_ADD,
+											&window_io->icon.notify_icon_data);
+					}
+				}
+			} break;
+
+			case WINDOW_TRAY_ICON_SHOW: {
+				if (!Window_Hide(window_io)) {
+					DefWindowProc(	msg->hwnd,
+									WM_SYSCOMMAND,
+									SC_MINIMIZE,
+									msg->lParam);
+				}
+			} break;
+
+			case WINDOW_TRAY_ICON_HIDE: {
+				Window_Show(window_io);
+			} break;
+
+			default: {
+				TranslateMessage(msg);
+				DispatchMessage(msg);
+			}
+		}
+	}
 }

@@ -29,7 +29,7 @@ int main() {
 		Parser_GetString(&parser, &s_section);
 
 		/// require sections
-		if (!String_StartWith(&s_section, s_section_ident))
+		if (!String_StartWith(&s_section, s_section_ident, true))
 			continue;
 
 		id_section = -1;
@@ -52,7 +52,7 @@ int main() {
 					Parser_GetString(&parser, &s_option, PARSER_MODE_PEEK);
 
 					/// section switch
-					if (String_StartWith(&s_option, s_section_ident))
+					if (String_StartWith(&s_option, s_section_ident, true))
 						break;
 
 #if 0
@@ -67,13 +67,13 @@ int main() {
 					if (s_option == "text") {
 						Parser_GetString(&parser, &s_default_text);
 
-						String_PrintLine(&s_default_text);
+						String_PrintLine(s_default_text);
 					}
 
 					if (s_option == "path") {
 						Parser_GetString(&parser, &s_default_folder);
 
-						String_PrintLine(&s_default_folder);
+						String_PrintLine(s_default_folder);
 					}
 				}
 			} break;
