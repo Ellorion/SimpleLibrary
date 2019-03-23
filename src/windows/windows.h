@@ -314,7 +314,7 @@ Window_Create(
 		nid->uCallbackMessage = WINDOW_TRAY_ICON;
 		nid->hIcon            = (HICON)LoadImage(0, TEXT("tray.ico"), IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
 
-		String_CopyBuffer(nid->szTip, S("Green man.. here's looking at ya!"), 63);
+		String_CopyBuffer(nid->szTip, S(window_out->title), 63);
 	}
 
 	return true;
@@ -434,6 +434,9 @@ Window_SetTitle(
 	window_io->title = title;
 
 	SetWindowText(window_io->hWnd, window_io->title);
+
+	NOTIFYICONDATA *nid = &window_io->icon.notify_icon_data;
+	String_CopyBuffer(nid->szTip, S(window_io->title), 63);
 }
 
 instant bool
