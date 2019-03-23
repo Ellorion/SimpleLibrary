@@ -285,6 +285,18 @@ ToHex(
 	*hex_low  = c_hex[(value >> 0) & 0xF];
 }
 
+enum KEYBOARD_HOTKEY_ID {
+	KEYBOARD_HOTKEY_01 = 0,
+	KEYBOARD_HOTKEY_02,
+	KEYBOARD_HOTKEY_03,
+	KEYBOARD_HOTKEY_04,
+	KEYBOARD_HOTKEY_05,
+	KEYBOARD_HOTKEY_06,
+	KEYBOARD_HOTKEY_07,
+	KEYBOARD_HOTKEY_08,
+	KEYBOARD_HOTKEY_09,
+	KEYBOARD_HOTKEY_ID_COUNT,
+};
 
 #include "core/memory.h"
 #include "core/string.h"
@@ -313,6 +325,7 @@ ToInt(
 #include "core/map.h"
 #include "core/thread.h"
 #include "core/network.h"
+#include "core/application.h"
 
 #include "utility/base64.h"
 #include "utility/clipboard.h"

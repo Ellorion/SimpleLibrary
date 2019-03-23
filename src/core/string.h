@@ -322,7 +322,7 @@ To_CString(
 instant void
 String_CreateBuffer(
 	String *s_buffer_out,
-	u32 buffer_size,
+	u64 buffer_size,
 	bool is_reference
 ) {
 	Assert(s_buffer_out);
@@ -335,7 +335,7 @@ String_CreateBuffer(
 
 instant String
 String_CreateBuffer(
-	u32 buffer_size
+	u64 buffer_size
 ) {
 	String s_buffer_out = {};
 
@@ -352,6 +352,16 @@ String_ToLower(
 ) {
 	if (value >= 'A' AND value <= 'Z')
 		 return (value + 32);
+
+	return value;
+}
+
+instant char
+String_ToUpper(
+	char value
+) {
+	if (value >= 'a' AND value <= 'z')
+		 return (value - 32);
 
 	return value;
 }

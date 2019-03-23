@@ -100,6 +100,8 @@ struct Window {
 		bool always_visible             = false;
 		NOTIFYICONDATA notify_icon_data = {};
 	} icon;
+
+	bool hotkey_triggered[KEYBOARD_HOTKEY_ID_COUNT];
 };
 
 LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
@@ -145,7 +147,6 @@ LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
 
 		 		} break;
 		 	}
-
 		 } break;
 	}
 
@@ -526,11 +527,17 @@ Window_ReadMessage(
 	Assert(msg);
 	Assert(is_running_io);
 
-	while (PeekMessage(msg, window_io->hWnd, 0, 0, PM_REMOVE)) {
+	while (PeekMessage(msg, 0, 0, 0, PM_REMOVE)) {
+		Memory_Set(window_io->hotkey_triggered, false, KEYBOARD_HOTKEY_ID_COUNT);
+
 		if (Mouse_Update(window_io->mouse, window_io, msg))	continue;
 		if (Keyboard_Update(window_io->keyboard, msg))      continue;
 
 		switch (msg->message) {
+			case WM_HOTKEY: {
+				window_io->hotkey_triggered[msg->wParam] = true;
+			} break;
+
 			case WINDOW_CLOSE: {
 				msg->wParam = 0;
 				*is_running_io = false;

@@ -42,7 +42,6 @@ Window_HandleEvents(
 		return;
 	}
 
-	Widget wg_exit_on_launch = Widget_CreateCheckBox(window, &font_20, {}, S("Exit on launch"), true);
 	Widget wg_list           = Widget_CreateListBox( window, &font_20, {});
 	Widget wg_filter_label   = Widget_CreateLabel(   window, &font_20, {}, S("Filter:"));
 	Widget wg_filter_data    = Widget_CreateTextBox( window, &font_20, {}, false);
@@ -58,7 +57,6 @@ Window_HandleEvents(
 	Array_Add(&ap_widgets, &wg_list);
 	Array_Add(&ap_widgets, &wg_filter_label);
 	Array_Add(&ap_widgets, &wg_filter_data);
-	Array_Add(&ap_widgets, &wg_exit_on_launch);
 
 	Layout layout;
 	Layout_Create(&layout, {0, 0, window->width, window->height}, true);
@@ -66,7 +64,6 @@ Window_HandleEvents(
 		Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT, 1);
 		Layout_Add(&layout, &wg_filter_label);
 		Layout_Add(&layout, &wg_filter_data);
-		Layout_Add(&layout, &wg_exit_on_launch);
 
 		Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
 		Layout_Add(&layout, &wg_list);
@@ -87,6 +84,9 @@ Window_HandleEvents(
 		Window_ReadMessage(window, &msg, &running, false);
 		OpenGL_AdjustScaleViewport(window, false);
 		Layout_Rearrange(&layout, window);
+
+		if (window->hotkey_triggered[KEYBOARD_HOTKEY_01])
+			Window_Show(window);
 
 		Widget_Update(&ap_widgets, keyboard);
 
@@ -134,9 +134,9 @@ Window_HandleEvents(
         	Widget_Update(&wg_list);
         }
 
-        /// exit program
+        /// hide program
 		if (keyboard->up[VK_ESCAPE])
-			running = false;
+			Window_Hide(window);
 
 		/// start selected app from list
 		if (wg_list.events.on_list_change_final) {
@@ -155,9 +155,6 @@ Window_HandleEvents(
 				}
 
 				String_Destroy(&s_select);
-
-				if (wg_exit_on_launch.data.is_checked)
-					running = false;
 			}
 		}
 
@@ -175,6 +172,11 @@ Window_HandleEvents(
 }
 
 APPLICATION_MAIN {
+	Application app;
+	Window      window;
+	Keyboard    keyboard;
+	Mouse       mouse;
+
 	bool hide_window_startup = false;
 
 	/// parse command line arguments
@@ -189,10 +191,12 @@ APPLICATION_MAIN {
 		}
 	}
 
-	Window window;
+	/// random const guid
+    if (!Application_IsSingleInstance(&app, S("056d62b3-1263-4a57-82e1-11e238fec793")))
+		return 0;
 
-	Keyboard keyboard;
-	Mouse    mouse;
+	/// press "control + shift + l" to show application window from everywhere while running
+	Application_RegisterHotKey(KEYBOARD_HOTKEY_01, MOD_CONTROL | MOD_SHIFT, 'l');
 
 	Window_Create(&window, "Application-Launcher", 512, 512 / 16 * 9, 32, &keyboard, &mouse);
 
@@ -208,6 +212,8 @@ APPLICATION_MAIN {
 
 	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
+
+	Application_Destroy(&app);
 
 	return 0;
 }
