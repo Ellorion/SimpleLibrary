@@ -138,6 +138,10 @@ Window_HandleEvents(
 		if (keyboard->up[VK_ESCAPE])
 			Window_Hide(window);
 
+		/// center window, in case of ocd
+		if (keyboard->up[VK_F12])
+			Window_ToCenterPosition(window);
+
 		/// start selected app from list
 		if (wg_list.events.on_list_change_final) {
 			String s_select = Widget_GetSelectedRow(&wg_list);
@@ -152,6 +156,8 @@ Window_HandleEvents(
 					String s_file = String_GetDelimiterSection(ts_app, S(","), 1);
 					File_Execute(s_file);
 					String_Destroy(&s_file);
+
+					Window_Hide(window);
 				}
 
 				String_Destroy(&s_select);
@@ -160,9 +166,11 @@ Window_HandleEvents(
 
 		/// Render
 		/// ===================================================================
-		OpenGL_ClearScreen();
+		if (Window_IsVisible(window)) {
+			OpenGL_ClearScreen();
 
-		Widget_Render(&shader_set, &ap_widgets);
+			Widget_Render(&shader_set, &ap_widgets);
+		}
 
 		Window_UpdateAndResetInput(window);
 	}

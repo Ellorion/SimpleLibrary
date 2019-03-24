@@ -180,6 +180,28 @@ Window_Destroy(
 	*window_io = {};
 }
 
+instant void
+Window_ToCenterPosition(
+	Window *window
+) {
+	Assert(window);
+
+	RECT rect_desktop;
+	GetWindowRect(GetDesktopWindow(), &rect_desktop);
+
+	/// includes window style size
+	RECT rect_window;
+	GetWindowRect(window->hWnd, &rect_window);
+
+	s32 width  = rect_window.right  - rect_window.left;
+	s32 height = rect_window.bottom - rect_window.top;
+
+	s32 x = ((rect_desktop.right - rect_desktop.left) - width)  / 2 + rect_desktop.left;
+	s32 y = ((rect_desktop.bottom - rect_desktop.top) - height) / 2 + rect_desktop.top;
+
+	MoveWindow(window->hWnd, x, y, width, height, false);
+}
+
 instant bool
 Window_Create(
 	Window *window_out,
@@ -216,17 +238,8 @@ Window_Create(
 		return false;
 	}
 
-	/// default position for fullscreen
-	s32 x = 0;
-	s32 y = 0;
-
 	RECT rect_window = {};
 	GetClientRect(GetDesktopWindow(), &rect_window);
-
-	/// get desktop window center
-	/// -------------------------------------
-	x = (rect_window.right  - width)  >> 1;
-	y = (rect_window.bottom - height) >> 1;
 
 	rect_window.right  = width;
 	rect_window.bottom = height;
@@ -249,7 +262,7 @@ Window_Create(
 	HWND hWnd = CreateWindowEx(	dwExStyle,
 								class_name, title,
 								dwStyle,
-								x, y,
+								CW_USEDEFAULT, CW_USEDEFAULT,
 								rect_window.right - rect_window.left,
 								rect_window.bottom - rect_window.top,
 								0, 0, hInstance, 0);
@@ -318,24 +331,12 @@ Window_Create(
 		String_CopyBuffer(nid->szTip, S(window_out->title), 63);
 	}
 
+	Window_ToCenterPosition(window_out);
+
 	return true;
 }
 
-instant void Mouse_Reset(Mouse *mouse);
 instant void Keyboard_ResetLastKey(Keyboard *keyboard);
-instant void Keyboard_Reset(Keyboard *keyboard, bool full_reset);
-
-instant void
-Window_UpdateAndResetInput(
-	Window *window
-) {
-	Assert(window);
-
-	SwapBuffers(window->hDC);
-
-	Mouse_Reset(window->mouse);
-	Keyboard_Reset(window->keyboard, false);
-}
 
 instant void
 Window_AlwaysOnTop(
@@ -582,4 +583,32 @@ Window_ReadMessage(
 			}
 		}
 	}
+}
+
+instant bool
+Window_IsVisible(
+	Window *window
+) {
+	Assert(window);
+
+	return IsWindowVisible(window->hWnd);
+}
+
+instant void Mouse_Reset(Mouse *mouse);
+instant void Keyboard_Reset(Keyboard *keyboard, bool full_reset);
+
+instant void
+Window_UpdateAndResetInput(
+	Window *window
+) {
+	Assert(window);
+
+	/// vsync does not seem to work, when this does not execute,
+	/// so the cpu ends up doing alot more work, because of the
+	/// increased speed in the loop cicle, if this would be disabled
+	/// for a hidden window
+	SwapBuffers(window->hDC);
+
+	Mouse_Reset(window->mouse);
+	Keyboard_Reset(window->keyboard, false);
 }

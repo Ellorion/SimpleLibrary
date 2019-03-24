@@ -5,10 +5,10 @@ const char *app_title = "File-Navigator";
 
 instant void
 Window_SetTitle(
-	Window *window,
+	Window *window_io,
 	String s_title
 ) {
-	Assert(window);
+	Assert(window_io);
 
 	String s_buffer;
 
@@ -22,7 +22,7 @@ Window_SetTitle(
 	String_Append(&s_buffer, S(app_title));
 	String_Append(&s_buffer, S("\0", 1));
 
-	Window_SetTitle(window, s_buffer.value);
+	Window_SetTitle(window_io, s_buffer.value);
 
 	String_Destroy(&s_buffer);
 }
