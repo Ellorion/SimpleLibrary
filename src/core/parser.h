@@ -1,5 +1,12 @@
 #pragma once
 
+#ifdef ARRAY_COUNT
+#define 	PARSER_ARRAY_COUNT ARRAY_COUNT
+#else
+#define 	PARSER_ARRAY_COUNT(_array) \
+			(sizeof(_array)/sizeof(_array[0]))
+#endif
+
 struct Parser {
 	String s_data;
 	bool skip_whitespace_and_comments = true;
@@ -279,7 +286,7 @@ Parser_GetBoolean(
 		"false"
 	};
 
-	FOR(ARRAY_COUNT(values_false), it) {
+	FOR(PARSER_ARRAY_COUNT(values_false), it) {
 		String ts_value = S(values_false[it]);
 
 		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
@@ -298,7 +305,7 @@ Parser_GetBoolean(
 		"true"
 	};
 
-	FOR(ARRAY_COUNT(values_true), it) {
+	FOR(PARSER_ARRAY_COUNT(values_true), it) {
 		String ts_value = S(values_true[it]);
 
 		if (String_StartWith(&parser_io->s_data, ts_value, true)) {

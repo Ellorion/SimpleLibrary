@@ -6,6 +6,8 @@
 #define String_SplitBuffer		Array_SplitBuffer
 #define String_Split			Array_Split
 
+#define String_SplitLines		Array_SplitLines
+
 instant void
 Array_Destroy(
 	Array<String> *array_out
@@ -186,6 +188,49 @@ Array_Split(
 	Array<String> as_result;
 
 	Array_SplitBuffer(&as_result, s_data, s_delimiter, type, add_empty_entry);
+
+	return as_result;
+}
+
+instant Array<String>
+Array_SplitLines(
+	String *s_data
+) {
+	Array<String> as_result;
+
+	String s_data_it = S(*s_data);
+
+	while(s_data_it.length) {
+		s64 index        = String_IndexOf(&s_data_it, S("\r"), 0, true);
+		s64 index_return = String_IndexOf(&s_data_it, S("\n"), 0, true);
+
+		bool found_carriage = true;
+
+		if (   index < 0
+			OR (index_return >= 0 AND index_return < index)
+		) {
+			index = index_return;
+			found_carriage = false;
+		}
+
+		/// no endline char found -> add string remainder
+		if (index < 0) {
+			Array_Add(&as_result, s_data_it);
+			break;
+		}
+
+		Array_Add(&as_result, S(s_data_it, index));
+
+		/// skip "\r" or "\n"
+		String_AddOffset(&s_data_it, index + 1);
+
+		/// skip "\n" in "\r\n"
+		if (    found_carriage
+			AND String_IndexOf(&s_data_it, S("\n"), 0, true) == 0
+		) {
+			String_AddOffset(&s_data_it, 1);
+		}
+	}
 
 	return as_result;
 }

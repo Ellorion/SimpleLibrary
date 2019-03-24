@@ -191,6 +191,8 @@ File_Write(
     fwrite(s_data.value, sizeof(char), sizeof(char) * s_data.length, file->fp);
 }
 
+///@TODO: pass return value as a buffer, to allow
+///       file hot-reloading without destroying the string buffer
 instant String
 File_Read(
 	File *file

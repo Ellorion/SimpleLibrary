@@ -314,9 +314,9 @@ ToInt(
 
 #include "core/time.h"
 #include "core/sort.h"
+#include "core/parser.h"
 #include "core/array.h"
 #include "core/rect.h"
-#include "core/parser.h"
 #include "core/cpu.h"
 #include "core/array_string.h"
 #include "core/tree.h"

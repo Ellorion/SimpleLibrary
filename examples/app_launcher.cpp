@@ -1,12 +1,14 @@
 #include "src/SLib.h"
 #include "test/core.h"
 
-/// app.dat example
-/// ===========================================================================
-/// name_of_app_in_list_1, C:/path/to/app.exe
-/// name_of_app_in_list_2, D:/path/to-another/app.exe
-/// name_of_app_in_list_3, E:\\path\\to-yet-another\app.exe
-/// name_of_app_in_list_4, F:\\my path\\to yet another again\app.exe
+String s_setting_data_example = S(R"(
+# app.dat example
+#  ===========================================================================
+#  name_of_app_in_list_1, C:/path/to/app.exe
+#  name_of_app_in_list_2, D:/path/to-another/app.exe
+#  name_of_app_in_list_3, E:\\path\\to-yet-another\app.exe
+#  name_of_app_in_list_4, F:\\my path\\to yet another again\app.exe
+)");
 
 instant void
 Window_HandleEvents(
@@ -42,9 +44,12 @@ Window_HandleEvents(
 		return;
 	}
 
+	/// main widget layout
+	/// =======================================================================
 	Widget wg_list           = Widget_CreateListBox( window, &font_20, {});
 	Widget wg_filter_label   = Widget_CreateLabel(   window, &font_20, {}, S("Filter:"));
 	Widget wg_filter_data    = Widget_CreateTextBox( window, &font_20, {}, false);
+	Widget wg_settings_show  = Widget_CreateButton(  window, &font_16, {}, S("Settings"));
 
 	wg_list.data.is_filter_case_sensitive = false;
 
@@ -53,28 +58,56 @@ Window_HandleEvents(
 	rect_filter_label_padding->w =+ 2;
 
 	/// tab-stop order (for tab-ables)
-	Array<Widget *> ap_widgets;
-	Array_Add(&ap_widgets, &wg_list);
-	Array_Add(&ap_widgets, &wg_filter_label);
-	Array_Add(&ap_widgets, &wg_filter_data);
+	Array<Widget *> ap_widgets_main;
+	Array_Add(&ap_widgets_main, &wg_list);
+	Array_Add(&ap_widgets_main, &wg_filter_label);
+	Array_Add(&ap_widgets_main, &wg_filter_data);
+	Array_Add(&ap_widgets_main, &wg_settings_show);
 
-	Layout layout;
-	Layout_Create(&layout, {0, 0, window->width, window->height}, true);
+	Layout layout_main;
+	Layout_Create(&layout_main, {0, 0, window->width, window->height}, true);
 	{
-		Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT, 1);
-		Layout_Add(&layout, &wg_filter_label);
-		Layout_Add(&layout, &wg_filter_data);
+		Layout_CreateBlock(&layout_main, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT, 1);
+		Layout_Add(&layout_main, &wg_filter_label);
+		Layout_Add(&layout_main, &wg_filter_data);
+		Layout_Add(&layout_main, &wg_settings_show);
 
-		Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
-		Layout_Add(&layout, &wg_list);
+		Layout_CreateBlock(&layout_main, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
+		Layout_Add(&layout_main, &wg_list);
 	}
 
+	/// settings widget layout
+	/// =======================================================================
+	Widget wg_settings_text   = Widget_CreateTextBox(window, &font_20, {}, true);
+	Widget wg_settings_cancel = Widget_CreateButton( window, &font_16, {}, S("Cancel"));
+	Widget wg_settings_apply  = Widget_CreateButton( window, &font_16, {}, S("Apply"));
+
+	Array<Widget *> ap_widgets_settings;
+	Array_Add(&ap_widgets_settings, &wg_settings_text);
+	Array_Add(&ap_widgets_settings, &wg_settings_cancel);
+	Array_Add(&ap_widgets_settings, &wg_settings_apply);
+
+	Layout layout_settings;
+	Layout_Create(&layout_settings, {0, 0, window->width, window->height}, true);
+	{
+		Layout_CreateBlock(&layout_settings, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT);
+		Layout_Add(&layout_settings, &wg_settings_cancel);
+		Layout_Add(&layout_settings, &wg_settings_apply);
+
+		Layout_CreateBlock(&layout_settings, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
+		Layout_Add(&layout_settings, &wg_settings_text);
+	}
+
+	String s_app_data;
 	String s_app_data_file = S("app.dat");
 
 	File_Watcher watch_app_data;
 	File_Watch(&watch_app_data, s_app_data_file);
 
 	Array<String> as_appdata;
+
+	Layout          *layout_active     = &layout_main;
+	Array<Widget *> *ap_widgets_active = &ap_widgets_main;
 
 	while(running) {
 		msg = {};
@@ -83,28 +116,35 @@ Window_HandleEvents(
 		/// ===================================================================
 		Window_ReadMessage(window, &msg, &running, false);
 		OpenGL_AdjustScaleViewport(window, false);
-		Layout_Rearrange(&layout, window);
+		Layout_Rearrange(layout_active, window);
 
 		if (window->hotkey_triggered[KEYBOARD_HOTKEY_01])
 			Window_Show(window);
 
-		Widget_Update(&ap_widgets, keyboard);
+		Widget_Update(ap_widgets_active, keyboard);
 
 		/// hot-load app list data
 		if (File_HasChanged(&watch_app_data)) {
-			String s_data = File_ReadAll(watch_app_data.s_filename);
+			String_Destroy(&s_app_data);
+			s_app_data = File_ReadAll(watch_app_data.s_filename);
 
-			if (!s_data.value) {
+			if (!s_app_data.value) {
 				Window_SetTitle(window, "File: \"app.dat\" does not exists.");
 			}
 			else {
-				as_appdata = String_Split(&s_data, S("\r\n"), DELIMITER_IGNORE, false);
+				Array_Clear(&as_appdata);
+				as_appdata = String_SplitLines(&s_app_data);
 
 				Widget_ClearRows(&wg_list);
 
 				/// fill list with app-names
 				FOR_ARRAY(as_appdata, it) {
 					String *ts_line = &ARRAY_IT(as_appdata, it);
+
+					/// skip comment
+					if (String_StartWith(ts_line, S("#"), true))
+						continue;
+
 					String s_section = String_GetDelimiterSection(ts_line, S(","), 0);
 					Widget_AddRow(&wg_list, s_section);
 					String_Destroy(&s_section);
@@ -138,6 +178,10 @@ Window_HandleEvents(
 		if (keyboard->up[VK_ESCAPE])
 			Window_Hide(window);
 
+		/// keyboard way to exit app
+		if (keyboard->up[VK_F4])
+			running = false;
+
 		/// center window, in case of ocd
 		if (keyboard->up[VK_F12])
 			Window_ToCenterPosition(window);
@@ -165,19 +209,56 @@ Window_HandleEvents(
 			}
 		}
 
+		/// settings handling
+		if (wg_settings_show.events.on_trigger) {
+			Widget_SwapLayout(	&ap_widgets_active,
+								&layout_active,
+								&ap_widgets_settings,
+								&layout_settings);
+
+			String *s_settings_data = Widget_GetTextData(&wg_settings_text);
+			*s_settings_data = File_ReadAll(s_app_data_file);
+
+			if (String_IsEmpty(s_settings_data)) {
+				String_Append(s_settings_data, s_setting_data_example);
+				String_TrimLeft(s_settings_data);
+			}
+		}
+
+		if (wg_settings_cancel.events.on_trigger) {
+			Widget_SwapLayout(	&ap_widgets_active,
+								&layout_active,
+								&ap_widgets_main,
+								&layout_main);
+		}
+
+		if (wg_settings_apply.events.on_trigger) {
+			Widget_SwapLayout(	&ap_widgets_active,
+								&layout_active,
+								&ap_widgets_main,
+								&layout_main);
+
+			String *s_settings_data = Widget_GetTextData(&wg_settings_text);
+
+			File file_settings = File_Open(s_app_data_file, "wb+");
+			File_Write(&file_settings, *s_settings_data);
+			File_Close(&file_settings);
+		}
+
 		/// Render
 		/// ===================================================================
 		if (Window_IsVisible(window)) {
 			OpenGL_ClearScreen();
 
-			Widget_Render(&shader_set, &ap_widgets);
+			Widget_Render(&shader_set, ap_widgets_active);
 		}
 
 		Window_UpdateAndResetInput(window);
-		Widget_Reset(&ap_widgets);
+		Widget_Reset(ap_widgets_active);
 	}
 
-	Widget_Destroy(&ap_widgets);
+	Widget_Destroy(&ap_widgets_main);
+	Widget_Destroy(&ap_widgets_settings);
 	ShaderSet_Destroy(&shader_set);
 }
 

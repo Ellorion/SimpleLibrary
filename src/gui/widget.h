@@ -2267,3 +2267,25 @@ Widget_Reset(
 		Widget_Reset(t_widget);
 	}
 }
+
+instant void
+Widget_SwapLayout(
+	Array<Widget *> **ap_widgets_active,
+	Layout          **layout_active,
+	Array<Widget *>  *ap_widgets_swap_to,
+	Layout           *layout_swap_to
+) {
+	Assert(ap_widgets_active);
+	Assert(layout_active);
+
+	Assert(ap_widgets_swap_to);
+	Assert(layout_swap_to);
+
+	Widget_Reset(*ap_widgets_active);
+
+	*ap_widgets_active = ap_widgets_swap_to;
+	*layout_active     = layout_swap_to;
+
+	if ((*ap_widgets_active)->count)
+		Widget_SetFocus(ARRAY_IT((**ap_widgets_active), 0));
+}
