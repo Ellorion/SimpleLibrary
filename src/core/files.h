@@ -141,46 +141,6 @@ File_Size(
 	return size;
 }
 
-instant String
-File_Execute(
-	String s_command
-) {
-	String s_result;
-
-	String ts_command;
-	String_Append(&ts_command, S("\""));
-	String_Append(&ts_command, s_command);
-	String_Append(&ts_command, S("\""));
-
-	/// length would calc. to 0 otherwise
-	String_Append(&ts_command, S("\0", 1));
-
-	STARTUPINFO info_startup = {};
-	PROCESS_INFORMATION info_proc = {};
-
-	info_startup.dwFlags = STARTF_USESTDHANDLES;
-
-	bool result = CreateProcess(
-		0,
-		ts_command.value,
-		0,
-		0,
-		false,
-		CREATE_NEW_CONSOLE,
-		0,
-		0,
-		&info_startup,
-		&info_proc
-	);
-
-	if (!result)
-		LOG_WARNING("could not open file: " << ts_command.value);
-
-	String_Destroy(&ts_command);
-
-	return s_result;
-}
-
 instant void
 File_Write(
 	File *file,

@@ -474,6 +474,7 @@ Network_HTTP_GetResponse(
 		String s_header_end_id = S("\r\n\r\n");
 		network->HTTP.header_size = String_IndexOf(&network->HTTP.s_buffer_chunk, s_header_end_id, 0, true);
 
+		/// in case it was not byRef and had existing data
 		String_Destroy(s_response_out);
 
 		if (network->HTTP.header_size < 0) {

@@ -245,7 +245,7 @@ Window_HandleEvents(Window *window) {
 					u64 length_path = config.basic.s_path.length;
 
 					File_ChangePath(&config.basic.s_path, t_entry->s_name);
-					File_Execute(config.basic.s_path);
+					Application_Execute(config.basic.s_path);
 					String_Cut(&config.basic.s_path, length_path);
 				} break;
 

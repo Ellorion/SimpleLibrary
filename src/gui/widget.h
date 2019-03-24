@@ -1440,38 +1440,25 @@ Widget_GetSelectedRowBuffer(
 	String_Append(s_row_data_out, *ts_row_data);
 }
 
-instant void
-Widget_GetSelectedRow(
-	Widget *widget,
-	String *s_data_out
-) {
-	Assert(widget);
-	Assert(s_data_out);
-	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
-
-	String_Clear(s_data_out);
-
-	if (!widget->data.as_row_data.count)
-		return;
-
-	if (widget->data.as_filter_data.count) {
-		*s_data_out = ARRAY_IT(widget->data.as_filter_data, widget->data.active_row_id);
-	}
-	else {
-		if (String_IsEmpty(&widget->data.s_row_filter))
-			*s_data_out = ARRAY_IT(widget->data.as_row_data   , widget->data.active_row_id);
-	}
-}
-
 instant String
-Widget_GetSelectedRow(
+Widget_GetSelectedRowRef(
 	Widget *widget
 ) {
 	Assert(widget);
 	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
 
 	String s_result = {};
-	Widget_GetSelectedRow(widget, &s_result);
+
+	if (!widget->data.as_row_data.count)
+		return s_result;
+
+	if (widget->data.as_filter_data.count) {
+		s_result = S(ARRAY_IT(widget->data.as_filter_data, widget->data.active_row_id));
+	}
+	else {
+		if (String_IsEmpty(&widget->data.s_row_filter))
+			s_result = S(ARRAY_IT(widget->data.as_row_data, widget->data.active_row_id));
+	}
 
 	return s_result;
 }

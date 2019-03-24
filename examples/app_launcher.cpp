@@ -133,7 +133,7 @@ Window_HandleEvents(
 			}
 			else {
 				Array_Clear(&as_appdata);
-				as_appdata = String_SplitLines(&s_app_data);
+				as_appdata = String_SplitLinesRef(&s_app_data);
 
 				Widget_ClearRows(&wg_list);
 
@@ -145,9 +145,8 @@ Window_HandleEvents(
 					if (String_StartWith(ts_line, S("#"), true))
 						continue;
 
-					String s_section = String_GetDelimiterSection(ts_line, S(","), 0);
+					String s_section = String_GetDelimiterSectionRef(ts_line, S(","), 0);
 					Widget_AddRow(&wg_list, s_section);
-					String_Destroy(&s_section);
 				}
 			}
 		}
@@ -188,7 +187,7 @@ Window_HandleEvents(
 
 		/// start selected app from list
 		if (wg_list.events.on_list_change_final) {
-			String s_select = Widget_GetSelectedRow(&wg_list);
+			String s_select = Widget_GetSelectedRowRef(&wg_list);
 
 			if (!String_IsEmpty(&s_select)) {
 				FOR_ARRAY(as_appdata, it) {
@@ -197,9 +196,16 @@ Window_HandleEvents(
 					if (!String_StartWith(ts_app, s_select, true))
 						continue;
 
-					String s_file = String_GetDelimiterSection(ts_app, S(","), 1);
-					File_Execute(s_file);
-					String_Destroy(&s_file);
+					String s_file = String_GetDelimiterSectionRef(ts_app, S(","), 1);
+
+					/// open download url in default browser (if available),
+					/// if the file does not exists
+					/// assuming it is not installed
+					/// (in that location) (on a fresh machine)
+					if (!Application_Execute(s_file)) {
+						String s_download_url = String_GetDelimiterSectionRef(ts_app, S(","), 2);
+						Application_OpenURL(s_download_url);
+					}
 
 					Window_Hide(window);
 					break;

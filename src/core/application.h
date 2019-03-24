@@ -84,6 +84,61 @@ Application_RegisterHotKey(
 }
 
 instant void
+Application_OpenURL(
+	String s_url
+) {
+	String s_open_url   = S(s_url);
+	String s_terminator = S("\0", 1);
+
+	if (!String_EndWith(&s_url, s_terminator, true)) {
+		s_open_url = String_Copy(s_open_url);
+		String_Append(&s_open_url, s_terminator);
+	}
+
+	ShellExecute(0, "open", s_open_url.value, 0, 0, SW_SHOWNORMAL);
+
+	String_Destroy(&s_open_url);
+}
+
+instant bool
+Application_Execute(
+	String s_command
+) {
+	String ts_command;
+	String_Append(&ts_command, S("\""));
+	String_Append(&ts_command, s_command);
+	String_Append(&ts_command, S("\""));
+
+	/// length would calc. to 0 otherwise
+	String_Append(&ts_command, S("\0", 1));
+
+	STARTUPINFO info_startup = {};
+	PROCESS_INFORMATION info_proc = {};
+
+	info_startup.dwFlags = STARTF_USESTDHANDLES;
+
+	bool result = CreateProcess(
+		0,
+		ts_command.value,
+		0,
+		0,
+		false,
+		CREATE_NEW_CONSOLE,
+		0,
+		0,
+		&info_startup,
+		&info_proc
+	);
+
+	if (!result)
+		LOG_WARNING("could not open file: " << ts_command.value);
+
+	String_Destroy(&ts_command);
+
+	return result;
+}
+
+instant void
 Application_Destroy(
 	Application *app
 ) {

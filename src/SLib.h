@@ -47,18 +47,14 @@
 ///               will be cleared / overwritten
 ///       _io  -> will read an input and generate an output
 ///               based on it
-///       _opt -> can be 0 (pointer), but does not set it as
+///       _opt -> can be 0 (pointer), but is not set with an
 ///               optional default value
 ///     otherwise, the pointer will only be used for reading
 ///
-///     Function names that end with "Buffer" have a byRef return parameter
-///     which needs manual freeing, in case it is not a static object / variable (tbd)
-///
-///     Function names that end with "Temp" issue a return value, which is only
-///     valid until that function is called again. (for temporary ownership)
-///
 /// Return types: if a function returns a struct, it's memory needs to
-///               be free'd to prevent memory leaks
+///               be free'd to prevent memory leaks,
+///               unless that function ends with "Ref". in that case the
+///               return value does not require freeing, since it uses a reference
 
 //#ifdef __MINGW32__
 //#   undef  _WIN32_WINNT

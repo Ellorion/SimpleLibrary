@@ -6,7 +6,7 @@
 #define String_SplitBuffer		Array_SplitBuffer
 #define String_Split			Array_Split
 
-#define String_SplitLines		Array_SplitLines
+#define String_SplitLinesRef	Array_SplitLinesRef
 
 instant void
 Array_Destroy(
@@ -193,7 +193,7 @@ Array_Split(
 }
 
 instant Array<String>
-Array_SplitLines(
+Array_SplitLinesRef(
 	String *s_data
 ) {
 	Array<String> as_result;
@@ -360,6 +360,36 @@ String_GetDelimiterSection(
 
 	Array_Clear(&as_section);
 	as_section = Array_Split(s_data, s_delimiter, DELIMITER_IGNORE, true);
+
+	FOR_ARRAY(as_section, it) {
+		if (it == index) {
+			String *ts_entry = &ARRAY_IT(as_section, it);
+
+			String_Append(&s_result, *ts_entry);
+
+			break;
+		}
+	}
+
+	String_TrimLeft(&s_result);
+	String_TrimRight(&s_result);
+
+	return s_result;
+}
+
+instant String
+String_GetDelimiterSectionRef(
+	String *s_data,
+	String  s_delimiter,
+	u64 index,
+	bool auto_trim = true
+) {
+	String s_result;
+
+	static Array<String> as_section;
+
+	Array_Clear(&as_section);
+	as_section = Array_SplitRef(s_data, s_delimiter, DELIMITER_IGNORE, true);
 
 	FOR_ARRAY(as_section, it) {
 		if (it == index) {

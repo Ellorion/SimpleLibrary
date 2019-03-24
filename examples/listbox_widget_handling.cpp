@@ -69,11 +69,9 @@ Window_HandleEvents(
 		}
 
 		if (widget_listbox.events.on_trigger) {
-			String s_row_data = Widget_GetSelectedRow(&widget_listbox);
+			String s_row_data = Widget_GetSelectedRowRef(&widget_listbox);
 
 			LOG_DEBUG(s_row_data.value);
-
-			String_Destroy(&s_row_data);
 		}
 
 		/// Render
