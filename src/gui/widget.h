@@ -916,9 +916,6 @@ Widget_Render(
 		wg_overlay = Widget_Render(shader_set, t_subwidget);
 	}
 
-	/// Reset per Frame Event Data
-	widget_io->events = {};
-
 	return wg_overlay;
 }
 
@@ -2247,4 +2244,26 @@ Widget_GetTextData(
 	Assert(widget);
 
 	return &widget->text.s_data;
+}
+
+instant void
+Widget_Reset(
+	Widget *widget_io
+) {
+	Assert(widget_io);
+
+	/// Reset per Frame Event Data
+	widget_io->events = {};
+}
+
+instant void
+Widget_Reset(
+	Array<Widget *> *ap_widgets
+) {
+	Assert(ap_widgets);
+
+	FOR_ARRAY(*ap_widgets, it) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it);
+		Widget_Reset(t_widget);
+	}
 }

@@ -158,6 +158,7 @@ Window_HandleEvents(
 					String_Destroy(&s_file);
 
 					Window_Hide(window);
+					break;
 				}
 
 				String_Destroy(&s_select);
@@ -173,6 +174,7 @@ Window_HandleEvents(
 		}
 
 		Window_UpdateAndResetInput(window);
+		Widget_Reset(&ap_widgets);
 	}
 
 	Widget_Destroy(&ap_widgets);

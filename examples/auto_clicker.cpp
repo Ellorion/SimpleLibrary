@@ -80,6 +80,7 @@ Window_HandleEvents(
 		Widget_Render(&shader_set, &ap_widgets);
 
 		Window_UpdateAndResetInput(window);
+		Widget_Reset(&ap_widgets);
 	}
 
 	Widget_Destroy(&ap_widgets);

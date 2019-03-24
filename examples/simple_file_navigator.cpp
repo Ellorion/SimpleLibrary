@@ -260,6 +260,7 @@ Window_HandleEvents(Window *window) {
 		Widget_Render(&shader_set, &a_widgets);
 
 		Window_UpdateAndResetInput(window);
+		Widget_Reset(&ap_widgets);
 	}
 
 	/// save changes on exit
