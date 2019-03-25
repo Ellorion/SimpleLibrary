@@ -13,7 +13,8 @@ File_HasExtension(
 
 	bool result = false;
 
-	if (!s_extension.length)  return true;
+	if (String_IsEmpty(&s_extension))
+		return true;
 
 	Array<String> as_extentions = Array_Split(&s_extension, S("|"), DELIMITER_IGNORE, true);
 
@@ -73,7 +74,7 @@ File_CreateDirectory(
 	String s_directory,
 	bool make_path_relative = true
 ) {
-	if (!s_directory.length)
+	if (String_IsEmpty(&s_directory))
 		return false;
 
 	String s_path_relative;
@@ -274,7 +275,7 @@ instant bool
 File_IsDirectory(
 	String s_path
 ) {
-	if (!s_path.length)
+	if (String_IsEmpty(&s_path))
 		return false;
 
 	char *c_path = String_CreateCBufferCopy(s_path);
@@ -301,7 +302,7 @@ File_ReadDirectory(
 ) {
 	Assert(a_entries_io);
 
-	if (!s_path.length)
+	if (String_IsEmpty(&s_path))
 		return;
 
 	HANDLE id_directory;
@@ -451,7 +452,7 @@ File_GetDrives(
 	s64 index_found;
 	String s_find = S("\0", 1);
 
-	while(s_buffer_it.length) {
+	while(!String_IsEmpty(&s_buffer_it)) {
 		if (!String_Find(&s_buffer_it, s_find, &index_found))
 			break;
 

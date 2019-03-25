@@ -1565,7 +1565,7 @@ Widget_LoadDirectoryList(
 						 ts_directory_buffer.length);
 	}
 
-	if (ts_directory_buffer.length) {
+	if (!String_IsEmpty(&ts_directory_buffer)) {
 		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_DIR  , show_full_path);
 		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_FILES, show_full_path);
 
@@ -1644,7 +1644,7 @@ Widget_CreateLabel(
 
 	t_widget.text.font = font;
 
-	if (s_data.length)
+	if (!String_IsEmpty(&s_data))
 		String_Append(&t_widget.text.s_data, s_data);
 
 	t_widget.trigger_autosize = true;
@@ -1684,7 +1684,7 @@ Widget_CreateButton(
 
 	t_widget.text.font = font;
 
-	if (s_data.length)
+	if (!String_IsEmpty(&s_data))
 		String_Append(&t_widget.text.s_data, s_data);
 
 	t_widget.trigger_autosize = true;

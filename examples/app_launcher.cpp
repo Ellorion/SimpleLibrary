@@ -3,11 +3,14 @@
 
 String s_setting_data_example = S(R"(
 # app.dat example
-#  ===========================================================================
-#  name_of_app_in_list_1, C:/path/to/app.exe
-#  name_of_app_in_list_2, D:/path/to-another/app.exe
-#  name_of_app_in_list_3, E:\\path\\to-yet-another\app.exe
-#  name_of_app_in_list_4, F:\\my path\\to yet another again\app.exe
+# ===========================================================================
+# name_of_app_in_list_1, C:/path/to/app.exe
+# name_of_app_in_list_2, D:/path/to-another/app.exe
+# name_of_app_in_list_3, E:\\path\\to-yet-another\app.exe
+# name_of_app_in_list_4, F:\\my path\\to yet another again\app.exe
+# open_download_link_since_file_does_not_exist, abc:/invalid.exe, http://www.example.com
+# open_url, , http://www.example.com
+# store_test_as_list_item_for_remembering
 )");
 
 instant void
@@ -198,6 +201,8 @@ Window_HandleEvents(
 					if (!String_StartWith(ts_app, s_select, true))
 						continue;
 
+					bool did_execute = true;
+
 					String s_file = String_GetDelimiterSectionRef(ts_app, S(","), 1);
 
 					/// open download url in default browser (if available),
@@ -206,10 +211,12 @@ Window_HandleEvents(
 					/// (in that location) (on a fresh machine)
 					if (!Application_Execute(s_file)) {
 						String s_download_url = String_GetDelimiterSectionRef(ts_app, S(","), 2);
-						Application_OpenURL(s_download_url);
+						did_execute = Application_OpenURL(s_download_url);
 					}
 
-					Window_Hide(window);
+					if (did_execute)
+						Window_Hide(window);
+
 					break;
 				}
 

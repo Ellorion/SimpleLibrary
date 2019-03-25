@@ -44,7 +44,7 @@ Font_HasError(
 ) {
 	Assert(font);
 
-	return (font->s_error.length > 0);
+	return (!String_IsEmpty(&font->s_error));
 }
 
 instant Font
@@ -55,7 +55,7 @@ Font_Load(
     Font font = {};
     String s_font_data = File_ReadAll(s_file, true);
 
-    if (!s_font_data.length) {
+    if (String_IsEmpty(&s_font_data)) {
 		String_Append(&font.s_error, S("Font \""));
 		String_Append(&font.s_error, s_file);
 		String_Append(&font.s_error, S("\" does not exist."));
@@ -70,7 +70,7 @@ Font_Load(
 		}
 		else {
 			font.s_data = s_font_data;
-			font.size = size;
+			font.size   = size;
 
 			const u8 *c_data = (u8 *)font.s_data.value;
 
@@ -784,7 +784,7 @@ Text_AddLines(
 
 		String s_data_it = S(text_line->s_data);
 
-		while(s_data_it.length) {
+		while(!String_IsEmpty(&s_data_it)) {
 			Codepoint codepoint;
 			s32 utf_byte_count;
 
@@ -873,13 +873,14 @@ Text_RenderLines(
 
 instant void Text_Cursor_Update(Text *text);
 
+/// @Useful?
 instant bool
 Text_Exists(
 	Text *text
 ) {
 	Assert(text);
 
-	return (text->s_data.length > 0);
+	return (!String_IsEmpty(&text->s_data));
 }
 
 instant bool
@@ -889,7 +890,7 @@ Text_Update(
 	Assert(text_io);
 
 	if (!text_io->font) {
-		if (text_io->s_data.length)
+		if (!String_IsEmpty(&text_io->s_data))
 			LOG_INFO("No font is set, while text is available.");
 
 		return false;
@@ -1006,7 +1007,7 @@ Text_Cursor_FindIndex(
 
 		String s_data_it = S(text_line->s_data);
 
-		while(s_data_it.length) {
+		while(!String_IsEmpty(&s_data_it)) {
 			Codepoint codepoint;
 			s32 utf_byte_count;
 
@@ -1399,7 +1400,7 @@ Text_Cursor_Update(
 
 		index_line_x = 0;
 
-		while(s_data_it.length) {
+		while(!String_IsEmpty(&s_data_it)) {
 			Codepoint codepoint;
 			s32 utf_byte_count;
 

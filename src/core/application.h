@@ -83,10 +83,13 @@ Application_RegisterHotKey(
 	return RegisterHotKey(0, hotkey_id, mod_flags, keyboard_char);
 }
 
-instant void
+instant bool
 Application_OpenURL(
 	String s_url
 ) {
+	if (String_IsEmpty(&s_url))
+		return false;
+
 	String s_open_url   = S(s_url);
 	String s_terminator = S("\0", 1);
 
@@ -98,6 +101,8 @@ Application_OpenURL(
 	ShellExecute(0, "open", s_open_url.value, 0, 0, SW_SHOWNORMAL);
 
 	String_Destroy(&s_open_url);
+
+	return true;
 }
 
 instant bool

@@ -38,7 +38,7 @@ Parser_IsRunning(
 	if (Parser_HasError(parser))
 		return false;
 
-	if (parser->s_data.length <= 0)
+	if (String_IsEmpty(&parser->s_data))
 		return false;
 
 	return true;
@@ -469,7 +469,7 @@ Parser_Token_Peek(
 	s_token_out->is_reference = true;
 	s_token_out->value        = s_data_it.value;
 
-	while(s_data_it.length) {
+	while(!String_IsEmpty(&s_data_it)) {
 		++s_token_out->length;
 
 		if (s_data_it.length == 1)

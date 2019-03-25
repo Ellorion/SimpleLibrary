@@ -52,7 +52,7 @@ String_IsEmpty(
 ) {
 	Assert(s_data);
 
-	return (   s_data->length == 0
+	return (   s_data->length <= 0
 			OR s_data->value  == 0);
 }
 
@@ -300,7 +300,7 @@ To_CString(
 	if (!c_length)
 		return;
 
-	if (!s_data->length) {
+	if (String_IsEmpty(s_data)) {
 		c_buffer_out[0] = '\0';
 		return;
 	}
@@ -497,7 +497,7 @@ String_IndexOf(
 	if (!s_data OR !s_data->length)
 		return result;
 
-	if (s_key.length == 0)
+	if (String_IsEmpty(&s_key))
 		return result;
 
 	u64 length_data = s_data->length;
@@ -526,10 +526,10 @@ String_IndexOfRev(
 	if (!s_data)
 		return result;
 
-	if (!s_data->length)
+	if (String_IsEmpty(s_data))
 		return result;
 
-	if (s_key.length == 0)
+	if (String_IsEmpty(&s_key))
 		return result;
 
 	/// index_start "starts" at the end of a string,
@@ -553,8 +553,8 @@ String_StartWith(
 	String  s_startwith,
 	bool is_case_sensitive
 ) {
-	if (!s_startwith.length OR !s_data OR !s_data->length)
-		return false;
+	if (String_IsEmpty(&s_startwith))  return false;
+	if (String_IsEmpty(s_data))        return false;
 
 	return (String_Compare(*s_data, s_startwith, s_startwith.length, is_case_sensitive) == 0);
 }
@@ -707,22 +707,38 @@ instant void
 String_TrimLeft(
 	String *s_data_io
 ) {
-	Assert(s_data_io);
+  	Assert(s_data_io);
 	Assert(!s_data_io->is_reference);
 
-	u64 length = 0;
-	u64 len_max = s_data_io->length;
+	if (String_IsEmpty(s_data_io))
+		return;
 
-	/// does not skip '\0'
-    while(length <= len_max) {
-		if (s_data_io->value[length] <= 32 AND s_data_io->value[length] != 127) ++length;
-		else break;
-    }
+	String s_data_it = S(*s_data_io);
 
-    Memory_Copy(s_data_io->value, s_data_io->value + length, s_data_io->length - length);
-    s_data_io->length -= length;
+	u64 trim_length = 0;
 
-    s_data_io->changed = true;
+	while(!String_IsEmpty(&s_data_it)) {
+		char ch = s_data_it.value[0];
+
+		switch (ch) {
+			case ' ':
+			case '\r':
+			case '\n':
+			case '\t': {
+				++trim_length;
+				String_AddOffset(&s_data_it, 1);
+				continue;
+			} break;
+		}
+
+		break;
+	}
+
+	if (trim_length) {
+		s_data_io->length -= trim_length;
+		Memory_Copy(s_data_io->value, s_data_io->value + trim_length, s_data_io->length);
+		s_data_io->changed = true;
+	}
 }
 
 instant void
@@ -733,6 +749,9 @@ String_TrimRight(
 	Assert(!s_data_io->is_reference);
 
 	u64 length = s_data_io->length;
+
+	if (String_IsEmpty(s_data_io))
+		return;
 
     while(length > 0) {
 		if (s_data_io->value[length - 1] <= 32 AND s_data_io->value[length - 1] != 127)
@@ -833,7 +852,7 @@ String_GetCodepoint(
 	Assert(s_data);
 	Assert(utf_byte_count);
 
-	if (s_data->length == 0) {
+	if (String_IsEmpty(s_data)) {
 		LOG_WARNING("No string available to read codepoint from.");
 		return 0;
 	}
@@ -850,7 +869,7 @@ String_GetCodepointAtIndex(
 	Assert(s_data);
 	Assert(utf_byte_count);
 
-	if (s_data->length == 0) {
+	if (String_IsEmpty(s_data)) {
 		LOG_WARNING("No string available to read codepoint from.");
 		return 0;
 	}
@@ -954,9 +973,8 @@ String_AppendCircle(
 	Assert(s_data_io);
 	Assert(!s_data_io->is_reference);
 
-	if (!s_data.value)		return false;
-	if (!s_data.length)    return false;
-	if (!buffer_limit)  	return false;
+	if (String_IsEmpty(&s_data))  return false;
+	if (!buffer_limit)  	     return false;
 
 	if (s_data_io->length + s_data.length > buffer_limit) {
 		if (reset_full_buffer) {

@@ -12,7 +12,7 @@ Window_SetTitle(
 
 	String s_buffer;
 
-	if (s_title.length) {
+	if (!String_IsEmpty(&s_title) {
 		String_Append(&s_buffer, S("["));
 		String_Append(&s_buffer, s_title);
 		String_Append(&s_buffer, S("]"));
@@ -127,7 +127,7 @@ Config_Parse(
 
 					/// is directory or list drives if empty
 					if (   File_IsDirectory(s_data)
-						OR !s_data.length
+						OR String_IsEmpty(&s_data)
 					) {
 						String_Clear(&config->basic.s_path);
 						String_Append(&config->basic.s_path, s_data);

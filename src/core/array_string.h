@@ -66,7 +66,7 @@ Array_SplitRefBuffer(
 
 	s64 index_found;
 
-	bool is_running = (s_data_it.length > 0);
+	bool is_running = !String_IsEmpty(&s_data_it);
 
 	while(is_running) {
 		if (!String_Find(&s_data_it, s_delimiter, &index_found)) {
@@ -76,7 +76,7 @@ Array_SplitRefBuffer(
 
 			Assert(s_data_it.length <= s_data->length);
 
-			if (!s_data_it.length)
+			if (String_IsEmpty(&s_data_it))
 				break;
 
 			is_running = false;
@@ -167,7 +167,7 @@ Array_SplitBuffer(
 		s_data_it.length -= pos_found + s_delimiter.length;
 	}
 
-	if (s_data_it.length > 0) {
+	if (!String_IsEmpty(&s_data_it)) {
 		String s_element;
 
 		if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count)
@@ -200,7 +200,7 @@ Array_SplitLinesRef(
 
 	String s_data_it = S(*s_data);
 
-	while(s_data_it.length) {
+	while(!String_IsEmpty(&s_data_it)) {
 		s64 index        = String_IndexOf(&s_data_it, S("\r"), 0, true);
 		s64 index_return = String_IndexOf(&s_data_it, S("\n"), 0, true);
 
@@ -254,7 +254,7 @@ Array_SplitWordsBuffer(
 		Array_Reserve(as_words_out, String_CalcWordCount(*s_data));
 	}
 
-	if (!s_data->length)
+	if (String_IsEmpty(s_data))
 		return 0;
 
 	String *s_element;
