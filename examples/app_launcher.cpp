@@ -158,7 +158,9 @@ Window_HandleEvents(
 			String *ts_data = Widget_GetTextData(&wg_filter_data);
 			bool is_tab = ((char)keyboard->key_sym == '\t');
 
-			if (XOR(wg_filter_data.text.allow_tab_input, !is_tab)) {
+			if (    !keyboard->pressing[VK_CONTROL]
+				AND XOR(wg_filter_data.text.allow_tab_input, !is_tab)
+			) {
 				String_Insert(ts_data, (char)keyboard->key_sym, ts_data->length);
 				Widget_Update(&wg_filter_data);
 			}
