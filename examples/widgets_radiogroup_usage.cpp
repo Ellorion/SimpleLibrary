@@ -43,7 +43,7 @@ Window_HandleEvents(
 		Layout_Add(&layout, &wg_radio_4);
 	}
 
-	Widget_LinkRadiogroup(&ap_radiogroup);
+	Widget_RadioGroup_Link(&ap_radiogroup);
 
 	while(running) {
 		msg = {};

@@ -1190,6 +1190,37 @@ Widget_CalcActiveRowID(
 }
 
 instant void
+Widget_RadioGroup_Link(
+	Array<Widget *> *ap_radiogroup
+) {
+	Assert(ap_radiogroup);
+
+	FOR_ARRAY(*ap_radiogroup, it) {
+		Widget *t_widget = ARRAY_IT(*ap_radiogroup, it);
+		t_widget->data.ap_radiogroup = ap_radiogroup;
+	}
+}
+
+instant void
+Widget_RadioGroup_Set(
+	Widget *widget_io
+) {
+	Assert(widget_io);
+	Assert(widget_io->data.is_checkable);
+
+	if (widget_io->data.ap_radiogroup) {
+		FOR_ARRAY(*widget_io->data.ap_radiogroup, it) {
+			Widget *t_widget = ARRAY_IT(*widget_io->data.ap_radiogroup, it);
+			Assert(t_widget->data.is_checkable);
+
+			t_widget->data.is_checked = false;
+		}
+	}
+
+	widget_io->data.is_checked = true;
+}
+
+instant void
 Widget_UpdateInput(
 	Widget *widget_io
 ) {
@@ -1219,6 +1250,8 @@ Widget_UpdateInput(
 
 	if (widget_io->data.is_floating AND !widget_io->data.is_popout)
 		return;
+
+
 
 	bool got_focus = widget_io->data.has_focus;
 	u64  prev_active_row = widget_io->data.active_row_id;
@@ -1283,16 +1316,7 @@ Widget_UpdateInput(
 
 			/// checkbox toggle + radiogroup option
 			if (got_focus AND widget_io->data.is_checkable) {
-				if (widget_io->data.ap_radiogroup) {
-					FOR_ARRAY(*widget_io->data.ap_radiogroup, it) {
-						Widget *t_widget = ARRAY_IT(*widget_io->data.ap_radiogroup, it);
-						Assert(t_widget->data.is_checkable);
-
-						t_widget->data.is_checked = widget_io->data.is_checked;
-					}
-				}
-
-				widget_io->data.is_checked = !widget_io->data.is_checked;
+				Widget_RadioGroup_Set(widget_io);
 			}
 
 			/// focus change
@@ -1340,7 +1364,7 @@ Widget_UpdateInput(
 		if (    widget_io->data.is_checkable
 			AND (is_key_return OR is_key_space)
 		) {
-			widget_io->data.is_checked = !widget_io->data.is_checked;
+			Widget_RadioGroup_Set(widget_io);
 		}
 
 		if (is_scrollable_list) {
@@ -2289,16 +2313,4 @@ Widget_SwapLayout(
 
 	if ((*ap_widgets_active)->count)
 		Widget_SetFocus(ARRAY_IT((**ap_widgets_active), 0));
-}
-
-instant void
-Widget_LinkRadiogroup(
-	Array<Widget *> *ap_radiogroup
-) {
-	Assert(ap_radiogroup);
-
-	FOR_ARRAY(*ap_radiogroup, it) {
-		Widget *t_widget = ARRAY_IT(*ap_radiogroup, it);
-		t_widget->data.ap_radiogroup = ap_radiogroup;
-	}
 }
