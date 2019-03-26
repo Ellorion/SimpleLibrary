@@ -38,9 +38,10 @@ Array_Clear(
 ) {
 	Assert(array_out);
 
-	if (!array_out->by_reference) {
-		if (std::is_class<T>::value)
-			AssertMessage(false, "Trying to clear unspecialized array which uses a class as a template type.");
+	if (    !array_out->by_reference
+		AND !std::is_pointer<T>::value
+	) {
+		AssertMessage(false, "Trying to clear unspecialized array.");
 	}
 
     Array_ClearContainer(array_out);
@@ -115,6 +116,24 @@ Array_DestroyContainer(
 
 	Memory_Free(array_out->memory);
 	*array_out = {};
+}
+
+template<typename T>
+instant void
+Array_Destroy(
+	Array<T> *array_out
+) {
+	if (std::is_pointer<T>::value) {
+		if (!array_out->by_reference)
+			LOG_WARNING("Array clearing of *data. Assuming array does not have ownership over content.");
+
+		Array_DestroyContainer(array_out);
+		return;
+	}
+
+	AssertMessage(false, 	"Trying to destroy non-* array data.\n"
+							"Custom overload of Array_Destroy routine is required "
+							"to avoid accidental memory leaks.");
 }
 
 /// Will add memory slots on top of existing ones and add to that count
