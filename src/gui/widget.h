@@ -1224,6 +1224,8 @@ Widget_UpdateInput(
 	bool is_scrollable_list = widget_io->data.has_scrollable_list;
 	bool is_scrollable      = widget_io->data.is_scrollable;
 
+	/// mouse input handling
+	/// -----------------------------------------------------------------------
     if (mouse) {
 		bool is_hovering = Mouse_IsHovering(widget_io, mouse);
 
@@ -1258,9 +1260,7 @@ Widget_UpdateInput(
 		if (mouse->up[0]) {
 			got_focus = is_hovering;
 
-			if (is_hovering) {
-				widget_io->events.on_trigger = true;
-			}
+			widget_io->events.on_trigger = is_hovering;
 
 			/// listbox entry selection
 			if (is_scrollable_list) {
@@ -1279,6 +1279,7 @@ Widget_UpdateInput(
 
 			/// checkbox toggle
 			if (got_focus AND widget_io->data.is_checkable) {
+				/// @TODO: add radiogroup (array <widget *>) and set to !is_checked
 				widget_io->data.is_checked = !widget_io->data.is_checked;
 			}
 
@@ -1288,11 +1289,7 @@ Widget_UpdateInput(
 
 		/// right mouse button
 		if (mouse->up[2]) {
-			got_focus = is_hovering;
-
-			if (is_hovering) {
-				widget_io->events.on_trigger_secondary = true;
-			}
+			widget_io->events.on_trigger_secondary = is_hovering;
 		}
 
 		/// widget_io + list scrolling
@@ -1313,6 +1310,8 @@ Widget_UpdateInput(
 		}
     }
 
+    /// keyboard input handling
+    /// -----------------------------------------------------------------------
     if (keyboard AND widget_io->data.has_focus) {
 		bool is_key_return = keyboard->up[VK_RETURN];
 		bool is_key_space  = keyboard->up[VK_SPACE];
@@ -1326,14 +1325,15 @@ Widget_UpdateInput(
         	widget_io->events.on_trigger_secondary = true;
         }
 
-		if (widget_io->data.is_checkable
-			AND (   is_key_return
-				 OR is_key_space)
+		if (    widget_io->data.is_checkable
+			AND (is_key_return OR is_key_space)
 		) {
 			widget_io->data.is_checked = !widget_io->data.is_checked;
 		}
 
 		if (is_scrollable_list) {
+			/// list-item navigation and triggering
+			/// ---------------------------------------------------------------
 			if (widget_io->data.active_row_id) {
 				if (keyboard->down[VK_UP]) {
 					--widget_io->data.active_row_id;
@@ -1381,6 +1381,8 @@ Widget_UpdateInput(
 		}
     }
 
+    /// list scrolling (if to be selected list-item is not (fully) visible)
+    /// -----------------------------------------------------------------------
     if (prev_active_row != widget_io->data.active_row_id AND is_scrollable_list) {
 		Rect rect_active_row;
         Widget_CalcActiveRowRect(widget_io, &rect_active_row);

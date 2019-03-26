@@ -1589,8 +1589,6 @@ Text_RemoveSelection(
 	return was_selection_removed;
 }
 
-/// @Simplicity
-/// could use a cleanup / rewrite
 instant void
 Text_UpdateInput(
     Text *text_io,
@@ -1612,6 +1610,8 @@ Text_UpdateInput(
 	s8 offset_index_x = 0;
 	s8 offset_index_y = 0;
 
+	/// cursor direction
+	/// -----------------------------------------------------------------------
 	CURSOR_MOVE_TYPE *move_type = &text_io->cursor.move_type;
 
 	Text_Cursor *cursor = &text_io->cursor;
@@ -1642,6 +1642,8 @@ Text_UpdateInput(
 
 	bool was_selecting = (cursor->data.index_select_start != cursor->data.index_select_end);
 
+	/// cursor end selection positioning
+	/// -----------------------------------------------------------------------
 	/// move the cursor to the start or end of the selection,
 	/// when selection ended and the cursor was moved
 	if (was_selecting AND !cursor->is_selecting AND offset_index_x != 0) {
@@ -1657,6 +1659,8 @@ Text_UpdateInput(
 		Text_Cursor_Update(text_io);
 	}
 
+	/// character block selection
+	/// -----------------------------------------------------------------------
 	if (offset_index_x != 0 OR offset_index_y != 0) {
 		if (!cursor->is_selecting)
 			cursor->data.index_select_start = cursor->data.index_select_end;
@@ -1670,7 +1674,6 @@ Text_UpdateInput(
 
 		s32 codepoint = String_GetCodepointAtIndex(&text_io->s_data, cursor_index, &utf_byte_count);
 
-		/// character block selection
 		if (    codepoint > 0
 			AND keyboard->pressing[VK_CONTROL]
 			AND offset_index_x != 0
@@ -1688,7 +1691,6 @@ Text_UpdateInput(
 					}
 
 					if (cursor_index > 0)
-						/// @UTF
 						cursor->data.index_select_end = cursor_index - 1;
 				}
             }
@@ -1707,7 +1709,6 @@ Text_UpdateInput(
 						AND cursor_index > 0
 					);
 
-					/// @UTF
 					cursor->data.index_select_end = cursor_index + 1;
 				}
             }
@@ -1723,6 +1724,8 @@ Text_UpdateInput(
 		return;
 	}
 
+	/// keyboard input handling
+	/// -----------------------------------------------------------------------
 	if (keyboard->is_key_sym AND keyboard->is_down) {
 		String s_selection;
 
@@ -1799,29 +1802,30 @@ Text_UpdateInput(
 										OR (was_selection_removed AND key != '\b'));
 
 				if (is_char_valid AND can_insert_char) {
-					if (cursor->data.index_select_end + 1 < text_io->s_data.length) {
-						s32 utf_byte_count;
-						s32 codepoint_current = String_GetCodepointAtIndex(
-													&text_io->s_data,
-													cursor->data.index_select_end,
-													&utf_byte_count
-												);
-
-						s32 codepoint_next    = String_GetCodepointAtIndex(
-													&text_io->s_data,
-													cursor->data.index_select_end + utf_byte_count,
-													&utf_byte_count
-												);
-
-						/// do not insert a newline seperator between '\r' and '\n'
-						/// in case windows linebreaks would have been used
-						if (    key_is_linebreak
-							AND codepoint_current == '\r'
-							AND codepoint_next    != '\n'
-						) {
-							++cursor->data.index_select_end;
-						}
-					}
+					/// in case someone sets the index between \r and \n via code
+//					if (cursor->data.index_select_end + 1 < text_io->s_data.length) {
+//						s32 utf_byte_count;
+//						s32 codepoint_current = String_GetCodepointAtIndex(
+//													&text_io->s_data,
+//													cursor->data.index_select_end,
+//													&utf_byte_count
+//												);
+//
+//						s32 codepoint_next    = String_GetCodepointAtIndex(
+//													&text_io->s_data,
+//													cursor->data.index_select_end + utf_byte_count,
+//													&utf_byte_count
+//												);
+//
+//						/// do not insert a newline seperator between '\r' and '\n'
+//						/// in case windows linebreaks would have been used
+//						if (    key_is_linebreak
+//							AND codepoint_current == '\r'
+//							AND codepoint_next    != '\n'
+//						) {
+//							++cursor->data.index_select_end;
+//						}
+//					}
 
 					cursor->move_index_x = String_Insert(
 												&text_io->s_data,
