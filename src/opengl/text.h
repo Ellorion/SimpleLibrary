@@ -1824,16 +1824,17 @@ Text_UpdateInput(
 	if (keyboard->is_down AND keyboard->down[VK_DELETE]) {
 		bool was_selection_removed = Text_RemoveSelection(text_io);
 
-		if (    text_io->s_data.length
-			AND cursor->data.index_select_end + 1 < text_io->s_data.length) {
+		if (!was_selection_removed) {
+			if (    text_io->s_data.length
+				AND cursor->data.index_select_end + 1 < text_io->s_data.length) {
 
-			String_Insert(
-				&text_io->s_data,
-				'\b',
-				cursor->data.index_select_end + 1
-			);
+				String_Insert(
+					&text_io->s_data,
+					'\b',
+					cursor->data.index_select_end + 1
+				);
+			}
 		}
-
 	}
 
 	/// string could have been appended, removed or cleared
