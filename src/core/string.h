@@ -897,15 +897,41 @@ String_Insert(
 	s32 length = 0;
 
 	if (c_data == '\b') {
-
 		/// begin after the to-be-removed character
 		if (index_start) {
 			length = 0;
 
-			/// remove 2 chars, if it is line-break
-			if (s_data_io->value[index_start + length - 1] == '\n')  --length;
-			if (s_data_io->value[index_start + length - 1] == '\r')  --length;
+			/// nothing to remove
+			if (String_IsEmpty(s_data_io))
+				return 0;
 
+			/// overflow prevention
+			if (index_start >= s_data_io->length)
+				index_start = s_data_io->length - 1;
+
+			bool is_return = false;
+
+			/// remove 2 chars, if it is line-break
+			/// ---------------------------------------------------------------
+			if (s_data_io->value[index_start + length - 1] == '\n') {
+				--length;
+				is_return = true;
+			}
+
+			if (s_data_io->value[index_start + length - 1] == '\r') {
+				--length;
+
+				/// index between '\r\n'
+				/// -> if '\r' should be removed, remove '\n' too
+				if (!is_return AND (index_start < s_data_io->length)) {
+					if (s_data_io->value[index_start + length + 1] == '\n') {
+						--length;
+						++index_start;
+					}
+				}
+			}
+
+			/// no linebreak chars to remove -> check for utf-8 bytes
 			if (!length) {
 				s32 utf_byte_count = 0;
 				String_GetCodepointAtIndex(s_data_io, index_start - 1, &utf_byte_count);

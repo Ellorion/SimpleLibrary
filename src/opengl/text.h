@@ -1802,31 +1802,6 @@ Text_UpdateInput(
 										OR (was_selection_removed AND key != '\b'));
 
 				if (is_char_valid AND can_insert_char) {
-					/// in case someone sets the index between \r and \n via code
-//					if (cursor->data.index_select_end + 1 < text_io->s_data.length) {
-//						s32 utf_byte_count;
-//						s32 codepoint_current = String_GetCodepointAtIndex(
-//													&text_io->s_data,
-//													cursor->data.index_select_end,
-//													&utf_byte_count
-//												);
-//
-//						s32 codepoint_next    = String_GetCodepointAtIndex(
-//													&text_io->s_data,
-//													cursor->data.index_select_end + utf_byte_count,
-//													&utf_byte_count
-//												);
-//
-//						/// do not insert a newline seperator between '\r' and '\n'
-//						/// in case windows linebreaks would have been used
-//						if (    key_is_linebreak
-//							AND codepoint_current == '\r'
-//							AND codepoint_next    != '\n'
-//						) {
-//							++cursor->data.index_select_end;
-//						}
-//					}
-
 					cursor->move_index_x = String_Insert(
 												&text_io->s_data,
 												key,
@@ -1844,6 +1819,21 @@ Text_UpdateInput(
 				}
 			}
 		}
+	}
+
+	if (keyboard->is_down AND keyboard->down[VK_DELETE]) {
+		bool was_selection_removed = Text_RemoveSelection(text_io);
+
+		if (    text_io->s_data.length
+			AND cursor->data.index_select_end + 1 < text_io->s_data.length) {
+
+			String_Insert(
+				&text_io->s_data,
+				'\b',
+				cursor->data.index_select_end + 1
+			);
+		}
+
 	}
 
 	/// string could have been appended, removed or cleared

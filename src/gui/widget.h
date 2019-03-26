@@ -1207,14 +1207,13 @@ Widget_RadioGroup_Set(
 ) {
 	Assert(widget_io);
 	Assert(widget_io->data.is_checkable);
+	Assert(widget_io->data.ap_radiogroup);
 
-	if (widget_io->data.ap_radiogroup) {
-		FOR_ARRAY(*widget_io->data.ap_radiogroup, it) {
-			Widget *t_widget = ARRAY_IT(*widget_io->data.ap_radiogroup, it);
-			Assert(t_widget->data.is_checkable);
+	FOR_ARRAY(*widget_io->data.ap_radiogroup, it) {
+		Widget *t_widget = ARRAY_IT(*widget_io->data.ap_radiogroup, it);
+		Assert(t_widget->data.is_checkable);
 
-			t_widget->data.is_checked = false;
-		}
+		t_widget->data.is_checked = false;
 	}
 
 	widget_io->data.is_checked = true;
