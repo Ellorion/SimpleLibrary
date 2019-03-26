@@ -43,6 +43,8 @@ struct Widget_Slide {
 	s64 step  = 0;
 };
 
+struct Widget;
+
 struct Widget_Data {
 	Color32 color_background       = Color_MakeGrey(0.9f);
 	Color32 color_outline          = {0.8f, 0.8f, 0.8f, 1.0f};
@@ -77,6 +79,8 @@ struct Widget_Data {
 
 	String s_row_filter;
 	Array<String> as_filter_data;
+
+	Array<Widget *> *ap_radiogroup = 0;
 };
 
 struct Widget {
@@ -1277,9 +1281,17 @@ Widget_UpdateInput(
 				}
 			}
 
-			/// checkbox toggle
+			/// checkbox toggle + radiogroup option
 			if (got_focus AND widget_io->data.is_checkable) {
-				/// @TODO: add radiogroup (array <widget *>) and set to !is_checked
+				if (widget_io->data.ap_radiogroup) {
+					FOR_ARRAY(*widget_io->data.ap_radiogroup, it) {
+						Widget *t_widget = ARRAY_IT(*widget_io->data.ap_radiogroup, it);
+						Assert(t_widget->data.is_checkable);
+
+						t_widget->data.is_checked = widget_io->data.is_checked;
+					}
+				}
+
 				widget_io->data.is_checked = !widget_io->data.is_checked;
 			}
 
@@ -2277,4 +2289,16 @@ Widget_SwapLayout(
 
 	if ((*ap_widgets_active)->count)
 		Widget_SetFocus(ARRAY_IT((**ap_widgets_active), 0));
+}
+
+instant void
+Widget_LinkRadiogroup(
+	Array<Widget *> *ap_radiogroup
+) {
+	Assert(ap_radiogroup);
+
+	FOR_ARRAY(*ap_radiogroup, it) {
+		Widget *t_widget = ARRAY_IT(*ap_radiogroup, it);
+		t_widget->data.ap_radiogroup = ap_radiogroup;
+	}
 }
