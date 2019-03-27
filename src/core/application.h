@@ -106,6 +106,32 @@ Application_OpenURL(
 }
 
 instant bool
+Application_OpenDirectory(
+	String s_directory
+) {
+	if (String_IsEmpty(&s_directory))
+		return false;
+
+	String s_open_directory = S(s_directory);
+	String s_terminator = S("\0", 1);
+
+	if (!String_EndWith(&s_directory, s_terminator, true)) {
+		s_open_directory = String_Copy(s_open_directory);
+		String_Append(&s_open_directory, s_terminator);
+	}
+
+	bool result = PathFileExists(s_open_directory.value);
+
+	if (result)
+		ShellExecute(0, "open", s_open_directory.value, 0, 0, SW_SHOWNORMAL);
+
+	String_Destroy(&s_open_directory);
+
+	return result;
+
+}
+
+instant bool
 Application_Execute(
 	String s_command
 ) {

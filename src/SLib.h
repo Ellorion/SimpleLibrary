@@ -15,6 +15,7 @@
 ///		-lopengl32
 ///		-lgdi32
 ///		-lws2_32
+///		-lShlwapi
 ///		-liphlpapi
 ///
 /// Compiler options:
@@ -67,6 +68,7 @@
 #include <iostream>
 #include <math.h>
 #include <winsock.h>
+#include <shlwapi.h>
 #include <iphlpapi.h>
 
 __attribute__((gnu_inline, always_inline))

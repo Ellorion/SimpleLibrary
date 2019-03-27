@@ -906,8 +906,8 @@ String_Insert(
 				return 0;
 
 			/// overflow prevention
-			if (index_start >= s_data_io->length)
-				index_start = s_data_io->length - 1;
+			if (index_start > s_data_io->length)
+				index_start = s_data_io->length;
 
 			bool is_return = false;
 

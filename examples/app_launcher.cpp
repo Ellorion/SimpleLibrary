@@ -205,13 +205,14 @@ Window_HandleEvents(
 
 					String s_file = String_GetDelimiterSectionRef(ts_app, S(","), 1);
 
-					/// open download url in default browser (if available),
-					/// if the file does not exists
-					/// assuming it is not installed
-					/// (in that location) (on a fresh machine)
+					/// execute application
 					if (!Application_Execute(s_file)) {
-						String s_download_url = String_GetDelimiterSectionRef(ts_app, S(","), 2);
-						did_execute = Application_OpenURL(s_download_url);
+						/// maybe a directory was supposed to be opened in explorer?
+						if (!Application_OpenDirectory(s_file)) {
+							/// open download url in default browser (if available)
+							String s_download_url = String_GetDelimiterSectionRef(ts_app, S(","), 2);
+							did_execute = Application_OpenURL(s_download_url);
+						}
 					}
 
 					if (did_execute)
