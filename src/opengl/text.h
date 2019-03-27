@@ -1826,7 +1826,7 @@ Text_UpdateInput(
 
 		if (!was_selection_removed) {
 			if (    text_io->s_data.length
-				AND cursor->data.index_select_end + 1 < text_io->s_data.length) {
+				AND cursor->data.index_select_end + 1 <= text_io->s_data.length) {
 
 				String_Insert(
 					&text_io->s_data,
