@@ -401,7 +401,7 @@ String_GetDelimiterSectionRef(
 		if (it == index) {
 			String *ts_entry = &ARRAY_IT(as_section, it);
 
-			String_Append(&s_result, *ts_entry);
+			s_result = S(*ts_entry);
 
 			break;
 		}

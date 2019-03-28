@@ -708,36 +708,54 @@ String_TrimLeft(
 	String *s_data_io
 ) {
   	Assert(s_data_io);
-	Assert(!s_data_io->is_reference);
 
 	if (String_IsEmpty(s_data_io))
 		return;
 
-	String s_data_it = S(*s_data_io);
+	if (s_data_io->is_reference) {
+		while(!String_IsEmpty(s_data_io)) {
+			char ch = s_data_io->value[0];
 
-	u64 trim_length = 0;
+			switch (ch) {
+				case ' ':
+				case '\r':
+				case '\n':
+				case '\t': {
+					String_AddOffset(s_data_io, 1);
+					continue;
+				} break;
+			}
 
-	while(!String_IsEmpty(&s_data_it)) {
-		char ch = s_data_it.value[0];
+			break;
+		}
+	}
+	else {
+		String s_data_it = S(*s_data_io);
 
-		switch (ch) {
-			case ' ':
-			case '\r':
-			case '\n':
-			case '\t': {
-				++trim_length;
-				String_AddOffset(&s_data_it, 1);
-				continue;
-			} break;
+		u64 trim_length = 0;
+
+		while(!String_IsEmpty(&s_data_it)) {
+			char ch = s_data_it.value[0];
+
+			switch (ch) {
+				case ' ':
+				case '\r':
+				case '\n':
+				case '\t': {
+					++trim_length;
+					String_AddOffset(&s_data_it, 1);
+					continue;
+				} break;
+			}
+
+			break;
 		}
 
-		break;
-	}
-
-	if (trim_length) {
-		s_data_io->length -= trim_length;
-		Memory_Copy(s_data_io->value, s_data_io->value + trim_length, s_data_io->length);
-		s_data_io->changed = true;
+		if (trim_length) {
+			s_data_io->length -= trim_length;
+			Memory_Copy(s_data_io->value, s_data_io->value + trim_length, s_data_io->length);
+			s_data_io->changed = true;
+		}
 	}
 }
 
@@ -746,23 +764,29 @@ String_TrimRight(
 	String *s_data_io
 ) {
 	Assert(s_data_io);
-	Assert(!s_data_io->is_reference);
-
-	u64 length = s_data_io->length;
 
 	if (String_IsEmpty(s_data_io))
 		return;
 
-    while(length > 0) {
+	u64 length = s_data_io->length;
+
+	while(length > 0) {
 		if (s_data_io->value[length - 1] <= 32 AND s_data_io->value[length - 1] != 127)
 			--length;
 		else
 			break;
-    }
+	}
 
-    s_data_io->length = length;
+	s_data_io->length  = length;
+	s_data_io->changed = true;
+}
 
-    s_data_io->changed = true;
+instant void
+String_Trim(
+	String *s_data_io
+) {
+	String_TrimLeft(s_data_io);
+	String_TrimRight(s_data_io);
 }
 
 instant u64
