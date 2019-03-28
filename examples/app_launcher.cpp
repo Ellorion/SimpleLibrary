@@ -136,7 +136,7 @@ Window_HandleEvents(
 			}
 			else {
 				Array_Clear(&as_appdata);
-				as_appdata = String_SplitLinesRef(&s_app_data);
+				as_appdata = String_SplitLinesRef(&s_app_data, false);
 
 				Widget_ClearRows(&wg_list);
 
