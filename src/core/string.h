@@ -46,16 +46,6 @@ String_GetLength(
 	return result;
 }
 
-instant bool
-String_IsEmpty(
-	String *s_data
-) {
-	Assert(s_data);
-
-	return (   s_data->length <= 0
-			OR s_data->value  == 0);
-}
-
 instant void
 String_Print(
 	String s_data
@@ -155,6 +145,51 @@ S(
 }
 
 instant void
+String_AddOffset(
+	String *s_data_io,
+	s64 offset
+) {
+	Assert(s_data_io);
+	Assert(s_data_io->is_reference);
+
+	s_data_io->value  += offset;
+	s_data_io->length -= offset;
+}
+
+instant bool
+String_IsEmpty(
+	String *s_data,
+	bool skip_whitespace = false
+) {
+	Assert(s_data);
+
+	String s_data_it = S(*s_data);
+
+	if (s_data_it.value == 0)
+		return true;
+
+	if (skip_whitespace) {
+		while(s_data_it.length) {
+			char ch = s_data_it.value[0];
+
+			switch (ch) {
+				case ' ':
+				case '\r':
+				case '\n':
+				case '\t': {
+					String_AddOffset(&s_data_it, 1);
+					continue;
+				} break;
+			}
+
+			break;
+		}
+	}
+
+	return (s_data_it.length <= 0);
+}
+
+instant void
 String_Destroy(
 	String *s_data_io
 ) {
@@ -176,18 +211,6 @@ String_Resize(
 	Assert(s_data_io);
 
 	s_data_io->value = Memory_Resize(s_data_io->value, char, s_data_io->length + length_delta);
-}
-
-instant void
-String_AddOffset(
-	String *s_data_io,
-	s64 offset
-) {
-	Assert(s_data_io);
-	Assert(s_data_io->is_reference);
-
-	s_data_io->value  += offset;
-	s_data_io->length -= offset;
 }
 
 instant bool
@@ -494,10 +517,10 @@ String_IndexOf(
 
 	int result = -1;
 
-	if (!s_data OR !s_data->length)
+	if (String_IsEmpty(s_data))
 		return result;
 
-	if (String_IsEmpty(&s_key))
+	if (String_IsEmpty(&s_key, false))
 		return result;
 
 	u64 length_data = s_data->length;
@@ -529,7 +552,7 @@ String_IndexOfRev(
 	if (String_IsEmpty(s_data))
 		return result;
 
-	if (String_IsEmpty(&s_key))
+	if (String_IsEmpty(&s_key, false))
 		return result;
 
 	/// index_start "starts" at the end of a string,
@@ -553,8 +576,8 @@ String_StartWith(
 	String  s_startwith,
 	bool is_case_sensitive
 ) {
-	if (String_IsEmpty(&s_startwith))  return false;
-	if (String_IsEmpty(s_data))        return false;
+	if (String_IsEmpty(&s_startwith, false))  return false;
+	if (String_IsEmpty(s_data))               return false;
 
 	return (String_Compare(*s_data, s_startwith, s_startwith.length, is_case_sensitive) == 0);
 }
@@ -709,9 +732,6 @@ String_TrimLeft(
 ) {
   	Assert(s_data_io);
 
-	if (String_IsEmpty(s_data_io))
-		return;
-
 	if (s_data_io->is_reference) {
 		while(!String_IsEmpty(s_data_io)) {
 			char ch = s_data_io->value[0];
@@ -765,7 +785,7 @@ String_TrimRight(
 ) {
 	Assert(s_data_io);
 
-	if (String_IsEmpty(s_data_io))
+	if (String_IsEmpty(s_data_io, false))
 		return;
 
 	u64 length = s_data_io->length;
@@ -1023,8 +1043,8 @@ String_AppendCircle(
 	Assert(s_data_io);
 	Assert(!s_data_io->is_reference);
 
-	if (String_IsEmpty(&s_data))  return false;
-	if (!buffer_limit)  	     return false;
+	if (String_IsEmpty(&s_data, false))  return false;
+	if (!buffer_limit)  	             return false;
 
 	if (s_data_io->length + s_data.length > buffer_limit) {
 		if (reset_full_buffer) {

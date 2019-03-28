@@ -87,7 +87,7 @@ instant bool
 Application_OpenURL(
 	String s_url
 ) {
-	if (String_IsEmpty(&s_url))
+	if (String_IsEmpty(&s_url, true))
 		return false;
 
 	String s_open_url   = S(s_url);
@@ -109,7 +109,7 @@ instant bool
 Application_OpenDirectory(
 	String s_directory
 ) {
-	if (String_IsEmpty(&s_directory))
+	if (String_IsEmpty(&s_directory, true))
 		return false;
 
 	String s_open_directory = S(s_directory);
@@ -135,6 +135,9 @@ instant bool
 Application_Execute(
 	String s_command
 ) {
+	if (String_IsEmpty(&s_command, true))
+		return false;
+
 	String ts_command;
 	String_Append(&ts_command, S("\""));
 	String_Append(&ts_command, s_command);

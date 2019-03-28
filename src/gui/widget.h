@@ -1493,7 +1493,7 @@ Widget_GetSelectedRowRef(
 		s_result = S(ARRAY_IT(widget->data.as_filter_data, widget->data.active_row_id));
 	}
 	else {
-		if (String_IsEmpty(&widget->data.s_row_filter))
+		if (String_IsEmpty(&widget->data.s_row_filter, false))
 			s_result = S(ARRAY_IT(widget->data.as_row_data, widget->data.active_row_id));
 	}
 

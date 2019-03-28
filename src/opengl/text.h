@@ -55,7 +55,7 @@ Font_Load(
     Font font = {};
     String s_font_data = File_ReadAll(s_file, true);
 
-    if (String_IsEmpty(&s_font_data)) {
+    if (String_IsEmpty(&s_font_data, true)) {
 		String_Append(&font.s_error, S("Font \""));
 		String_Append(&font.s_error, s_file);
 		String_Append(&font.s_error, S("\" does not exist."));
@@ -786,7 +786,7 @@ Text_AddLines(
 
 		while(!String_IsEmpty(&s_data_it)) {
 			Codepoint codepoint;
-			s32 utf_byte_count;
+			s32 utf_byte_count = 0;
 
 			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
 
@@ -1009,7 +1009,7 @@ Text_Cursor_FindIndex(
 
 		while(!String_IsEmpty(&s_data_it)) {
 			Codepoint codepoint;
-			s32 utf_byte_count;
+			s32 utf_byte_count = 0;
 
 			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
 
@@ -1402,7 +1402,7 @@ Text_Cursor_Update(
 
 		while(!String_IsEmpty(&s_data_it)) {
 			Codepoint codepoint;
-			s32 utf_byte_count;
+			s32 utf_byte_count = 0;
 
 			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
 

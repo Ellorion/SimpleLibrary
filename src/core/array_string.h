@@ -216,7 +216,7 @@ Array_SplitLinesRef(
 
 		/// no endline char found -> add string remainder
 		if (index < 0) {
-			if (include_empty_lines OR !String_IsEmpty(&s_data_it))
+			if (include_empty_lines OR !String_IsEmpty(&s_data_it, true))
 				Array_Add(&as_result, s_data_it);
 
 			break;
@@ -224,7 +224,7 @@ Array_SplitLinesRef(
 
 		String s_data_adding = S(s_data_it, index);
 
-		if (include_empty_lines OR !String_IsEmpty(&s_data_adding))
+		if (include_empty_lines OR !String_IsEmpty(&s_data_adding, true))
 			Array_Add(&as_result, s_data_adding);
 
 		/// skip "\r" or "\n"
@@ -392,6 +392,7 @@ String_GetDelimiterSectionRef(
 ) {
 	String s_result;
 
+	/// since it is likely to be used more than once
 	static Array<String> as_section;
 
 	Array_Clear(&as_section);
