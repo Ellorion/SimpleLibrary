@@ -12,7 +12,7 @@ Window_SetTitle(
 
 	String s_buffer;
 
-	if (!String_IsEmpty(&s_title) {
+	if (!String_IsEmpty(&s_title, false)) {
 		String_Append(&s_buffer, S("["));
 		String_Append(&s_buffer, s_title);
 		String_Append(&s_buffer, S("]"));
@@ -94,7 +94,7 @@ Config_Parse(
 
 	while (Parser_IsRunning(&parser_config)) {
 		/// skip non-section identifier
-		if (!Parser_GetSectionName(&parser_config, &s_data, s_section_id))
+		if (!Parser_GetSectionNameRef(&parser_config, &s_data, s_section_id))
 			continue;
 
 		if (s_data == "basic") {
@@ -103,10 +103,10 @@ Config_Parse(
 				if (Parser_IsSection(&parser_config, s_section_id))
 					break;
 
-				Parser_GetString(&parser_config, &s_data);
+				Parser_GetStringRef(&parser_config, &s_data, PARSER_MODE_SEEK, false);
 
 				if (s_data == "font-file") {
-					Parser_GetString(&parser_config, &s_data);
+					Parser_GetStringRef(&parser_config, &s_data, PARSER_MODE_SEEK, false);
 
 					if (File_Exists(s_data)) {
 						String_Clear(&config->basic.s_font);
@@ -123,7 +123,7 @@ Config_Parse(
 				}
 				else
 				if (s_data == "path_latest") {
-					Parser_GetString(&parser_config, &s_data);
+					Parser_GetStringRef(&parser_config, &s_data, PARSER_MODE_SEEK, false);
 
 					/// is directory or list drives if empty
 					if (   File_IsDirectory(s_data)
@@ -142,7 +142,7 @@ Config_Parse(
 				if (Parser_IsSection(&parser_config, s_section_id))
 					break;
 
-				Parser_GetString(&parser_config, &s_data);
+				Parser_GetStringRef(&parser_config, &s_data, PARSER_MODE_SEEK, false);
 
 				if (s_data == "is_zooming") {
 					Parser_GetBoolean(&parser_config, &config->window.is_zooming);
@@ -183,8 +183,8 @@ Window_HandleEvents(Window *window) {
 	/// widgets
 	Widget wg_listbox = Widget_CreateListBox(window, &font, {});
 
-    Array<Widget *> a_widgets;
-    Array_Add(&a_widgets, &wg_listbox);
+    Array<Widget *> ap_widgets;
+    Array_Add(&ap_widgets, &wg_listbox);
 
     /// layout
 	Layout layout;
@@ -214,7 +214,7 @@ Window_HandleEvents(Window *window) {
 			Layout_Rearrange(&layout, window);
 
 		/// update
-		Widget_Update(&a_widgets, keyboard);
+		Widget_Update(&ap_widgets, keyboard);
 
 		if(keyboard->up[VK_ESCAPE]) {
 			running = false;
@@ -257,7 +257,7 @@ Window_HandleEvents(Window *window) {
 		/// render
 		OpenGL_ClearScreen();
 
-		Widget_Render(&shader_set, &a_widgets);
+		Widget_Render(&shader_set, &ap_widgets);
 
 		Window_UpdateAndResetInput(window);
 		Widget_Reset(&ap_widgets);

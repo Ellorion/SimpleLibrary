@@ -19,18 +19,18 @@ int main() {
 
 	Parser_IsString(&parser, S("settings"));
 
-	Parser_GetString(&parser, &s_option, S(":"));
-	Parser_GetString(&parser, &s_path);
+	Parser_GetStringRef(&parser, &s_option, S(":"), PARSER_MODE_SEEK);
+	Parser_GetStringRef(&parser, &s_path, PARSER_MODE_SEEK, false);
 	String_Print(s_option);
 	String_PrintLine(s_path);
 
-	Parser_GetString(&parser, &s_word);
+	Parser_GetStringRef(&parser, &s_word, PARSER_MODE_SEEK, false);
 	String_PrintLine(s_word);
 
-	Parser_GetString(&parser, &s_word);
+	Parser_GetStringRef(&parser, &s_word, PARSER_MODE_SEEK, false);
 	String_PrintLine(s_word);
 
-	Parser_GetString(&parser, &s_option, S(":"));
+	Parser_GetStringRef(&parser, &s_option, S(":"), PARSER_MODE_SEEK);
 	String_PrintLine(s_option);
 
 	Parser_GetBoolean(&parser, &is_true);

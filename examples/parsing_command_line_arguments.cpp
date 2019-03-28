@@ -6,7 +6,7 @@ APPLICATION_MAIN {
 
 	String s_command_arg;
 	while(Parser_IsRunning(&parser_args)) {
-		Parser_GetString(&parser_args, &s_command_arg, PARSER_MODE_SEEK);
+		Parser_GetStringRef(&parser_args, &s_command_arg, PARSER_MODE_SEEK, false);
 
 		String_Print(S("Arg: "));
 		String_PrintLine(s_command_arg);

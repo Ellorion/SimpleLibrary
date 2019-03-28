@@ -26,7 +26,7 @@ int main() {
 	};
 
 	while(Parser_IsRunning(&parser)) {
-		Parser_GetString(&parser, &s_section);
+		Parser_GetStringRef(&parser, &s_section, PARSER_MODE_SEEK, false);
 
 		/// require sections
 		if (!String_StartWith(&s_section, s_section_ident, true))
@@ -49,14 +49,14 @@ int main() {
 		switch (id_section) {
 			case 0: { /// /:default
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetString(&parser, &s_option, PARSER_MODE_PEEK);
+					Parser_GetStringRef(&parser, &s_option, PARSER_MODE_PEEK, false);
 
 					/// section switch
 					if (String_StartWith(&s_option, s_section_ident, true))
 						break;
 
 #if 0
-					Parser_GetString(&parser, &s_option);
+					Parser_GetStringRef(&parser, &s_option);
 #else
 					Parser_AddOffset(&parser, s_option.length);
 					Parser_SkipUntilToken(&parser);
@@ -65,13 +65,13 @@ int main() {
 					/// section options
 					/// =======================================================
 					if (s_option == "text") {
-						Parser_GetString(&parser, &s_default_text);
+						Parser_GetStringRef(&parser, &s_default_text, PARSER_MODE_SEEK, false);
 
 						String_PrintLine(s_default_text);
 					}
 
 					if (s_option == "path") {
-						Parser_GetString(&parser, &s_default_folder);
+						Parser_GetStringRef(&parser, &s_default_folder, PARSER_MODE_SEEK, false);
 
 						String_PrintLine(s_default_folder);
 					}

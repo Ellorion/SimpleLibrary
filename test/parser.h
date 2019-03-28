@@ -36,7 +36,7 @@ Test_Parser(
 	u32 test_option_count  = 0;
 
 	while(Parser_IsRunning(&parser)) {
-		Parser_GetString(&parser, &s_data);
+		Parser_GetStringRef(&parser, &s_data, PARSER_MODE_SEEK, false);
 
 		/// require sections
 		if (!String_StartWith(&s_data, S(c_section_ident), true))
@@ -59,18 +59,18 @@ Test_Parser(
 		switch (id_section) {
 			case 0: {	/// /:default
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetString(&parser, &s_data, PARSER_MODE_PEEK);
+					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_PEEK, false);
 
 					/// section switch
 					if (String_StartWith(&s_data, S(c_section_ident), true))
 						break;
 
-					Parser_GetString(&parser, &s_data);
+					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_SEEK, false);
 
 					/// section options
 					/// =======================================================
 					if (s_data == "text") {
-						Parser_GetString(&parser, &s_data);
+						Parser_GetStringRef(&parser, &s_data, PARSER_MODE_SEEK, false);
 						test_option_count += 1;
 
 						AssertMessage(	!parser.has_error
@@ -78,7 +78,7 @@ Test_Parser(
 					}
 
 					if (s_data == "path") {
-						Parser_GetString(&parser, &s_data);
+						Parser_GetStringRef(&parser, &s_data, PARSER_MODE_SEEK, false);
 						test_option_count += 1;
 
 						AssertMessage(	    !parser.has_error
@@ -96,18 +96,18 @@ Test_Parser(
 
 			case 1: {	/// /:save
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetString(&parser, &s_data, PARSER_MODE_PEEK);
+					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_PEEK, false);
 
 					/// section switch
 					if (String_StartWith(&s_data, S(c_section_ident), true))
 						break;
 
-					Parser_GetString(&parser, &s_data);
+					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_SEEK, false);
 
 					/// section options
 					/// =======================================================
 					if (s_data == "path") {
-						Parser_GetString(&parser, &s_data);
+						Parser_GetStringRef(&parser, &s_data, PARSER_MODE_SEEK, false);
 						test_option_count += 1;
 
 						AssertMessage(	    !parser.has_error
@@ -125,13 +125,13 @@ Test_Parser(
 
 			case 2: {	/// /:music
 				while(Parser_IsRunning(&parser)) {
-					Parser_GetString(&parser, &s_data, PARSER_MODE_PEEK);
+					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_PEEK, false);
 
 					/// section switch
 					if (String_StartWith(&s_data, S(c_section_ident), true))
 						break;
 
-					Parser_GetString(&parser, &s_data);
+					Parser_GetStringRef(&parser, &s_data, PARSER_MODE_SEEK, false);
 
 					/// section options
 					/// =======================================================

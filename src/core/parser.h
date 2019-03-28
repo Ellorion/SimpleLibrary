@@ -156,11 +156,11 @@ Parser_IsString(
 }
 
 instant void
-Parser_GetString(
+Parser_GetStringRef(
 	Parser *parser_io,
 	String *s_data_out,
 	String  s_until_match,
-	PARSER_MODE_TYPE type = PARSER_MODE_SEEK
+	PARSER_MODE_TYPE type
 ) {
 	Assert(parser_io);
 	Assert(s_data_out);
@@ -194,10 +194,11 @@ Parser_GetString(
 }
 
 instant void
-Parser_GetString(
+Parser_GetStringRef(
 	Parser *parser_io,
 	String *s_data_out,
-	PARSER_MODE_TYPE type = PARSER_MODE_SEEK
+	PARSER_MODE_TYPE type,
+	bool include_quotes
 ) {
 	Assert(parser_io);
 	Assert(s_data_out);
@@ -205,7 +206,10 @@ Parser_GetString(
 	if (Parser_HasError(parser_io))
 		return;
 
+	s64 offset_parser = 0;
+
 	if (String_StartWith(&parser_io->s_data, S("\""), true)) {
+		++offset_parser;
 		Parser_AddOffset(parser_io, 1);
 
 		s64 index_found;
@@ -218,18 +222,21 @@ Parser_GetString(
 			return;
 		}
 
-		s_data_out->value   = parser_io->s_data.value;
-		s_data_out->length  = index_found;
-		s_data_out->changed = true;
-		s_data_out->is_reference = true;
+		*s_data_out = S(parser_io->s_data.value, index_found);
+
+		if (include_quotes AND offset_parser) {
+			/// include starting & ending '\"'
+			String_AddOffset(s_data_out, -offset_parser);
+			s_data_out->length += 1;
+		}
 
 		if (type == PARSER_MODE_PEEK) {
-			/// reverse starting "\""
-			Parser_AddOffset(parser_io, -1);
+			/// reverse starting '\"'
+			Parser_AddOffset(parser_io, -offset_parser);
 		}
 		else
 		if (type == PARSER_MODE_SEEK) {
-			/// include ending "\""
+			/// include ending '\"'
 			Parser_AddOffset(parser_io, index_found + 1);
 
 			if (parser_io->skip_whitespace_and_comments)
@@ -239,10 +246,7 @@ Parser_GetString(
 		return;
 	}
 
-	s_data_out->value   = parser_io->s_data.value;
-	s_data_out->length  = 0;
-	s_data_out->changed = true;
-	s_data_out->is_reference = true;
+	*s_data_out = S(parser_io->s_data.value, 0);
 
 	while(Parser_IsRunning(parser_io)) {
         char ch = parser_io->s_data.value[0];
@@ -403,13 +407,13 @@ Parser_IsSection(
 	Assert(s_section_id.length);
 
 	String s_data;
-	Parser_GetString(parser_io, &s_data, PARSER_MODE_PEEK);
+	Parser_GetStringRef(parser_io, &s_data, PARSER_MODE_PEEK, false);
 
 	return String_StartWith(&s_data, s_section_id, true);
 }
 
 instant bool
-Parser_GetSectionName(
+Parser_GetSectionNameRef(
 	Parser *parser_io,
 	String *s_data_out,
 	String s_section_id
@@ -420,7 +424,7 @@ Parser_GetSectionName(
 
 	bool is_section = Parser_IsSection(parser_io, s_section_id);
 
-	Parser_GetString(parser_io, s_data_out);
+	Parser_GetStringRef(parser_io, s_data_out, PARSER_MODE_SEEK, false);
 
 	if (is_section)
 		String_AddOffset(s_data_out, s_section_id.length);
@@ -436,7 +440,7 @@ Parser_Token_CanTokenize(
 		((_min) <= (_value) AND (_value) <= (_max))
 
 	if (   INCL(character,   0,  44)
-		OR INCL(character,  46,  47)
+		OR INCL(character,  45,  47)
 		OR INCL(character,  58,  64)
 		OR INCL(character,  91,  91)
 		OR INCL(character,  93,  94)
@@ -452,7 +456,8 @@ Parser_Token_CanTokenize(
 instant void
 Parser_Token_Peek(
 	Parser *parser,
-	String *s_token_out
+	String *s_token_out,
+	bool include_quotes
 ) {
 	Assert(parser);
 	Assert(s_token_out);
@@ -475,6 +480,25 @@ Parser_Token_Peek(
 		if (s_data_it.length == 1)
 			break;
 
+		if (s_data_it.value[0] == '\"') {
+			Parser_GetStringRef(parser, s_token_out, PARSER_MODE_PEEK, include_quotes);
+			break;
+		}
+
+		/// since '\r' and '\n' are not tokenizeable
+		/// with Parser_Token_CanTokenize, group
+		/// them this way
+		if (s_data_it.value[0] == '\r') {
+			String_AddOffset(&s_data_it, 1);
+
+			if (s_data_it.value[0] == '\n') {
+				++s_token_out->length;
+				String_AddOffset(&s_data_it, 1);
+			}
+
+			break;
+		}
+
 		if (!Parser_Token_CanTokenize(s_data_it.value[0]))
 			break;
 
@@ -488,12 +512,13 @@ Parser_Token_Peek(
 instant void
 Parser_Token_Get(
     Parser *parser,
-    String *s_token_out
+    String *s_token_out,
+    bool include_quotes
 ) {
 	if (Parser_HasError(parser))
 		return;
 
-	Parser_Token_Peek(parser, s_token_out);
+	Parser_Token_Peek(parser, s_token_out, include_quotes);
 	Parser_AddOffset(parser, s_token_out->length);
 }
 
@@ -508,7 +533,7 @@ Parser_Token_IsMatch(
 		return false;
 
 	String ts_token;
-	Parser_Token_Peek(parser, &ts_token);
+	Parser_Token_Peek(parser, &ts_token, false);
 
 	if (!(s_token == ts_token)) {
 		parser->has_error = true;
