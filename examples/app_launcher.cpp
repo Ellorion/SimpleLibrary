@@ -11,6 +11,7 @@ String s_setting_data_example = S(R"(
 # open_download_link_since_file_does_not_exist, abc:/invalid.exe, http://www.example.com
 # open_url, , http://www.example.com
 # store_test_as_list_item_for_remembering
+# open_folder, C:/
 )");
 
 instant void
@@ -157,14 +158,22 @@ Window_HandleEvents(
 		/// append text to filter, if list has focus
 		/// (does support backspace, but will not show text cursor,
 		///  since textbox does not have focus)
-		if (wg_list.data.has_focus AND keyboard->is_key_sym AND keyboard->is_down) {
-			String *ts_data = Widget_GetTextData(&wg_filter_data);
-			bool is_tab = ((char)keyboard->key_sym == '\t');
+		if (wg_list.data.has_focus) {
+			if (keyboard->is_key_sym AND keyboard->is_down) {
+				String *ts_data = Widget_GetTextData(&wg_filter_data);
+				bool is_tab = ((char)keyboard->key_sym == '\t');
 
-			if (    !keyboard->pressing[VK_CONTROL]
-				AND XOR(wg_filter_data.text.allow_tab_input, !is_tab)
-			) {
-				String_Insert(ts_data, (char)keyboard->key_sym, ts_data->length);
+				if (    !keyboard->pressing[VK_CONTROL]
+					AND XOR(wg_filter_data.text.allow_tab_input, !is_tab)
+				) {
+					String_Insert(ts_data, (char)keyboard->key_sym, ts_data->length);
+					Widget_Update(&wg_filter_data);
+				}
+			}
+			else
+			if (keyboard->up[VK_DELETE]) {
+				String *ts_data = Widget_GetTextData(&wg_filter_data);
+				String_Clear(ts_data);
 				Widget_Update(&wg_filter_data);
 			}
 		}

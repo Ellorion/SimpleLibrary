@@ -310,6 +310,7 @@ ToInt(
 	return result;
 }
 
+#include "core/mutex.h"
 #include "core/time.h"
 #include "core/sort.h"
 #include "core/parser.h"
