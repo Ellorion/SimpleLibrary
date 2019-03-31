@@ -145,13 +145,11 @@ Network_Listen(
 
 	if (result == SOCKET_ERROR) {
 		String_Overwrite(&network.s_error, S("Network binding failed."));
-		Network_Close(&network);
 		return network;
 	}
 
 	if (listen(network.socket, SOMAXCONN) == SOCKET_ERROR) {
 		String_Overwrite(&network.s_error, S("Network socket listening failed."));
-		Network_Close(&network);
 		return network;
 	}
 
@@ -191,7 +189,6 @@ Network_Connect(
 	Network network = Network_Create();
 
 	if (Network_HasError(&network)) {
-		Network_Close(&network);
 		return network;
 	}
 
@@ -199,7 +196,6 @@ Network_Connect(
 
 	if (String_IsEmpty(&s_ip_address)) {
 		String_Overwrite(&network.s_error, S("IP loopup failed."));
-		Network_Close(&network);
 		return network;
 	}
 
@@ -212,7 +208,6 @@ Network_Connect(
 
 	if (result == SOCKET_ERROR) {
 		String_Overwrite(&network.s_error, S("Network socket connection failed."));
-		Network_Close(&network);
 	}
 
 	return network;
@@ -247,7 +242,6 @@ Network_Send(
 
 	if (!Network_IsSocketValid(network)) {
 		String_Overwrite(&network->s_error, S("Invalid network socket [send].\n\tForgot to connect to a host?"));
-		Network_Close(network);
 		return false;
 	}
 
@@ -255,7 +249,6 @@ Network_Send(
 
 	if (result == SOCKET_ERROR) {
 		String_Overwrite(&network->s_error, S("Socket error after data was send. [send]"));
-		Network_Close(network);
 	}
 
 	return (result != SOCKET_ERROR);
@@ -272,7 +265,6 @@ Network_Receive(
 
 	if (!Network_IsSocketValid(network)) {
 		String_Overwrite(&network->s_error, S("Invalid network socket [recv].\n\tForgot to connect to a host?"));
-		Network_Close(network);
 		return 0;
 	}
 
@@ -494,7 +486,6 @@ Network_HTTP_GetResponse(
 		if (network->HTTP.bytes_received < 0) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
 			String_Overwrite(&network->s_error, S("No response recieved."));
-			Network_Close(network);
 			return false;
 		}
 
@@ -507,7 +498,6 @@ Network_HTTP_GetResponse(
 		if (network->HTTP.header_size < 0) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
 			String_Overwrite(&network->s_error, S("No http header recieved."));
-			Network_Close(network);
 			return false;
 		}
 
@@ -523,7 +513,6 @@ Network_HTTP_GetResponse(
 		if (network->HTTP.response_code != 200) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
 			String_Overwrite(&network->s_error, S("HTTP response code was not 200."));
-			Network_Close(network);
 			return false;
 		}
 
@@ -559,7 +548,6 @@ Network_HTTP_GetResponse(
 				if (network->HTTP.bytes_received <= 0) {
 					network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
 					String_Overwrite(&network->s_error, S("Receiving remaining data chunks failed."));
-					Network_Close(network);
 					return false;
 				}
 

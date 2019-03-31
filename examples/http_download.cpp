@@ -2,7 +2,6 @@
 #include "test/core.h"
 
 int main() {
-	Network network;
 	String s_header;
 	String s_response;
 
@@ -12,7 +11,7 @@ int main() {
 /// host adress as the one requesting to.
 /// @Note: do not call the host-string "s_host", or winsock.h will complain
 /// because of a macro, that is used there. Thank you, microsoft.
-//	Network network = Network_Connect(s_host_adress, 80);
+	Network network = Network_Connect(s_host_adress, 80);
 
 	Network_HTTP_Request(&network, s_host_adress, S(""));
 	Network_HTTP_GetResponse(&network, &s_header);
@@ -24,6 +23,8 @@ int main() {
 	if (Network_HasError(&network)) {
 		String_Print(S("[Error] "));
 		String_PrintLine(network.s_error);
+
+		LOG_DEBUG("Code: " << network.HTTP.response_code);
 	}
 
 	Network_Destroy(&network);
