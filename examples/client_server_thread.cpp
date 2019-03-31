@@ -19,7 +19,7 @@ Thread_Listener(
 		String_PrintLine(s_data, recv);
 	}
 
-	Network_Close(&socket_connection);
+	Network_Destroy(&socket_connection);
 
 	return 0;
 };
@@ -40,7 +40,7 @@ int main() {
 		--counter;
 	}
 
-	Network_Close(&network);
+	Network_Destroy(&network);
 
 	Thread_WaitFor(&thread);
 

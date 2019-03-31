@@ -3,27 +3,6 @@
 /// Server: socket() -> bind() -> listen() -> accept() |-> send()/recv() -> close()
 /// Client: socket() -> connect()                      |-> send()/recv() -> close()
 
-/// Usage HTTP Request / Response:
-//	String s_ip = S("127.0.0.1");
-//	Network network = Network_Connect(s_ip.value, 80);
-//
-//	if (!Network_HTTP_Request(&network, s_ip, S("/")))
-//		return 0;
-//
-//	String s_header;
-//	String s_buffer;
-//	bool success = Network_HTTP_GetResponse(&network, &s_header);
-//
-//	String_Print(s_header);
-//
-//	while(success) {
-//		success = Network_HTTP_GetResponse(&network, &s_buffer);
-//
-//		String_Print(s_buffer);
-//	}
-//
-//	Network_Close(&network);
-
 enum NETWORK_HTTP_STAGE {
 	NETWORK_HTTP_STAGE_IDLE = 0,
 	NETWORK_HTTP_STAGE_REQUESTED,
@@ -34,6 +13,7 @@ enum NETWORK_HTTP_STAGE {
 
 struct Network {
 	SOCKET socket = INVALID_SOCKET;
+	String s_error;
 
 	struct HTTP {
 		u16    packet_size    = 1024;
@@ -56,6 +36,16 @@ struct Network_Info {
 	String s_gateway_mask;
 	String s_mac;
 };
+
+instant bool
+Network_HasError(
+	Network *network
+) {
+	Assert(network);
+
+	return (   network->HTTP.stage == NETWORK_HTTP_STAGE_ERROR
+			OR network->s_error.length);
+}
 
 instant bool
 Network_Init(
@@ -87,11 +77,41 @@ Network_Close(
 
 	s32 result = closesocket(network_out->socket);
 
-	if (result == SOCKET_ERROR)
-		LOG_ERROR("closesocket: " << WSAGetLastError());
+	if (result == SOCKET_ERROR) {
+		String_Overwrite(&network_out->s_error, S("closesocket error."));
+	}
 
-	*network_out = {};
+	network_out->HTTP = {};
 	network_out->socket = INVALID_SOCKET;
+}
+
+instant void
+Network_DestroyInfo(
+	Network_Info *info
+) {
+	Assert(info);
+
+	String_Destroy(&info->s_gateway_ip);
+	String_Destroy(&info->s_gateway_mask);
+	free(info->s_ip.value);
+	String_Destroy(&info->s_ip_mask);
+	String_Destroy(&info->s_mac);
+	String_Destroy(&info->s_name_adapter);
+	String_Destroy(&info->s_name_device);
+
+	info->s_ip = {};
+	info->s_ip.changed = true;
+}
+
+instant void
+Network_Destroy(
+	Network *network_out
+) {
+	Assert(network_out);
+
+	Network_Close(network_out);
+	String_Destroy(&network_out->s_error);
+	*network_out = {};
 }
 
 instant Network
@@ -102,10 +122,10 @@ Network_Create(
 	if (!Network_Init())
 		return network;
 
-	network.socket  = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	network.socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (network.socket == INVALID_SOCKET)
-		LOG_ERROR("Network socket is invalid.");
+		String_Overwrite(&network.s_error, S("Network socket is invalid."));
 
 	return network;
 }
@@ -122,16 +142,15 @@ Network_Listen(
 	socket_addr.sin_port        = htons(port);
 
 	s32 result = bind(network.socket, (SOCKADDR *)&socket_addr, sizeof(socket_addr));
-	if (result == SOCKET_ERROR) {
-		LOG_ERROR("Network binding failed: " << WSAGetLastError());
 
+	if (result == SOCKET_ERROR) {
+		String_Overwrite(&network.s_error, S("Network binding failed."));
 		Network_Close(&network);
 		return network;
 	}
 
 	if (listen(network.socket, SOMAXCONN) == SOCKET_ERROR) {
-		LOG_ERROR("Network socket listening failed: " << WSAGetLastError());
-
+		String_Overwrite(&network.s_error, S("Network socket listening failed."));
 		Network_Close(&network);
 		return network;
 	}
@@ -149,6 +168,9 @@ Network_GetIPByName(
 
 	hostent *host = gethostbyname(s_name.value);
 
+	if (!host)
+		return s_ip;
+
 	char *c_ip = inet_ntoa(*(in_addr *)host->h_addr);
 
 	/// not by reference
@@ -163,17 +185,20 @@ Network_GetIPByName(
 
 instant Network
 Network_Connect(
-	const char* c_host_adress,
+	String s_host_adress,
 	u16 port
 ) {
-	Assert(c_host_adress);
-
 	Network network = Network_Create();
 
- 	String s_ip_address = Network_GetIPByName(S(c_host_adress));
+	if (Network_HasError(&network)) {
+		Network_Close(&network);
+		return network;
+	}
+
+ 	String s_ip_address = Network_GetIPByName(s_host_adress);
 
 	if (String_IsEmpty(&s_ip_address)) {
-		LOG_ERROR("IP loopup failed.");
+		String_Overwrite(&network.s_error, S("IP loopup failed."));
 		Network_Close(&network);
 		return network;
 	}
@@ -186,7 +211,7 @@ Network_Connect(
 	s32 result = connect(network.socket, (SOCKADDR *)&socket_addr, sizeof(socket_addr));
 
 	if (result == SOCKET_ERROR) {
-		LOG_ERROR("Network socket connection failed: " << WSAGetLastError());
+		String_Overwrite(&network.s_error, S("Network socket connection failed."));
 		Network_Close(&network);
 	}
 
@@ -221,13 +246,19 @@ Network_Send(
 	Assert(network);
 
 	if (!Network_IsSocketValid(network)) {
-		LOG_ERROR("Invalid network socket [send].");
+		String_Overwrite(&network->s_error, S("Invalid network socket [send].\n\tForgot to connect to a host?"));
+		Network_Close(network);
 		return false;
 	}
 
-	send(network->socket, s_data.value, s_data.length, 0);
+	int result = send(network->socket, s_data.value, s_data.length, 0);
 
-	return true;
+	if (result == SOCKET_ERROR) {
+		String_Overwrite(&network->s_error, S("Socket error after data was send. [send]"));
+		Network_Close(network);
+	}
+
+	return (result != SOCKET_ERROR);
 }
 
 instant s32
@@ -240,7 +271,8 @@ Network_Receive(
 	Assert(s_buffer_out->length);
 
 	if (!Network_IsSocketValid(network)) {
-		LOG_ERROR("Invalid network socket [recv].");
+		String_Overwrite(&network->s_error, S("Invalid network socket [recv].\n\tForgot to connect to a host?"));
+		Network_Close(network);
 		return 0;
 	}
 
@@ -371,24 +403,6 @@ Network_GetInfo(
 }
 
 instant void
-Network_DestroyInfo(
-	Network_Info *info
-) {
-	Assert(info);
-
-	String_Destroy(&info->s_gateway_ip);
-	String_Destroy(&info->s_gateway_mask);
-	free(info->s_ip.value);
-	String_Destroy(&info->s_ip_mask);
-	String_Destroy(&info->s_mac);
-	String_Destroy(&info->s_name_adapter);
-	String_Destroy(&info->s_name_device);
-
-	info->s_ip = {};
-	info->s_ip.changed = true;
-}
-
-instant void
 Network_PrintInfo(
 	Network_Info *info
 ) {
@@ -422,6 +436,13 @@ Network_HTTP_Request(
 ) {
 	Assert(network);
 
+	if (!Network_IsSocketValid(network)) {
+		*network = Network_Connect(s_ip, 80);
+
+		if (Network_HasError(network))
+			return false;
+	}
+
 	if (   network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
 		OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_DATA
 	) {
@@ -429,6 +450,7 @@ Network_HTTP_Request(
 	}
 
 	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
+	String_Clear(&network->s_error);
 
 	String s_request;
 	String_Append(&s_request, S("GET /"));
@@ -451,6 +473,9 @@ Network_HTTP_GetResponse(
 	Assert(network);
 	Assert(s_response_out);
 
+	if (Network_HasError(network))
+		return false;
+
 	if (!(   network->HTTP.stage == NETWORK_HTTP_STAGE_REQUESTED
 		  OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
 		  OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_DATA)
@@ -466,8 +491,10 @@ Network_HTTP_GetResponse(
 		/// get http response header
 		network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
 
-		if (!network->HTTP.bytes_received) {
+		if (network->HTTP.bytes_received < 0) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+			String_Overwrite(&network->s_error, S("No response recieved."));
+			Network_Close(network);
 			return false;
 		}
 
@@ -479,6 +506,8 @@ Network_HTTP_GetResponse(
 
 		if (network->HTTP.header_size < 0) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+			String_Overwrite(&network->s_error, S("No http header recieved."));
+			Network_Close(network);
 			return false;
 		}
 
@@ -493,6 +522,8 @@ Network_HTTP_GetResponse(
 
 		if (network->HTTP.response_code != 200) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+			String_Overwrite(&network->s_error, S("HTTP response code was not 200."));
+			Network_Close(network);
 			return false;
 		}
 
@@ -514,23 +545,30 @@ Network_HTTP_GetResponse(
 			network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
 		}
 		else {
-			network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
-
-			if (!network->HTTP.bytes_received) {
-				network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-				return false;
+			/// receive at least once when only a valid header was recieved before
+			if (network->HTTP.stage != NETWORK_HTTP_STAGE_RESPONSED_HEADER) {
+				/// last chunk, if buffer is not fully filled
+				network->HTTP.is_receiving = ((u64)network->HTTP.bytes_received == network->HTTP.s_buffer_chunk.length);
 			}
 
-			String_Destroy(s_response_out);
-			*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.bytes_received);
-
-			/// last chunk, if buffer is not fully filled
-			network->HTTP.is_receiving = ((u64)network->HTTP.bytes_received == network->HTTP.s_buffer_chunk.length);
-
-			if (network->HTTP.is_receiving)
+			if (network->HTTP.is_receiving) {
 				network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
-			else
+
+				network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
+
+				if (network->HTTP.bytes_received <= 0) {
+					network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+					String_Overwrite(&network->s_error, S("Receiving remaining data chunks failed."));
+					Network_Close(network);
+					return false;
+				}
+
+				String_Destroy(s_response_out);
+				*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.bytes_received);
+			}
+			else {
 				network->HTTP.stage = NETWORK_HTTP_STAGE_IDLE;
+			}
 		}
 	}
 

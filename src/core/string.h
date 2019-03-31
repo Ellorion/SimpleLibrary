@@ -46,44 +46,6 @@ String_GetLength(
 	return result;
 }
 
-instant void
-String_Print(
-	String s_data
-) {
-	FOR(s_data.length, it) {
-		std::cout << s_data.value[it];
-	}
-}
-
-instant void
-String_PrintLine(
-	String s_data
-) {
-	String_Print(s_data);
-	std::cout << std::endl;
-}
-
-instant void
-String_Print(
-	String s_data,
-	u64 length
-) {
-	length = MIN(s_data.length, length);
-
-	FOR(length, it) {
-		std::cout << s_data.value[it];
-	}
-}
-
-instant void
-String_PrintLine(
-	String s_data,
-	u64 length
-) {
-	String_Print(s_data, length);
-	std::cout << std::endl;
-}
-
 /// (temporary) string conversion
 instant String
 S(
@@ -142,6 +104,44 @@ S(
 	s_data_it.changed      = true;
 
 	return s_data_it;
+}
+
+instant void
+String_Print(
+	String s_data
+) {
+	FOR(s_data.length, it) {
+		std::cout << s_data.value[it];
+	}
+}
+
+instant void
+String_PrintLine(
+	String s_data
+) {
+	String_Print(s_data);
+	std::cout << std::endl;
+}
+
+instant void
+String_Print(
+	String s_data,
+	u64 length
+) {
+	length = MIN(s_data.length, length);
+
+	FOR(length, it) {
+		std::cout << s_data.value[it];
+	}
+}
+
+instant void
+String_PrintLine(
+	String s_data,
+	u64 length
+) {
+	String_Print(s_data, length);
+	std::cout << std::endl;
 }
 
 instant void
