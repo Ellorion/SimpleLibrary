@@ -9,7 +9,6 @@ struct Tree {
 	bool is_expanded = false;
 
 	Array<Tree<T>> a_branch;
-	Array<Tree<T>> a_leaf;
 };
 
 template <typename T>
@@ -37,7 +36,7 @@ Tree_AddLeaf(
 	Assert(tree_io);
 	Assert(leaf_out);
 
-	Array_AddEmpty(&tree_io->a_leaf, leaf_out);
+	Array_AddEmpty(&tree_io->a_branch, leaf_out);
 	(*leaf_out)->is_leaf = true;
 }
 
@@ -88,9 +87,34 @@ Tree_Print(
 	if (!tree->is_expanded)
 		return;
 
-	FOR_ARRAY(tree->a_leaf, it)
-        Tree_Print(&ARRAY_IT(tree->a_leaf, it)  , level+1);
-
 	FOR_ARRAY(tree->a_branch, it)
         Tree_Print(&ARRAY_IT(tree->a_branch, it), level+1);
+}
+
+instant void
+Tree_PrintAll(
+	Tree<String> *tree,
+	u32 level = 0
+) {
+	if (tree->is_leaf) {
+		if (level) {
+			FOR(level - 1, it)
+				std::cout << "|- ";
+		}
+
+		String_PrintLine(tree->data);
+		return;
+	}
+
+	if (!String_IsEmpty(&tree->s_name)) {
+		if (level) {
+			FOR(level - 1, it)
+				std::cout << "|- ";
+		}
+
+		String_PrintLine(tree->s_name);
+	}
+
+	FOR_ARRAY(tree->a_branch, it)
+        Tree_PrintAll(&ARRAY_IT(tree->a_branch, it), level+1);
 }
