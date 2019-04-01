@@ -14,9 +14,13 @@ int main() {
 	Network network = Network_Connect(s_host_adress, 80);
 
 	Network_HTTP_Request(&network, s_host_adress, S(""));
-	Network_HTTP_GetResponse(&network, &s_header);
+	Network_HTTP_GetResponseRef(&network, &s_header);
 
-	while (Network_HTTP_GetResponse(&network, &s_response)) {
+	/// will make prev. reference data in s_header invalid,
+	/// since its storage will be overwritten
+	/// -> create a copy of the header in case the data is needed
+	///    during this operation
+	while (Network_HTTP_GetResponseRef(&network, &s_response)) {
 		String_Print(s_response);
 	}
 

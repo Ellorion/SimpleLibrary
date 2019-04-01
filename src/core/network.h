@@ -458,7 +458,7 @@ Network_HTTP_Request(
 }
 
 instant bool
-Network_HTTP_GetResponse(
+Network_HTTP_GetResponseRef(
 	Network *network,
 	String  *s_response_out
 ) {
