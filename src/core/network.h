@@ -15,6 +15,7 @@ struct Network {
 	SOCKET socket = INVALID_SOCKET;
 	String s_error;
 
+	/// @Note: does not support SSL
 	struct HTTP {
 		u16    packet_size    = 1024;
 		u16    response_code  = 0;
@@ -472,14 +473,17 @@ Network_HTTP_GetResponseRef(
 		  OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
 		  OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_DATA)
 	) {
-		String_Clear(s_response_out);
 		return false;
 	}
 
 	if (network->HTTP.s_buffer_chunk.length < network->HTTP.packet_size)
 		String_CreateBuffer(&network->HTTP.s_buffer_chunk, network->HTTP.packet_size, false);
 
+	/// header
+	/// =======================================================================
 	if (!network->HTTP.is_receiving) {
+		bool result = false;
+
 		/// get http response header
 		network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
 
@@ -506,59 +510,98 @@ Network_HTTP_GetResponseRef(
 		/// return http header
 		*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.header_size);
 
-		String s_http_code = String_GetDelimiterSection(s_response_out, S(" "), 1, true);
+		String s_http_code = String_GetDelimiterSectionRef(s_response_out, S(" "), 1, true);
 		network->HTTP.response_code = ToInt(s_http_code);
-		String_Destroy(&s_http_code);
 
-		if (network->HTTP.response_code != 200) {
-			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-			String_Overwrite(&network->s_error, S("HTTP response code was not 200."));
-			return false;
+		switch (network->HTTP.response_code) {
+			/// Moved Permanently
+			case 301: {
+				Parser parser_header = Parser_Load(*s_response_out, true);
+
+				String s_data;
+				while(Parser_IsRunning(&parser_header)) {
+					Parser_GetStringRef(&parser_header, &s_data, PARSER_MODE_SEEK, false);
+
+					if (s_data == "Location:") {
+						/// return already parsed redirecting url instead of full header
+						Parser_GetStringRef(&parser_header, &s_data, PARSER_MODE_SEEK, false);
+						/// since both strings use a reference to network->HTTP.s_buffer_chunk,
+						/// it can be overwritten without any memory leak,
+						/// and the string buffer size also stays intact
+						*s_response_out = s_data;
+						break;
+					}
+				}
+			} break;
+
+			/// everything is awesome
+			case 200: {
+				result = true;
+			} break;
+
+			default: {
+				network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+				String_Overwrite(&network->s_error, S("HTTP response code was not 200."));
+				return false;
+			} break;
 		}
 
 		network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_HEADER;
 		network->HTTP.is_receiving = true;
-	}
-	else {
-		if (    network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
-			AND network->HTTP.bytes_received > network->HTTP.header_size
-		) {
-			/// get content chunk, which was sent with the header,
-			/// instead of requesting more needed chunks prematurely
-			String s_remaining_chunk = S(network->HTTP.s_buffer_chunk);
-			String_AddOffset(&s_remaining_chunk, network->HTTP.header_size);
 
-			String_Destroy(s_response_out);
-			*s_response_out = s_remaining_chunk;
-
-			network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
-		}
-		else {
-			/// receive at least once when only a valid header was recieved before
-			if (network->HTTP.stage != NETWORK_HTTP_STAGE_RESPONSED_HEADER) {
-				/// last chunk, if buffer is not fully filled
-				network->HTTP.is_receiving = ((u64)network->HTTP.bytes_received == network->HTTP.s_buffer_chunk.length);
-			}
-
-			if (network->HTTP.is_receiving) {
-				network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
-
-				network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
-
-				if (network->HTTP.bytes_received <= 0) {
-					network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-					String_Overwrite(&network->s_error, S("Receiving remaining data chunks failed."));
-					return false;
-				}
-
-				String_Destroy(s_response_out);
-				*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.bytes_received);
-			}
-			else {
-				network->HTTP.stage = NETWORK_HTTP_STAGE_IDLE;
-			}
-		}
+		return result;
 	}
 
-	return network->HTTP.is_receiving;
+	/// response data / content chunks
+	/// =======================================================================
+	/// error checking
+	if (network->HTTP.response_code != 200) {
+		network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+		String_Overwrite(&network->s_error, S("HTTP response code was not 200."));
+		return false;
+	}
+
+	/// get content chunk, which was sent with the header,
+	/// instead of requesting more (needed) chunks prematurely
+	/// -----------------------------------------------------------------------
+	if (    network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
+		AND network->HTTP.bytes_received > network->HTTP.header_size
+	) {
+		String s_remaining_chunk = S(network->HTTP.s_buffer_chunk);
+		String_AddOffset(&s_remaining_chunk, network->HTTP.header_size);
+
+		String_Destroy(s_response_out);
+		*s_response_out = s_remaining_chunk;
+
+		network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
+
+		return true;
+	}
+
+	/// receive remaining chunks
+	/// -----------------------------------------------------------------------
+	if (network->HTTP.stage != NETWORK_HTTP_STAGE_RESPONSED_HEADER) {
+		/// received last chunk before, if buffer was not fully filled
+		network->HTTP.is_receiving = ((u64)network->HTTP.bytes_received == network->HTTP.s_buffer_chunk.length);
+	}
+
+	if (network->HTTP.is_receiving) {
+		network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
+
+		network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
+
+		if (network->HTTP.bytes_received <= 0) {
+			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+			String_Overwrite(&network->s_error, S("Receiving remaining data chunks failed."));
+			return false;
+		}
+
+		String_Destroy(s_response_out);
+		*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.bytes_received);
+
+		return true;
+	}
+
+	network->HTTP.stage = NETWORK_HTTP_STAGE_IDLE;
+	return false;
 }

@@ -206,6 +206,8 @@ Parser_GetStringRef(
 	if (Parser_HasError(parser_io))
 		return;
 
+	AssertMessage(parser_io->s_data.value != s_data_out->value, "Do not overwrite parser data pointer.");
+
 	s64 offset_parser = 0;
 
 	if (String_StartWith(&parser_io->s_data, S("\""), true)) {

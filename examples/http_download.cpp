@@ -16,6 +16,14 @@ int main() {
 	Network_HTTP_Request(&network, s_host_adress, S(""));
 	Network_HTTP_GetResponseRef(&network, &s_header);
 
+	if (network.HTTP.response_code == 301) {
+		LOG_DEBUG("New URL:");
+		String_PrintLine(s_header);
+
+		Network_Destroy(&network);
+		return 0;
+	}
+
 	/// will make prev. reference data in s_header invalid,
 	/// since its storage will be overwritten
 	/// -> create a copy of the header in case the data is needed
