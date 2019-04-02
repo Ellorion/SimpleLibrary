@@ -323,10 +323,12 @@ ToInt(
 #include "core/image.h"
 #include "core/map.h"
 #include "core/thread.h"
-#include "core/network.h"
-#include "core/application.h"
 
 #include "utility/base64.h"
+#include "core/network.h"
+
+#include "core/application.h"
+
 #include "utility/clipboard.h"
 #include "utility/file_watcher.h"
 

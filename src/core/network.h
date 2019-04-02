@@ -22,6 +22,7 @@ struct Network {
 		s32    header_size    = 0;
 		s32    bytes_received = 0;
 		String s_buffer_chunk;
+		String s_credentials;
 
 		NETWORK_HTTP_STAGE stage = NETWORK_HTTP_STAGE_IDLE;
 		bool   is_receiving   = false;
@@ -422,6 +423,46 @@ Network_PrintInfo(
 }
 
 instant bool
+Network_HTTP_HasCredentials(
+	Network *network
+) {
+	Assert(network);
+
+	return (network->HTTP.s_credentials.length > 0);
+}
+
+instant void
+Network_HTTP_ClearCredentials(
+	Network *network
+) {
+	Assert(network);
+
+	String_Clear(&network->HTTP.s_credentials);
+}
+
+instant bool
+Network_HTTP_SetCredentials(
+	Network *network,
+	String s_user,
+	String s_pass
+) {
+	Assert(network);
+
+	if (String_IsEmpty(&s_user))
+		return false;
+
+	String_Overwrite(&network->HTTP.s_credentials, s_user);
+	String_Append(&network->HTTP.s_credentials, S(":", 1));
+	String_Append(&network->HTTP.s_credentials, s_pass);
+
+	String s_encoded = Base64_Encode(network->HTTP.s_credentials);
+	String_Destroy(&network->HTTP.s_credentials);
+	network->HTTP.s_credentials = s_encoded;
+
+	return true;
+}
+
+instant bool
 Network_HTTP_Request(
 	Network *network,
 	String   s_ip,
@@ -448,10 +489,14 @@ Network_HTTP_Request(
 	String s_request;
 	String_Append(&s_request, S("GET /"));
 	String_Append(&s_request, s_path);
-	String_Append(&s_request, S(" HTTP/1.1\r\n"));
-	String_Append(&s_request, S("Host: "));
+	String_Append(&s_request, S(" HTTP/1.1"));
+	String_Append(&s_request, S("\r\nHost: "));
 	String_Append(&s_request, s_ip);
-	String_Append(&s_request, S("\r\n"));
+
+	if (Network_HTTP_HasCredentials(network)) {
+		String_Append(&s_request, S("\r\nAuthorization: Basic "));
+		String_Append(&s_request, network->HTTP.s_credentials);
+	}
 
 	String_Append(&s_request, S("\r\n\r\n"));
 
@@ -514,8 +559,12 @@ Network_HTTP_GetResponseRef(
 		network->HTTP.response_code = ToInt(s_http_code);
 
 		switch (network->HTTP.response_code) {
-			/// Moved Permanently
-			case 301: {
+			case 200: {		/// everything is awesome
+				result = true;
+			} break;
+
+			case 301:		/// Moved Permanently
+			case 302: {		/// Moved Temporarily
 				Parser parser_header = Parser_Load(*s_response_out, true);
 
 				String s_data;
@@ -534,14 +583,15 @@ Network_HTTP_GetResponseRef(
 				}
 			} break;
 
-			/// everything is awesome
-			case 200: {
-				result = true;
+			case 401: {		/// Unauthorized
+				network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+				String_Overwrite(&network->s_error, S("Unauthorized access. User/pass is required."));
+				return false;
 			} break;
 
-			default: {
+			case 404: {		/// Not Found
 				network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-				String_Overwrite(&network->s_error, S("HTTP response code was not 200."));
+				String_Overwrite(&network->s_error, S("Requested content is not available on the host."));
 				return false;
 			} break;
 		}
@@ -554,10 +604,23 @@ Network_HTTP_GetResponseRef(
 
 	/// response data / content chunks
 	/// =======================================================================
-	/// error checking
+	/// for (manually) unhandled response code information
 	if (network->HTTP.response_code != 200) {
+		String s_error;
+
+		switch (network->HTTP.response_code) {
+			case 301:
+			case 302: {
+				s_error = S("URL is redirecting to another location.");
+			} break;
+
+			default: {
+				s_error = S("HTTP response code was not 200. Check HTTP header for details.");
+			} break;
+		}
+
+		String_Overwrite(&network->s_error, s_error);
 		network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-		String_Overwrite(&network->s_error, S("HTTP response code was not 200."));
 		return false;
 	}
 

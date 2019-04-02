@@ -1,40 +1,44 @@
 #pragma once
 
-instant char *
+instant String
 Base64_Encode(
-	const char *text
+	String s_data
 ) {
+	Assert(!String_IsEmpty(&s_data));
+
 	const char encodingTable[] =
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-	int length = String_GetLength(text);
-	char *encoded = Memory_Create(char, (length + 2) / 3 * 4 + 1);
-	int enc_index = -1;
+	u64 length = s_data.length;
 
-	for (int index = 0; index < length; index += 3) {
-		u32 buffer =  (text[index + 0] << 16)
-					| (text[index + 1] <<  8)
-					| (text[index + 2]);
+	String s_encoded = String_CreateBuffer((length + 2) / 3 * 4 + 1);
+
+	s64 enc_index = -1;
+
+	for (u64 index = 0; index < length; index += 3) {
+		u32 buffer =  (s_data.value[index + 0] << 16)
+					| (s_data.value[index + 1] <<  8)
+					| (s_data.value[index + 2]);
 
 		/// 6 bits -> 0-63 * position in buffer & trunkated by 63 (0x3F)
-		encoded[++enc_index] = encodingTable[(buffer >> (6 * 3) & 0x3F)];
-		encoded[++enc_index] = encodingTable[(buffer >> (6 * 2) & 0x3F)];
+		s_encoded.value[++enc_index] = encodingTable[(buffer >> (6 * 3) & 0x3F)];
+		s_encoded.value[++enc_index] = encodingTable[(buffer >> (6 * 2) & 0x3F)];
 
-		if (text[index + 1] == '\0') {
-			encoded[++enc_index] = '=';
-			encoded[++enc_index] = '=';
+		if (s_data.value[index + 1] == '\0') {
+			s_encoded.value[++enc_index] = '=';
+			s_encoded.value[++enc_index] = '=';
 			break;
 		}
 
-		encoded[++enc_index] = encodingTable[(buffer >> (6 * 1) & 0x3F)];
+		s_encoded.value[++enc_index] = encodingTable[(buffer >> (6 * 1) & 0x3F)];
 
-		if (text[index + 2] == '\0') {
-			encoded[++enc_index] = '=';
+		if (s_data.value[index + 2] == '\0') {
+			s_encoded.value[++enc_index] = '=';
 			break;
 		}
 
-		encoded[++enc_index] = encodingTable[(buffer >> (6 * 0) & 0x3F)];
+		s_encoded.value[++enc_index] = encodingTable[(buffer >> (6 * 0) & 0x3F)];
 	}
 
-	return encoded;
+	return s_encoded;
 }

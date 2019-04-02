@@ -16,7 +16,9 @@ int main() {
 	Network_HTTP_Request(&network, s_host_adress, S(""));
 	Network_HTTP_GetResponseRef(&network, &s_header);
 
-	if (network.HTTP.response_code == 301) {
+	if (   network.HTTP.response_code == 301
+		OR network.HTTP.response_code == 302
+	) {
 		LOG_DEBUG("New URL:");
 		String_PrintLine(s_header);
 
