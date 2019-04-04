@@ -39,6 +39,117 @@ struct Network_Info {
 	String s_mac;
 };
 
+struct Network_HTTP_URI {
+	String s_protocol;
+	String s_credentials_plain; /// not base64 encoded
+	String s_domain;
+	String s_path;
+	String s_error;
+
+	u16 port;
+};
+
+instant void
+Network_HTTP_DestroyURI(
+	Network_HTTP_URI *uri
+) {
+    Assert(uri);
+
+    Assert(!uri->s_error.value OR uri->s_error.is_reference);
+
+    String_Destroy(&uri->s_credentials_plain);
+    String_Destroy(&uri->s_domain);
+    String_Destroy(&uri->s_path);
+    String_Destroy(&uri->s_protocol);
+
+    *uri = {};
+}
+
+instant Network_HTTP_URI
+Network_HTTP_ParseURL(
+    String s_url
+) {
+	String ts_url = S(s_url);
+
+	String s_seperator_protocol    = S("://");
+	String s_seperator_credentials = S("@");
+	String s_seperator_domain      = S("/");
+	String s_seperator_port        = S(":");
+
+	s64 index_find;
+	Network_HTTP_URI uri;
+
+	/// check availability
+	/// -----------------------------------------------------------------------
+	if (String_IsEmpty(&ts_url, true)) {
+		uri.s_error = S("No URL was assigned.");
+		return uri;
+	}
+
+	/// check protocol
+	/// -----------------------------------------------------------------------
+	index_find = String_IndexOf(&ts_url, s_seperator_protocol, 0, true);
+
+	if (index_find > 0) {
+		if (!String_StartWith(&ts_url, S("http"), false)) {
+			uri.s_error = S("Only http protocol is supported.");
+			return uri;
+		}
+
+		uri.s_protocol = S(ts_url, index_find);
+
+		index_find += s_seperator_protocol.length;
+
+		String_AddOffset(&ts_url, index_find);
+	}
+
+	/// check credentials
+	/// -----------------------------------------------------------------------
+	index_find = String_IndexOf(&ts_url, s_seperator_credentials, 0, true);
+
+	if (index_find > 0) {
+		uri.s_credentials_plain = S(ts_url, index_find);
+		String_AddOffset(&ts_url, index_find + s_seperator_credentials.length);
+	}
+
+	/// check domain
+	/// -----------------------------------------------------------------------
+	index_find = String_IndexOf(&ts_url, s_seperator_domain, 0, true);
+
+	if (index_find < 0)
+		index_find = ts_url.length;
+
+	uri.s_domain = S(ts_url, index_find);
+	String_AddOffset(&ts_url, index_find);
+
+	if (String_IsEmpty(&uri.s_domain, true)) {
+		uri.s_error = S("Invalid URL used for parsing into URI.");
+		return uri;
+	}
+
+	/// check port
+	/// -----------------------------------------------------------------------
+	index_find = String_IndexOf(&uri.s_domain, s_seperator_port, 0, true);
+
+	if (index_find > 0) {
+		String s_port = S(uri.s_domain);
+		String_AddOffset(&s_port, index_find + s_seperator_port.length);
+		uri.port = ToInt(s_port);
+
+		uri.s_domain.length = index_find;
+	}
+	else {
+		/// default port for http
+		uri.port = 80;
+	}
+
+	/// remaining path
+	/// -----------------------------------------------------------------------
+	uri.s_path = ts_url;
+
+	return uri;
+}
+
 instant bool
 Network_HasError(
 	Network *network
@@ -80,7 +191,7 @@ Network_Close(
 	s32 result = closesocket(network_out->socket);
 
 	if (result == SOCKET_ERROR) {
-		String_Overwrite(&network_out->s_error, S("closesocket error."));
+		network_out->s_error = S("closesocket error.");
 	}
 
 	network_out->HTTP = {};
@@ -127,7 +238,7 @@ Network_Create(
 	network.socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (network.socket == INVALID_SOCKET)
-		String_Overwrite(&network.s_error, S("Network socket is invalid."));
+		network.s_error = S("Network socket is invalid.");
 
 	return network;
 }
@@ -146,12 +257,12 @@ Network_Listen(
 	s32 result = bind(network.socket, (SOCKADDR *)&socket_addr, sizeof(socket_addr));
 
 	if (result == SOCKET_ERROR) {
-		String_Overwrite(&network.s_error, S("Network binding failed."));
+		network.s_error = S("Network binding failed.");
 		return network;
 	}
 
 	if (listen(network.socket, SOMAXCONN) == SOCKET_ERROR) {
-		String_Overwrite(&network.s_error, S("Network socket listening failed."));
+		network.s_error = S("Network socket listening failed.");
 		return network;
 	}
 
@@ -166,7 +277,13 @@ Network_GetIPByName(
 ) {
 	String s_ip;
 
-	hostent *host = gethostbyname(s_name.value);
+	String ts_name;
+	String_Append(&ts_name, s_name);
+	String_Append(&ts_name, S("\0", 1));
+
+	hostent *host = gethostbyname(ts_name.value);
+
+	String_Destroy(&ts_name);
 
 	if (!host)
 		return s_ip;
@@ -177,7 +294,7 @@ Network_GetIPByName(
 	/// the return struct takes ownership
 	/// also includes 0-terminator
 	s_ip.value   = c_ip;
-	s_ip.length  = String_GetLength(c_ip) + 1;
+	s_ip.length  = String_GetLength(c_ip);
 	s_ip.changed = true;
 
 	return s_ip;
@@ -197,7 +314,7 @@ Network_Connect(
  	String s_ip_address = Network_GetIPByName(s_host_adress);
 
 	if (String_IsEmpty(&s_ip_address)) {
-		String_Overwrite(&network.s_error, S("IP loopup failed."));
+		network.s_error = S("IP loopup failed.");
 		return network;
 	}
 
@@ -209,7 +326,7 @@ Network_Connect(
 	s32 result = connect(network.socket, (SOCKADDR *)&socket_addr, sizeof(socket_addr));
 
 	if (result == SOCKET_ERROR) {
-		String_Overwrite(&network.s_error, S("Network socket connection failed."));
+		network.s_error = S("Network socket connection failed.");
 	}
 
 	return network;
@@ -243,15 +360,14 @@ Network_Send(
 	Assert(network);
 
 	if (!Network_IsSocketValid(network)) {
-		String_Overwrite(&network->s_error, S("Invalid network socket [send].\n\tForgot to connect to a host?"));
+		network->s_error = S("Invalid network socket [send].\n\tForgot to connect to a host?");
 		return false;
 	}
 
 	int result = send(network->socket, s_data.value, s_data.length, 0);
 
-	if (result == SOCKET_ERROR) {
-		String_Overwrite(&network->s_error, S("Socket error after data was send. [send]"));
-	}
+	if (result == SOCKET_ERROR)
+		network->s_error = S("Socket error after data was send. [send]");
 
 	return (result != SOCKET_ERROR);
 }
@@ -266,7 +382,7 @@ Network_Receive(
 	Assert(s_buffer_out->length);
 
 	if (!Network_IsSocketValid(network)) {
-		String_Overwrite(&network->s_error, S("Invalid network socket [recv].\n\tForgot to connect to a host?"));
+		network->s_error = S("Invalid network socket [recv].\n\tForgot to connect to a host?");
 		return 0;
 	}
 
@@ -431,6 +547,15 @@ Network_HTTP_HasCredentials(
 	return (network->HTTP.s_credentials.length > 0);
 }
 
+instant bool
+Network_HTTP_HasCredentials(
+	Network_HTTP_URI *uri
+) {
+	Assert(uri);
+
+	return (uri->s_credentials_plain.length > 0);
+}
+
 instant void
 Network_HTTP_ClearCredentials(
 	Network *network
@@ -462,6 +587,24 @@ Network_HTTP_SetCredentials(
 	return true;
 }
 
+instant bool
+Network_HTTP_SetCredentials(
+	Network *network,
+	String s_user_and_pass
+) {
+	Assert(network);
+
+	if (String_IsEmpty(&s_user_and_pass))
+		return false;
+
+	String s_encoded = Base64_Encode(s_user_and_pass);
+	String_Destroy(&network->HTTP.s_credentials);
+	network->HTTP.s_credentials = s_encoded;
+
+	return true;
+}
+
+/// @Depricated
 instant bool
 Network_HTTP_Request(
 	Network *network,
@@ -500,7 +643,72 @@ Network_HTTP_Request(
 
 	String_Append(&s_request, S("\r\n\r\n"));
 
-	return Network_Send(network, s_request);
+	bool success = Network_Send(network, s_request);
+
+	String_Destroy(&s_request);
+
+	return success;
+}
+
+instant bool
+Network_HTTP_Request(
+	Network *network,
+	String   s_url
+) {
+	Assert(network);
+
+	Network_HTTP_URI uri = Network_HTTP_ParseURL(s_url);
+
+	if (uri.s_error.length) {
+		/// since every error message is at a contant memory location,
+		/// it is enouth to simply put a reference here
+		network->s_error = S(uri.s_error);
+		Network_HTTP_DestroyURI(&uri);
+		return false;
+	}
+
+	if (!Network_IsSocketValid(network)) {
+		*network = Network_Connect(uri.s_domain, uri.port);
+
+		if (Network_HasError(network)) {
+			Network_HTTP_DestroyURI(&uri);
+			return false;
+		}
+	}
+
+	if (   network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
+		OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_DATA
+	) {
+		Network_HTTP_DestroyURI(&uri);
+		return false;
+	}
+
+	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
+	String_Clear(&network->s_error);
+
+	String s_request;
+	String_Append(&s_request, S("GET /"));
+	String_Append(&s_request, uri.s_path);
+	String_Append(&s_request, S(" HTTP/1.1"));
+	String_Append(&s_request, S("\r\nHost: "));
+	String_Append(&s_request, uri.s_domain);
+
+	if (Network_HTTP_HasCredentials(&uri)) {
+		Network_HTTP_SetCredentials(network, uri.s_credentials_plain);
+
+		String_Append(&s_request, S("\r\nAuthorization: Basic "));
+		String_Append(&s_request, network->HTTP.s_credentials);
+	}
+
+	String_Append(&s_request, S("\r\n\r\n"));
+
+	Network_HTTP_DestroyURI(&uri);
+
+	bool success = Network_Send(network, s_request);
+
+	String_Destroy(&s_request);
+
+	return success;
 }
 
 instant bool
@@ -534,7 +742,7 @@ Network_HTTP_GetResponseRef(
 
 		if (network->HTTP.bytes_received < 0) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-			String_Overwrite(&network->s_error, S("No response recieved."));
+			network->s_error = S("No response recieved.");
 			return false;
 		}
 
@@ -546,7 +754,7 @@ Network_HTTP_GetResponseRef(
 
 		if (network->HTTP.header_size < 0) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-			String_Overwrite(&network->s_error, S("No http header recieved."));
+			network->s_error = S("No http header recieved.");
 			return false;
 		}
 
@@ -585,13 +793,13 @@ Network_HTTP_GetResponseRef(
 
 			case 401: {		/// Unauthorized
 				network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-				String_Overwrite(&network->s_error, S("Unauthorized access. User/pass is required."));
+				network->s_error = S("Unauthorized access. User/pass is required.");
 				return false;
 			} break;
 
 			case 404: {		/// Not Found
 				network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-				String_Overwrite(&network->s_error, S("Requested content is not available on the host."));
+				network->s_error = S("Requested content is not available on the host.");
 				return false;
 			} break;
 		}
@@ -606,20 +814,17 @@ Network_HTTP_GetResponseRef(
 	/// =======================================================================
 	/// for (manually) unhandled response code information
 	if (network->HTTP.response_code != 200) {
-		String s_error;
-
 		switch (network->HTTP.response_code) {
 			case 301:
 			case 302: {
-				s_error = S("URL is redirecting to another location.");
+				network->s_error = S("URL is redirecting to another location.");
 			} break;
 
 			default: {
-				s_error = S("HTTP response code was not 200. Check HTTP header for details.");
+				network->s_error = S("HTTP response code was not 200. Check HTTP header for details.");
 			} break;
 		}
 
-		String_Overwrite(&network->s_error, s_error);
 		network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
 		return false;
 	}
@@ -655,7 +860,7 @@ Network_HTTP_GetResponseRef(
 
 		if (network->HTTP.bytes_received <= 0) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-			String_Overwrite(&network->s_error, S("Receiving remaining data chunks failed."));
+			network->s_error = S("Receiving remaining data chunks failed.");
 			return false;
 		}
 
