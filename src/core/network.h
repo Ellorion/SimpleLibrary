@@ -17,10 +17,12 @@ struct Network {
 
 	/// @Note: does not support SSL
 	struct HTTP {
-		u16    packet_size    = 1024;
-		u16    response_code  = 0;
-		s32    header_size    = 0;
-		s32    bytes_received = 0;
+		u16    packet_size     = 1024;
+		u16    response_code   = 0;
+		s32    header_size     = 0;
+		s32    bytes_receiving = 0;
+		s64    bytes_received  = 0;
+		s64    content_length  = 0;
 		String s_buffer_chunk;
 		String s_credentials;
 
@@ -221,10 +223,10 @@ Network_Destroy(
 	Network *network_out
 ) {
 	Assert(network_out);
+	Assert(!network_out->s_error.value OR network_out->s_error.is_reference);
 
 	Network_Close(network_out);
-	String_Destroy(&network_out->s_error);
-	*network_out = {};
+	network_out->HTTP = {};
 }
 
 instant Network
@@ -352,6 +354,26 @@ Network_WaitForConnection(
 		LOG_WARNING("New socket connection failed: " << network_connection_out->socket);
 }
 
+/// true, if data was sent
+instant s32
+Network_HTTP_WaitForData(
+	Network *network,
+	s64 seconds,
+	s64 useconds
+) {
+	Assert(network);
+
+	timeval timeout;
+	timeout.tv_sec  = seconds;
+	timeout.tv_usec = useconds;
+
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(network->socket, &fds);
+
+	return select(0, &fds, 0, 0, &timeout);
+}
+
 instant bool
 Network_Send(
 	Network *network,
@@ -375,7 +397,8 @@ Network_Send(
 instant s32
 Network_Receive(
 	Network *network,
-	String  *s_buffer_out
+	String  *s_buffer_out,
+	bool is_content_length_known
 ) {
 	Assert(network);
 	Assert(s_buffer_out);
@@ -383,7 +406,17 @@ Network_Receive(
 
 	if (!Network_IsSocketValid(network)) {
 		network->s_error = S("Invalid network socket [recv].\n\tForgot to connect to a host?");
-		return 0;
+		return -1;
+	}
+
+	if (!is_content_length_known) {
+		/// make sure there is something to read,
+		/// if the content length is not known beforehand,
+		/// otherwise recv will block the app when no more data arrives
+		s32 buffer_data_count = Network_HTTP_WaitForData(network, 1, 0);
+
+		if (buffer_data_count <= 0)
+			return buffer_data_count;
 	}
 
 	return recv(network->socket, s_buffer_out->value, s_buffer_out->length, 0);
@@ -657,6 +690,12 @@ Network_HTTP_Request(
 ) {
 	Assert(network);
 
+	String_Clear(&network->HTTP.s_credentials);
+
+	/// in case the header file does not deliver that information
+	network->HTTP.content_length = 0;
+	network->HTTP.bytes_received = 0;
+
 	Network_HTTP_URI uri = Network_HTTP_ParseURL(s_url);
 
 	if (uri.s_error.length) {
@@ -684,6 +723,7 @@ Network_HTTP_Request(
 	}
 
 	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
+	network->HTTP.is_receiving = false;
 	String_Clear(&network->s_error);
 
 	String s_request;
@@ -738,9 +778,11 @@ Network_HTTP_GetResponseRef(
 		bool result = false;
 
 		/// get http response header
-		network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
+		network->HTTP.bytes_receiving = Network_Receive(network,
+														&network->HTTP.s_buffer_chunk,
+														network->HTTP.content_length > 0);
 
-		if (network->HTTP.bytes_received < 0) {
+		if (network->HTTP.bytes_receiving <= 0) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
 			network->s_error = S("No response recieved.");
 			return false;
@@ -768,6 +810,25 @@ Network_HTTP_GetResponseRef(
 
 		switch (network->HTTP.response_code) {
 			case 200: {		/// everything is awesome
+				Parser parser_header = Parser_Load(*s_response_out, true);
+
+				String s_data;
+				while(Parser_IsRunning(&parser_header)) {
+					Parser_GetStringRef(&parser_header, &s_data, PARSER_MODE_SEEK, false);
+
+					if (s_data == "Content-Length:") {
+						/// return already parsed redirecting url instead of full header
+						Parser_GetStringRef(&parser_header, &s_data, PARSER_MODE_SEEK, false);
+						/// since both strings use a reference to network->HTTP.s_buffer_chunk,
+						/// it can be overwritten without any memory leak,
+						/// and the string buffer size also stays intact
+						network->HTTP.content_length = ToInt(s_data);
+						break;
+					}
+				}
+
+				Parser_Destroy(&parser_header);
+
 				result = true;
 			} break;
 
@@ -789,6 +850,8 @@ Network_HTTP_GetResponseRef(
 						break;
 					}
 				}
+
+				Parser_Destroy(&parser_header);
 			} break;
 
 			case 401: {		/// Unauthorized
@@ -833,7 +896,7 @@ Network_HTTP_GetResponseRef(
 	/// instead of requesting more (needed) chunks prematurely
 	/// -----------------------------------------------------------------------
 	if (    network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
-		AND network->HTTP.bytes_received > network->HTTP.header_size
+		AND network->HTTP.bytes_receiving > network->HTTP.header_size
 	) {
 		String s_remaining_chunk = S(network->HTTP.s_buffer_chunk);
 		String_AddOffset(&s_remaining_chunk, network->HTTP.header_size);
@@ -842,6 +905,7 @@ Network_HTTP_GetResponseRef(
 		*s_response_out = s_remaining_chunk;
 
 		network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
+		network->HTTP.bytes_received += s_remaining_chunk.length;
 
 		return true;
 	}
@@ -849,27 +913,103 @@ Network_HTTP_GetResponseRef(
 	/// receive remaining chunks
 	/// -----------------------------------------------------------------------
 	if (network->HTTP.stage != NETWORK_HTTP_STAGE_RESPONSED_HEADER) {
-		/// received last chunk before, if buffer was not fully filled
-		network->HTTP.is_receiving = ((u64)network->HTTP.bytes_received == network->HTTP.s_buffer_chunk.length);
+		if (network->HTTP.content_length)
+			network->HTTP.is_receiving = (network->HTTP.bytes_received != network->HTTP.content_length);
 	}
 
 	if (network->HTTP.is_receiving) {
 		network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
 
-		network->HTTP.bytes_received = Network_Receive(network, &network->HTTP.s_buffer_chunk);
+		network->HTTP.bytes_receiving  = Network_Receive(network,
+														&network->HTTP.s_buffer_chunk,
+														network->HTTP.content_length > 0);
 
-		if (network->HTTP.bytes_received <= 0) {
-			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
-			network->s_error = S("Receiving remaining data chunks failed.");
-			return false;
+		network->HTTP.bytes_received  += network->HTTP.bytes_receiving;
+
+		if (network->HTTP.bytes_receiving <= 0) {
+			if (network->HTTP.bytes_receiving < 0) {
+				network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
+				network->s_error = S("Receiving remaining data chunks failed.");
+				return false;
+			}
+
+			/// at this point, there was nothing more to receive (or the timeout kicked in)
+			/// and the transfer is done, but only in case the content-length was not known
+		}
+		else {
+			String_Destroy(s_response_out);
+			*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.bytes_receiving);
+
+			return true;
 		}
 
-		String_Destroy(s_response_out);
-		*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.bytes_received);
-
-		return true;
 	}
 
 	network->HTTP.stage = NETWORK_HTTP_STAGE_IDLE;
 	return false;
+}
+
+instant String
+Network_HTTP_DownloadData(
+	String s_url,
+	bool *has_error
+) {
+	#define OnErrorReturn()	\
+		if (Network_HasError(&network)) {	\
+			Network_Destroy(&network); \
+			*has_error = true;	\
+			String_Destroy(&s_result); \
+			s_result = S(network.s_error);	\
+			return s_result;	\
+		}
+
+	Assert(has_error);
+
+	Network network;
+	String s_header;
+	String s_response;
+	bool success;
+
+	String s_result;
+	bool is_url_reloacating;
+
+	/// to make sure it does not end up in an endless loop
+	u16 relocation_count_limit = 5;
+
+	do {
+		is_url_reloacating = false;
+
+		Network_HTTP_Request(&network, s_url);
+		OnErrorReturn();
+
+		success = Network_HTTP_GetResponseRef(&network, &s_header);
+
+		is_url_reloacating = (   network.HTTP.response_code == 301
+							  OR network.HTTP.response_code == 302);
+
+		if (is_url_reloacating) {
+			if (s_url.is_reference) {
+				s_url = s_header;
+			}
+			else{
+				String_Overwrite(&s_url, s_header);
+			}
+
+			--relocation_count_limit;
+		}
+
+	} while(is_url_reloacating AND relocation_count_limit);
+
+	OnErrorReturn();
+
+	while (Network_HTTP_GetResponseRef(&network, &s_response)) {
+		String_Append(&s_result, s_response);
+	}
+
+	OnErrorReturn();
+
+	Network_Destroy(&network);
+
+	*has_error = false;
+	return s_result;
 }
