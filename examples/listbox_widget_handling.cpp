@@ -5,9 +5,6 @@ instant void
 Window_HandleEvents(
 	Window *window
 ) {
-	MSG msg;
-	bool running = true;
-
 	Timer timer_fps;
 	Time_Reset(&timer_fps);
 
@@ -50,19 +47,17 @@ Window_HandleEvents(
 	Widget_AddRow(&widget_listbox, S("14"));
 	Widget_AddRow(&widget_listbox, S("15"));
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
+		Window_ReadMessage(window);
 		OpenGL_AdjustScaleViewport(window);
 
 		/// hold shift-key to get reverse tab order
 		Widget_Update(&ap_widgets, keyboard);
 
 		if (keyboard->up[VK_ESCAPE] OR widget_exit.events.on_trigger)
-			running = false;
+			window->is_running = false;
 
 		if (widget_click_me.events.on_trigger) {
 			std::cout << "clicked" << std::endl;
@@ -96,20 +91,16 @@ Window_HandleEvents(
 }
 
 int main() {
-	Window window;
-
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard, &mouse);
+	Window window = Window_Create("Hello, World!", 800, 480, true, &keyboard, &mouse);
 	Window_Show(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	OpenGL_UseVSync(&window, true);
 
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
 
 	return 0;

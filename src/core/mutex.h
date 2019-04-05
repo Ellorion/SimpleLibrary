@@ -6,7 +6,7 @@ struct Mutex_Ticket {
 };
 
 instant void
-Mutex_Lock(
+Mutex_WaitForRelease(
 	Mutex_Ticket *mutex
 ) {
 	Assert(mutex);

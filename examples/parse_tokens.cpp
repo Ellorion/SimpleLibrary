@@ -14,7 +14,7 @@ int main() {
 	Window_Show(&window);
 
 	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	OpenGL_UseVSync(&window, true);
 
 	Window_HandleEvents(&window);
 
@@ -31,7 +31,7 @@ int main() {
 
 	String s_token;
 	while(Parser_IsRunning(&parser)) {
-		Parser_Token_Get(&parser, &s_token);
+		Parser_Token_Get(&parser, &s_token, true);
 
 		if (s_token == "window")
 			String_Print(S("another_window"));

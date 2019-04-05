@@ -5,10 +5,6 @@ instant void
 Window_HandleEvents(
 	Window *window
 ) {
-	MSG msg;
-	bool running = true;
-	bool ui_zoom_enabled = true;
-
 	Timer timer_fps;
 	Time_Reset(&timer_fps);
 
@@ -46,13 +42,11 @@ Window_HandleEvents(
 
 	Vertex_BindAttributes(&shader_set, &vertex);
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
-		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
+		Window_ReadMessage(window);
+		OpenGL_AdjustScaleViewport(window, true);
 
 		/// Render
 		/// ===================================================================
@@ -75,19 +69,15 @@ Window_HandleEvents(
 }
 
 int main() {
-	Window window;
-
 	Keyboard keyboard;
 
-	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard);
+	Window window = Window_Create("Hello, World!", 800, 480, true, &keyboard);
 	Window_Show(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	OpenGL_UseVSync(&window, true);
 
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
 
 	return 0;

@@ -206,7 +206,7 @@ Parser_GetStringRef(
 	if (Parser_HasError(parser_io))
 		return;
 
-	AssertMessage(parser_io->s_data.value != s_data_out->value, "Do not overwrite parser data pointer.");
+	String_Destroy(s_data_out);
 
 	s64 offset_parser = 0;
 

@@ -5,9 +5,6 @@ instant void
 Window_HandleEvents(
 	Window *window
 ) {
-	MSG msg;
-	bool running = true;
-
 	ShaderSet shader_set = ShaderSet_Create(window);
 
 	OpenGL_SetBlending(true);
@@ -45,12 +42,10 @@ Window_HandleEvents(
 
 	Widget_RadioGroup_Link(&ap_radiogroup);
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
+		Window_ReadMessage(window);
 		OpenGL_AdjustScaleViewport(window);
 		Layout_Rearrange(&layout, window);
 
@@ -58,7 +53,7 @@ Window_HandleEvents(
 		Widget_Update(&ap_widgets, keyboard);
 
 		if (keyboard->up[VK_ESCAPE])
-			running = false;
+			window->is_running = false;
 
 		/// Render
 		/// ===================================================================
@@ -76,20 +71,16 @@ Window_HandleEvents(
 }
 
 int main() {
-	Window window;
-
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard, &mouse);
+	Window window = Window_Create("Hello, World!", 800, 480, true, &keyboard, &mouse);
 	Window_Show(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	OpenGL_UseVSync(&window, true);
 
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
 
 	return 0;

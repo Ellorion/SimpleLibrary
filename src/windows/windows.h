@@ -79,20 +79,23 @@ struct Mouse;
 struct Keyboard;
 
 struct Window {
-	const char  *title	 	  = 0;
-	HWND   		 hWnd         = 0;
-	HDC    		 hDC          = 0;
-	HGLRC  		 hRC          = 0;
-	float		 x_viewport   = 0;
-	float		 y_viewport   = 0;
-	s32    		 width        = 0;
-	s32    		 height       = 0;
-	bool   		 isFullscreen = false;
-	bool   		 useVSync     = false;
-	Keyboard    *keyboard     = 0;
-	Mouse       *mouse        = 0;
-	float        scale_x      = 1;
-	float        scale_y      = 1;
+	const char  *title	 	   = 0;
+	HWND   		 hWnd          = 0;
+	HDC    		 hDC           = 0;
+	HGLRC  		 hRC           = 0;
+	float		 x_viewport    = 0;
+	float		 y_viewport    = 0;
+	s32    		 width         = 0;
+	s32    		 height        = 0;
+	bool   		 is_fullscreen = false;
+	bool   		 use_VSync      = false;
+	Keyboard    *keyboard      = 0;
+	Mouse       *mouse         = 0;
+	float        scale_x       = 1;
+	float        scale_y       = 1;
+	bool         is_running    = false;
+	bool         is_zooming    = false;
+	bool         uses_opengl   = false;
 
 	struct Icon {
 		bool enable                     = true;
@@ -153,16 +156,21 @@ LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
 	return DefWindowProc(hWnd, uMessage, wParam, lParam);
 }
 
+instant void OpenGL_Destroy(Window *);
+
 instant void
 Window_Destroy(
 	Window *window_io
 ) {
+	if (window_io->uses_opengl)
+		OpenGL_Destroy(window_io);
+
 	if (window_io->icon.notify_icon_data.hWnd) {
 		Shell_NotifyIcon(	NIM_DELETE,
 							&window_io->icon.notify_icon_data);
 	}
 
-	if (window_io->isFullscreen) {
+	if (window_io->is_fullscreen) {
 		ChangeDisplaySettings(0, 0);
 	}
 
@@ -202,20 +210,44 @@ Window_ToCenterPosition(
 	MoveWindow(window->hWnd, x, y, width, height, false);
 }
 
+/// nCmdShow = 10 => Normal window size (not min/max)
+/// returns true, if tray icon changed
 instant bool
+Window_Show(
+	Window *window,
+	int nCmdShow = 10
+) {
+	Assert(window);
+
+	ShowWindow(window->hWnd, nCmdShow);
+
+	SetForegroundWindow(window->hWnd);
+	SetFocus(window->hWnd);
+
+	if (!window->icon.enable)                 return false;
+	if (!window->icon.notify_icon_data.hWnd)  return false;
+	if ( window->icon.always_visible)         return false;
+	if (!window->icon.minimize_to)            return false;
+
+	Shell_NotifyIcon(	NIM_DELETE,
+						&window->icon.notify_icon_data);
+
+	return true;
+}
+
+instant void OpenGL_Init(Window *);
+
+instant Window
 Window_Create(
-	Window *window_out,
 	const char *title,
 	s32 width,
 	s32 height,
-	s32 bits = 32,
+	bool use_opengl,
 	Keyboard *keyboard = 0,
-	Mouse *mouse = 0
+	Mouse *mouse = 0,
+	s32 bits = 32
 ) {
-	Assert(window_out);
-	Assert(!Window_IsCreated(window_out));
-
-	*window_out = {};
+	Window window = {};
 
 	/// register window class
 	/// -------------------------------------
@@ -235,7 +267,7 @@ Window_Create(
 
 	if (!RegisterClass(&wc)) {
 		LOG_ERROR("RegisterClass() failed: Cannot register window_out class.");
-		return false;
+		return window;
 	}
 
 	RECT rect_window = {};
@@ -247,13 +279,8 @@ Window_Create(
 	u32 dwExStyle = WS_EX_APPWINDOW;
 	u32 dwStyle   = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 
-	if (window_out->isFullscreen) {
-		dwStyle  |= WS_POPUP;
-	}
-	else {
-		dwExStyle |= WS_EX_WINDOWEDGE;
-		dwStyle   |= WS_OVERLAPPEDWINDOW;
-	}
+	dwExStyle |= WS_EX_WINDOWEDGE;
+	dwStyle   |= WS_OVERLAPPEDWINDOW;
 
 	AdjustWindowRectEx(&rect_window, dwStyle, false, dwExStyle);
 
@@ -269,11 +296,11 @@ Window_Create(
 
 	if (!hWnd) {
 		LOG_ERROR("CreateWindow() failed: Cannot create a window_out.");
-		Window_Destroy(window_out);
-		return false;
+		Window_Destroy(&window);
+		return window;
 	}
 
-	window_out->hWnd = hWnd;
+	window.hWnd = hWnd;
 
 	/// set pixel format
 	/// -------------------------------------
@@ -290,50 +317,55 @@ Window_Create(
 
 	if (!pf) {
 		LOG_ERROR("ChoosePixelFormat() failed: Cannot find a suitable pixel format.");
-		Window_Destroy(window_out);
-		return false;
+		Window_Destroy(&window);
+		return window;
 	}
 
 	if (!SetPixelFormat(hDC, pf, &pfd)) {
 		LOG_ERROR("SetPixelFormat() failed: Cannot set format specified.");
-		Window_Destroy(window_out);
-		return false;
+		Window_Destroy(&window);
+		return window;
 	}
 
 	if (!DescribePixelFormat(hDC, pf, sizeof(PIXELFORMATDESCRIPTOR), &pfd)) {
 		LOG_ERROR("DescribePixelFormat() failed: " << GetLastError());
-		Window_Destroy(window_out);
-		return false;
+		Window_Destroy(&window);
+		return window;
 	}
 
-	window_out->hDC = hDC;
+	window.hDC = hDC;
 
-	window_out->title  = title;
-	window_out->width  = width;
-	window_out->height = height;
+	window.title  = title;
+	window.width  = width;
+	window.height = height;
 
 	if (mouse)
-		window_out->mouse = mouse;
+		window.mouse = mouse;
 
 	if (keyboard)
-		window_out->keyboard = keyboard;
+		window.keyboard = keyboard;
 
 	if (File_Exists(S("tray.ico"))) {
-		NOTIFYICONDATA *nid   = &window_out->icon.notify_icon_data;
+		NOTIFYICONDATA *nid   = &window.icon.notify_icon_data;
 
 		nid->cbSize           = sizeof(NOTIFYICONDATA);
-		nid->hWnd             = window_out->hWnd;
+		nid->hWnd             = window.hWnd;
 		nid->uID              = WINDOW_TRAY_ICON_ID;
 		nid->uFlags           = NIF_ICON | NIF_MESSAGE | NIF_TIP;
 		nid->uCallbackMessage = WINDOW_TRAY_ICON;
 		nid->hIcon            = (HICON)LoadImage(0, TEXT("tray.ico"), IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
 
-		String_CopyBuffer(nid->szTip, S(window_out->title), 63);
+		String_CopyBuffer(nid->szTip, S(window.title), 63);
 	}
 
-	Window_ToCenterPosition(window_out);
+	Window_ToCenterPosition(&window);
 
-	return true;
+	window.is_running = true;
+
+	if (use_opengl)
+		OpenGL_Init(&window);
+
+	return window;
 }
 
 instant void Keyboard_ResetLastKey(Keyboard *keyboard);
@@ -367,7 +399,7 @@ Window_ToggleFullscreen(
 ) {
 	Assert(window_io);
 
-	if (!window_io->isFullscreen) {
+	if (!window_io->is_fullscreen) {
 		DWORD dwStyle = (DWORD)GetWindowLong(window_io->hWnd, GWL_STYLE);
 
 		dwStyle = dwStyle | WS_POPUP;
@@ -378,7 +410,7 @@ Window_ToggleFullscreen(
 		ShowWindow(window_io->hWnd, SW_RESTORE);
 		ShowWindow(window_io->hWnd, SW_MAXIMIZE);
 
-		window_io->isFullscreen = true;
+		window_io->is_fullscreen = true;
 	}
 	else {
 		DWORD dwStyle = (DWORD)GetWindowLong(window_io->hWnd, GWL_STYLE);
@@ -390,7 +422,7 @@ Window_ToggleFullscreen(
 
 		ShowWindow(window_io->hWnd, SW_RESTORE);
 
-		window_io->isFullscreen = false;
+		window_io->is_fullscreen = false;
 	}
 }
 
@@ -402,7 +434,7 @@ Window_SetSize(
 ) {
 	Assert(window_io);
 
-	if (window_io->isFullscreen)
+	if (window_io->is_fullscreen)
 		Window_ToggleFullscreen(window_io);
 
 	RECT rect = {};
@@ -464,31 +496,6 @@ Window_UnAdjustRect(
 	return success;
 }
 
-/// nCmdShow = 10 => Normal window size (not min/max)
-/// returns true, if tray icon changed
-instant bool
-Window_Show(
-	Window *window,
-	int nCmdShow = 10
-) {
-	Assert(window);
-
-	ShowWindow(window->hWnd, nCmdShow);
-
-	SetForegroundWindow(window->hWnd);
-	SetFocus(window->hWnd);
-
-	if (!window->icon.enable)                 return false;
-	if (!window->icon.notify_icon_data.hWnd)  return false;
-	if ( window->icon.always_visible)         return false;
-	if (!window->icon.minimize_to)            return false;
-
-	Shell_NotifyIcon(	NIM_DELETE,
-						&window->icon.notify_icon_data);
-
-	return true;
-}
-
 /// return false as decider to trigger DefWindowProc instead
 instant bool
 Window_Hide(
@@ -519,33 +526,30 @@ OpenGL_AdjustScaleViewport(Window *, bool);
 
 instant void
 Window_ReadMessage(
-	Window *window_io,
-	MSG    *msg,
-	bool   *is_running_io,
-	bool    is_zooming
+	Window *window_io
 ) {
 	Assert(window_io);
-	Assert(msg);
-	Assert(is_running_io);
 
-	while (PeekMessage(msg, 0, 0, 0, PM_REMOVE)) {
+	MSG msg;
+
+	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
 		Memory_Set(window_io->hotkey_triggered, false, KEYBOARD_HOTKEY_ID_COUNT);
 
-		if (Mouse_Update(window_io->mouse, window_io, msg))	continue;
-		if (Keyboard_Update(window_io->keyboard, msg))      continue;
+		if (Mouse_Update(window_io->mouse, window_io, &msg))  continue;
+		if (Keyboard_Update(window_io->keyboard, &msg))       continue;
 
-		switch (msg->message) {
+		switch (msg.message) {
 			case WM_HOTKEY: {
-				window_io->hotkey_triggered[msg->wParam] = true;
+				window_io->hotkey_triggered[msg.wParam] = true;
 			} break;
 
 			case WINDOW_CLOSE: {
-				msg->wParam = 0;
-				*is_running_io = false;
+				msg.wParam = 0;
+				window_io->is_running = false;
 			} break;
 
 			case WINDOW_RESIZE: {
-				OpenGL_AdjustScaleViewport(window_io, is_zooming);
+				OpenGL_AdjustScaleViewport(window_io, window_io->is_zooming);
 			} break;
 
 			case WINDOW_TRAY_ICON_CREATE: {
@@ -566,10 +570,10 @@ Window_ReadMessage(
 
 			case WINDOW_TRAY_ICON_SHOW: {
 				if (!Window_Hide(window_io)) {
-					DefWindowProc(	msg->hwnd,
+					DefWindowProc(	msg.hwnd,
 									WM_SYSCOMMAND,
 									SC_MINIMIZE,
-									msg->lParam);
+									msg.lParam);
 				}
 			} break;
 
@@ -578,8 +582,8 @@ Window_ReadMessage(
 			} break;
 
 			default: {
-				TranslateMessage(msg);
-				DispatchMessage(msg);
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
 			}
 		}
 	}

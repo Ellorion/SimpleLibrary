@@ -9,9 +9,6 @@ instant void
 Window_HandleEvents(
 	Window *window
 ) {
-	MSG msg;
-	bool running = true;
-
 	Timer timer_autoclick;
 	Time_Reset(&timer_autoclick);
 
@@ -43,12 +40,10 @@ Window_HandleEvents(
 		Layout_Add(&layout, &wg_autoclick);
 	}
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
+		Window_ReadMessage(window);
 		OpenGL_AdjustScaleViewport(window, false);
 
 		Layout_Rearrange(&layout, {0, 0, window->width, window->height});
@@ -56,7 +51,7 @@ Window_HandleEvents(
 		Widget_Update(&ap_widgets, keyboard);
 
 		if (keyboard->up[VK_ESCAPE])
-			running = false;
+			window->is_running = false;
 
 		if (wg_autoclick.events.on_trigger_secondary)  {
 			wg_autoclick.data.is_checked = !wg_autoclick.data.is_checked;
@@ -88,20 +83,16 @@ Window_HandleEvents(
 }
 
 int main() {
-	Window window;
-
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window_Create(&window, "Auto-Clicker", 320, 240, 32, &keyboard, &mouse);
+	Window window = Window_Create("Auto-Clicker", 320, 240, true, &keyboard, &mouse);
 	Window_Show(&window);
 	Window_AlwaysOnTop(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	OpenGL_UseVSync(&window, true);
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
 
 	return 0;

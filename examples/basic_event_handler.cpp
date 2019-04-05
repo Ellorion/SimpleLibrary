@@ -1,60 +1,33 @@
 #include "src/SLib.h"
 #include "test/core.h"
 
-instant void
-Window_HandleEvents(
-	Window *window
-) {
-	MSG msg;
-	bool running = true;
-
-	window->icon.always_visible = true;
-
-	ShaderSet  shader_set = ShaderSet_Create(window);
-	Keyboard  *keyboard   = window->keyboard;
-	Font       font       = Font_Load(S("default.ttf"), 16);
-
-	Assert(keyboard);
-
-	if (Font_HasError(&font)) {
-		MessageBox(window->hWnd, font.s_error.value, 0, MB_OK);
-		return;
-	}
-
-	while(running) {
-		msg = {};
-
-		/// Events
-		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
-
-		if (keyboard->up[VK_ESCAPE])
-			running = false;
-
-		/// Render
-		/// ===================================================================
-		OpenGL_ClearScreen();
-		Window_UpdateAndResetInput(window);
-	}
-
-	ShaderSet_Destroy(&shader_set);
-}
-
 int main() {
-	Window window;
-
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window_Create(&window, "Demo-Application", 512, 512 / 16 * 9, 32, &keyboard, &mouse);
+	Window window = Window_Create(
+		"Demo-Application",
+		800, 480,
+		true,
+		&keyboard, &mouse
+	);
+
 	Window_Show(&window);
+	OpenGL_UseVSync(&window, true);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	while(window.is_running) {
+		Window_ReadMessage(&window);
 
-	Window_HandleEvents(&window);
+		/// Events
+		/// ===================================================================
+		if (keyboard.up[VK_ESCAPE])
+			window.is_running = false;
 
-	OpenGL_Destroy(&window);
+		/// Render
+		/// ===================================================================
+		Window_UpdateAndResetInput(&window);
+	}
+
 	Window_Destroy(&window);
 
 	return 0;

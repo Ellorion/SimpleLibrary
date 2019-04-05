@@ -5,9 +5,6 @@ instant void
 Window_HandleEvents(
 	Window *window
 ) {
-	MSG msg;
-	bool running = true;
-
 	Timer timer_fps;
 	Time_Reset(&timer_fps);
 
@@ -31,16 +28,14 @@ Window_HandleEvents(
 	Text text = Text_Create(&shader_set, &font, &s_data, {10, 10, window->width - 20, window->height}, TEXT_ALIGN_X_LEFT);
 	text.data.color = {1, 0, 0, 1};
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
+		Window_ReadMessage(window);
 		OpenGL_AdjustScaleViewport(window);
 
 		if (keyboard->up[VK_ESCAPE])
-			running = false;
+			window->is_running = false;
 
 		/// Render
 		/// ===================================================================
@@ -66,18 +61,14 @@ Window_HandleEvents(
 }
 
 int main() {
-	Window window;
-
 	Keyboard keyboard;
-	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard);
+	Window window = Window_Create("Hello, World!", 800, 480, true, &keyboard);
 	Window_Show(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, false);
+	OpenGL_UseVSync(&window, false);
 
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
 
 	return 0;

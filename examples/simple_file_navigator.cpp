@@ -154,9 +154,6 @@ Config_Parse(
 
 instant void
 Window_HandleEvents(Window *window) {
-	MSG msg;
-	bool running = true;
-
 	/// configuration
 	Config config;
 	config.basic.s_path      = String_Copy("");
@@ -201,11 +198,9 @@ Window_HandleEvents(Window *window) {
 
 	bool is_zooming = config.window.is_zooming;
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// events
-		Window_ReadMessage(window, &msg, &running, false);
+		Window_ReadMessage(window);
 
 		/// scaling behavior
 		OpenGL_AdjustScaleViewport(window, is_zooming);
@@ -217,7 +212,7 @@ Window_HandleEvents(Window *window) {
 		Widget_Update(&ap_widgets, keyboard);
 
 		if(keyboard->up[VK_ESCAPE]) {
-			running = false;
+			window->is_running = false;
 		}
 		else
 		if (keyboard->up[VK_BACK]) {
@@ -268,20 +263,16 @@ Window_HandleEvents(Window *window) {
 }
 
 int main() {
-	Window window;
-
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window_Create(&window, app_title, 800, 480, 32, &keyboard, &mouse);
+	Window window = Window_Create(app_title, 800, 480, true, &keyboard, &mouse);
 	Window_Show(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	OpenGL_UseVSync(&window, true);
 
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
 
 	return 0;

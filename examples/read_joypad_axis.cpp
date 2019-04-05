@@ -3,20 +3,14 @@
 
 instant void
 Window_HandleEvents(Window *window) {
-	MSG msg;
-	bool running = true;
-	bool ui_zoom_enabled = true;
-
 	Joypad joypad;
 	Joypad_Init_XInput(&joypad);
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
-		OpenGL_AdjustScaleViewport(window, ui_zoom_enabled);
+		Window_ReadMessage(window);
+		OpenGL_AdjustScaleViewport(window, true);
 
 		Joypad_GetInput(&joypad, 0);
 
@@ -32,17 +26,13 @@ Window_HandleEvents(Window *window) {
 }
 
 int main() {
-	Window window;
-
-	Window_Create(&window, "Hello, World!", 800, 480);
+	Window window = Window_Create("Hello, World!", 800, 480, true);
 	Window_Show(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	OpenGL_UseVSync(&window, true);
 
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
 
 	return 0;

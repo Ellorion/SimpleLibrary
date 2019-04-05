@@ -8,6 +8,9 @@ OpenGL_Init(
 ) {
 	Assert(window_io);
 
+	if (window_io->uses_opengl)
+		return;
+
 	if (window_io->hDC) {
 		window_io->hRC = wglCreateContext(window_io->hDC);
 		wglMakeCurrent(window_io->hDC, window_io->hRC);
@@ -26,6 +29,8 @@ OpenGL_Init(
 		glEnable(GL_POINT_SMOOTH);
 		glEnable(GL_LINE_SMOOTH);
 		glEnable(GL_POLYGON_SMOOTH);
+
+		window_io->uses_opengl = true;
 	}
 }
 
@@ -43,7 +48,7 @@ OpenGL_Destroy(
 }
 
 instant void
-OpenGL_SetVSync(
+OpenGL_UseVSync(
 	Window *window_out,
 	bool enable
 ) {
@@ -52,7 +57,7 @@ OpenGL_SetVSync(
 	if(wglSwapIntervalEXT)
 		wglSwapIntervalEXT(enable);
 
-	window_out->useVSync = enable;
+	window_out->use_VSync = enable;
 
 	LOG_DEBUG("VSync: " << (enable
 							? "enabled."

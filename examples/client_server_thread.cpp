@@ -15,7 +15,7 @@ Thread_Listener(
 	Network_WaitForConnection(&network_listener, &socket_connection);
 
 	u32 recv;
-	while ((recv = Network_Receive(&socket_connection, &s_data))) {
+	while ((recv = Network_Receive(&socket_connection, &s_data, false))) {
 		String_PrintLine(s_data, recv);
 	}
 
@@ -30,7 +30,7 @@ int main() {
 	Thread thread = Thread_Create(&port, Thread_Listener);
 	Thread_Execute(&thread);
 
-	Network network = Network_Connect("127.0.0.1", port);
+	Network network = Network_Connect(S("127.0.0.1"), port);
 
 	u32 counter = 5;
 

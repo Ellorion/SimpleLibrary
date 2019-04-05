@@ -5,18 +5,13 @@ instant void
 Window_HandleEvents(
 	Window *window
 ) {
-	MSG msg;
-	bool running = true;
-
 	Timer timer_mouse_move;
 	Time_Reset(&timer_mouse_move);
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
+		Window_ReadMessage(window);
 
 		/// Render
 		/// ===================================================================
@@ -37,19 +32,15 @@ Window_HandleEvents(
 
 int main() {
 	Mouse mouse;
-	Window window;
-
 	Keyboard keyboard;
 
-	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard, &mouse);
+	Window window = Window_Create("Hello, World!", 800, 480, true, &keyboard, &mouse);
 	Window_Show(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	OpenGL_UseVSync(&window, true);
 
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
 
 	return 0;

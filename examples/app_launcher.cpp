@@ -18,9 +18,6 @@ instant void
 Window_HandleEvents(
 	Window *window
 ) {
-	MSG msg;
-	bool running = true;
-
 	/// @Info: "tray.ico" has to be in app-folder before startup,
 	///        to support the tray-icon system
 	window->icon.always_visible = true;
@@ -113,12 +110,10 @@ Window_HandleEvents(
 	Layout          *layout_active     = &layout_main;
 	Array<Widget *> *ap_widgets_active = &ap_widgets_main;
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
+		Window_ReadMessage(window);
 		OpenGL_AdjustScaleViewport(window, false);
 		Layout_Rearrange(layout_active, window);
 
@@ -193,7 +188,7 @@ Window_HandleEvents(
 
 		/// keyboard way to exit app
 		if (keyboard->up[VK_F4])
-			running = false;
+			window->is_running = false;
 
 		/// center window, in case of ocd
 		if (keyboard->up[VK_F12])
@@ -314,21 +309,18 @@ APPLICATION_MAIN {
 	/// press "control + shift + l" to show application window from everywhere while running
 	Application_RegisterHotKey(KEYBOARD_HOTKEY_01, MOD_CONTROL | MOD_SHIFT, 'l');
 
-	Window_Create(&window, "Application-Launcher", 512, 512 / 16 * 9, 32, &keyboard, &mouse);
+	window = Window_Create("Application-Launcher", 512, 512 / 16 * 9, true, &keyboard, &mouse);
 
 	if (hide_window_startup)
 		Window_Hide(&window);
 	else
 		Window_Show(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, true);
+	OpenGL_UseVSync(&window, true);
 
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
-
 	Application_Destroy(&app);
 
 	return 0;

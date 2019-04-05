@@ -5,9 +5,6 @@ instant void
 Window_HandleEvents(
 	Window *window
 ) {
-	MSG msg;
-	bool running = true;
-
 	ShaderSet shader_set = ShaderSet_Create(window);
 
 	OpenGL_SetBlending(true);
@@ -44,16 +41,14 @@ Window_HandleEvents(
 		Text_Update(&text_box);
 	}
 
-	while(running) {
-		msg = {};
-
+	while(window->is_running) {
 		/// Events
 		/// ===================================================================
-		Window_ReadMessage(window, &msg, &running, false);
+		Window_ReadMessage(window);
 		OpenGL_AdjustScaleViewport(window);
 
 		if (keyboard->up[VK_ESCAPE])
-			running = false;
+			window->is_running = false;
 
 		/// Render
 		/// ===================================================================
@@ -74,18 +69,14 @@ Window_HandleEvents(
 }
 
 int main() {
-	Window window;
-
 	Keyboard keyboard;
-	Window_Create(&window, "Hello, World!", 800, 480, 32, &keyboard);
+	Window window = Window_Create("Hello, World!", 800, 480, true, &keyboard);
 	Window_Show(&window);
 
-	OpenGL_Init(&window);
-	OpenGL_SetVSync(&window, false);
+	OpenGL_UseVSync(&window, false);
 
 	Window_HandleEvents(&window);
 
-	OpenGL_Destroy(&window);
 	Window_Destroy(&window);
 
 	return 0;
