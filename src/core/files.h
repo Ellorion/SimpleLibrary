@@ -202,7 +202,7 @@ File_ReadAll(
 
 	s_data.changed = true;
 
-	MEASURE_END("(" << c_filename << ") ");
+	MEASURE_END("(" << s_filename.value << ") ");
 
 	return s_data;
 }
@@ -247,6 +247,32 @@ operator < (
 
 	return (entry_1.type < entry_2.type);
 }
+
+/// @Testing
+bool
+operator <= (
+	Directory_Entry &entry_1,
+	Directory_Entry &entry_2
+) {
+	if(entry_1.type == entry_2.type) {
+		/// do not move, should always be the first entry
+		if (entry_1.s_name == "..") return false;
+		if (entry_2.s_name == "..") return false;
+
+		long index_1 = String_IndexOfRev(&entry_1.s_name, S("."), true);
+		long index_2 = String_IndexOfRev(&entry_2.s_name, S("."), true);
+
+		u64 length = 0;
+
+		if (index_1 >= 0 AND index_2 >= 0)
+			length = MIN(index_1, index_2);
+
+		return (String_Compare(entry_1.s_name, entry_2.s_name, length, false) <= 0);
+	}
+
+	return (entry_1.type <= entry_2.type);
+}
+
 bool
 operator > (
 	Directory_Entry &entry_1,
@@ -269,6 +295,31 @@ operator > (
 	}
 
 	return (entry_1.type > entry_2.type);
+}
+
+/// @Testing
+bool
+operator >= (
+	Directory_Entry &entry_1,
+	Directory_Entry &entry_2
+) {
+	if(entry_1.type == entry_2.type) {
+		/// do not move, should always be the first entry
+		if (entry_1.s_name == "..") return false;
+		if (entry_2.s_name == "..") return false;
+
+		long index_1 = String_IndexOfRev(&entry_1.s_name, S("."), true);
+		long index_2 = String_IndexOfRev(&entry_2.s_name, S("."), true);
+
+		u64 length = 0;
+
+		if (index_1 >= 0 AND index_2 >= 0)
+			length = MIN(index_1, index_2);
+
+		return (String_Compare(entry_1.s_name, entry_2.s_name, length, false) >= 0);
+	}
+
+	return (entry_1.type >= entry_2.type);
 }
 
 instant bool

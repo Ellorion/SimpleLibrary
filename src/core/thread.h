@@ -40,6 +40,15 @@ Thread_Execute(
 						);
 }
 
+instant bool
+Thread_WasStarted(
+	Thread *thread
+) {
+	Assert(thread);
+
+	return (thread->handle != 0);
+}
+
 instant void
 Thread_WaitFor(
 	Thread *thread

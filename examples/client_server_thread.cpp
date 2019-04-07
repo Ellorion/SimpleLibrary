@@ -2,7 +2,7 @@
 #include "test/core.h"
 
 instant u64 WINAPI
-Thread_Listener(
+Listener_Thread(
 	void *data
 ) {
 	u16 port = *(u16 *)data;
@@ -27,7 +27,7 @@ Thread_Listener(
 int main() {
 	u16 port = 80;
 
-	Thread thread = Thread_Create(&port, Thread_Listener);
+	Thread thread = Thread_Create(&port, Listener_Thread);
 	Thread_Execute(&thread);
 
 	Network network = Network_Connect(S("127.0.0.1"), port);

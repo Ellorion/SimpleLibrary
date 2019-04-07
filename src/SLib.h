@@ -4,7 +4,7 @@
 #define SHOW_WARNING			1
 
 #define DEBUG_EVENT_STATUS		0
-#define DEBUG_BENCHMARK			0
+#define DEBUG_BENCHMARK			1
 
 /// Operating System: Windows
 ///
@@ -78,6 +78,10 @@
 //#   undef  _WIN32_WINNT
 //#   define _WIN32_WINNT 0x0501
 //#endif // __MINGW32__
+
+#ifndef _MSC_VER
+#define  __forceinline __attribute__((always_inline))
+#endif
 
 #include <windows.h>
 #include <GL/gl.h>
@@ -193,9 +197,13 @@ _AssertMessage(
 
 	#define MEASURE_END(_text) \
 		std::cout << "Measure [" << __FUNCTION__ << "]: " << _text << Time_Measure(&DEBUG_tmr_measure) << " ms" << std::endl;
+
+#define MEASURE_END_AVG(_text, _count) \
+		std::cout << "Measure [" << __FUNCTION__ << "]: " << _text << (Time_Measure(&DEBUG_tmr_measure) / _count) << " ms" << std::endl;
 #else
 	#define MEASURE_START()
 	#define MEASURE_END(_text)
+	#define MEASURE_END_AVG(_text, _count)
 #endif
 
 /// ::: Utilities
@@ -329,6 +337,7 @@ ToInt(
 }
 
 #include "core/mutex.h"
+#include "core/thread.h"
 #include "core/time.h"
 #include "core/sort.h"
 #include "core/parser.h"
@@ -340,7 +349,6 @@ ToInt(
 #include "core/files.h"
 #include "core/image.h"
 #include "core/map.h"
-#include "core/thread.h"
 
 #include "utility/base64.h"
 #include "core/network.h"

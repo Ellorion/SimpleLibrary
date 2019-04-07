@@ -463,6 +463,21 @@ Array_PrintList(
 	}
 }
 
+template <typename T, typename Func>
+instant void
+Array_PrintList(
+	Array<T> *a_data,
+	Func OnOutput
+) {
+	Assert(a_data);
+
+	FOR_ARRAY(*a_data, it) {
+		T t_data = ARRAY_IT(*a_data, it);
+
+		std::cout << OnOutput(t_data) << std::endl;
+	}
+}
+
 instant void
 Array_PrintList(
 	Array<String> *a_data

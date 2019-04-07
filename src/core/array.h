@@ -288,6 +288,44 @@ Array_CreateBuffer(
 	return a_buffer;
 }
 
+template <typename T, typename Func>
+instant void
+Array_Sort(
+	Array<T> *array_io,
+	Func OnCompare
+) {
+	Assert(array_io);
+
+	if(!array_io->count)
+		return;
+
+	Sort_Data<T> sort_data;
+	sort_data.begin_io  = &array_io->memory[0];
+	sort_data.end_io    = &array_io->memory[array_io->count - 1];
+	sort_data.OnCompare = OnCompare;
+
+	Sort_Quick_Custom(sort_data);
+}
+
+template <typename T>
+instant void
+Array_Sort(
+	Array<T> *array_io,
+	SORT_ORDER_TYPE type
+) {
+	Assert(array_io);
+
+	if(!array_io->count)
+		return;
+
+	Sort_Data<T> sort_data;
+	sort_data.begin_io  = &array_io->memory[0];
+	sort_data.end_io    = &array_io->memory[array_io->count - 1];
+	sort_data.type		= type;
+
+	Sort_Quick(sort_data);
+}
+
 template <typename T>
 instant void
 Array_Sort_Ascending(
@@ -298,9 +336,13 @@ Array_Sort_Ascending(
 	if(!array_io->count)
 		return;
 
-	Sort_Quick( &array_io->memory[0],
-				&array_io->memory[array_io->count - 1],
-				SORT_ORDER_ASCENDING);
+	/// @Rant: noticably faster than the below lambda version,
+	///        which would be even worst without force-inlining
+	Array_Sort(array_io, SORT_ORDER_ASCENDING);
+
+	///	Array_Sort(array_io, [](T one, T two) __forceinline {
+	///		return (one < two);
+	///	});
 }
 
 template <typename T>
@@ -313,9 +355,13 @@ Array_Sort_Descending(
 	if(!array_io->count)
 		return;
 
-	Sort_Quick( &array_io->memory[0],
-				&array_io->memory[array_io->count - 1],
-				SORT_ORDER_DESCENDING);
+	/// @Rant: noticably faster than the below lambda version,
+	///        which would be even worst without force-inlining
+	Array_Sort(array_io, SORT_ORDER_DESCENDING);
+
+	///	Array_Sort(array_io, [](T one, T two) __forceinline {
+	///		return (one > two);
+	///	});
 }
 
 instant void
@@ -393,6 +439,28 @@ Array_AddRange(
 	for(u64 it = t_min; it < t_max; ++it) {
 		u64 value = OnModifyData(it);
 		Array_Add(a_data_io, value);
+	}
+}
+
+template <typename T, typename Func>
+instant void
+Array_AddRange(
+	Array<T> *a_data_io,
+	u64 min,
+	u64 max,
+	Func OnAssignData
+) {
+	Assert(a_data_io);
+
+	u64 t_min = MIN(min, max);
+	u64 t_max = MAX(min, max);
+
+	u64 t_delta = t_max - t_min;
+
+	for(u64 it = t_min; it < t_max; ++it) {
+		T data;
+		OnAssignData(&data, it);
+		Array_Add(a_data_io, data);
 	}
 }
 
