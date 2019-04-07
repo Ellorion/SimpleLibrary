@@ -44,8 +44,8 @@ R"(
 	);
 
 	mat4 scale_matrix = mat4(
-		scale_x , 0      , 0, 0,
-		0       , scale_y, 0, 0,
+		1.0f/scale_x , 0      , 0, 0,
+		0       , 1.0f/scale_y, 0, 0,
 		0       , 0      , 1, 0,
 		0       , 0      , 0, 1
 	);
@@ -175,8 +175,8 @@ R"(
 	);
 
 	mat4 scale_matrix = mat4(
-		scale_x , 0      , 0, 0,
-		0       , scale_y, 0, 0,
+		1.0f/scale_x , 0      , 0, 0,
+		0       , 1.0f/scale_y, 0, 0,
 		0       , 0      , 1, 0,
 		0       , 0      , 0, 1
 	);
@@ -331,8 +331,8 @@ R"(
 	} o_Vertex;
 
 	mat4 scale_matrix = mat4(
-		scale_x, 0      , 0, 0,
-		0      , scale_y, 0, 0,
+		1.0f/scale_x, 0      , 0, 0,
+		0      , 1.0f/scale_y, 0, 0,
 		0      , 0      , 1, 0,
 		0      , 0      , 0, 1
 	);
@@ -434,8 +434,8 @@ R"(
 	);
 
 	mat4 scale_matrix = mat4(
-		scale_x , 0      , 0, 0,
-		0       , scale_y, 0, 0,
+		1.0f/scale_x , 0      , 0, 0,
+		0       , 1.0f/scale_y, 0, 0,
 		0       , 0      , 1, 0,
 		0       , 0      , 0, 1
 	);

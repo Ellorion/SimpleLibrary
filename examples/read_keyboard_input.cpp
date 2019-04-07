@@ -10,7 +10,6 @@ Window_HandleEvents(Window *window) {
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
-		OpenGL_AdjustScaleViewport(window, true);
 
 		/// Render
 		/// ===================================================================

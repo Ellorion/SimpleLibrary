@@ -298,6 +298,8 @@ ShaderSet_Use(
 		viewport.h = (float)t_window->height;
 
 		Shader_SetValue(shader_set_io, "viewport", (float *)&viewport, 4);
+		Shader_SetValue(shader_set_io, "scale_x", shader_set_io->window->scale_x);
+		Shader_SetValue(shader_set_io, "scale_y", shader_set_io->window->scale_y);
 
 		OpenGL_SetBlending(true);
 	}

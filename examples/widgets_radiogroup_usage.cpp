@@ -46,7 +46,6 @@ Window_HandleEvents(
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
-		OpenGL_AdjustScaleViewport(window);
 		Layout_Rearrange(&layout, window);
 
 		/// hold shift-key to get reverse order

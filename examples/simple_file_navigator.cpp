@@ -196,17 +196,10 @@ Window_HandleEvents(Window *window) {
 	Widget_LoadDirectoryList(&wg_listbox, config.basic.s_path, &a_listing, false);
 	Window_SetTitle(window, config.basic.s_path);
 
-	bool is_zooming = config.window.is_zooming;
-
 	while(window->is_running) {
 		/// events
 		Window_ReadMessage(window);
-
-		/// scaling behavior
-		OpenGL_AdjustScaleViewport(window, is_zooming);
-
-		if (!is_zooming)
-			Layout_Rearrange(&layout, window);
+		Layout_Rearrange(&layout, window);
 
 		/// update
 		Widget_Update(&ap_widgets, keyboard);

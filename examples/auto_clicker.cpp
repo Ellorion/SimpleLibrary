@@ -44,8 +44,6 @@ Window_HandleEvents(
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
-		OpenGL_AdjustScaleViewport(window, false);
-
 		Layout_Rearrange(&layout, {0, 0, window->width, window->height});
 
 		Widget_Update(&ap_widgets, keyboard);

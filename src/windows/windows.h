@@ -73,29 +73,35 @@ Dialog_OpenDirectory(
     return result;
 }
 
+enum WINDOW_SCALE_TYPE {
+	WINDOW_SCALE_EXPAND,
+	WINDOW_SCALE_ASPECT_RATIO,
+///	WINDOW_SCALE_STRETCH, /// @TODO(?)
+};
+
 static const char *class_name = "OpenGL";
 
 struct Mouse;
 struct Keyboard;
 
 struct Window {
-	const char  *title	 	   = 0;
-	HWND   		 hWnd          = 0;
-	HDC    		 hDC           = 0;
-	HGLRC  		 hRC           = 0;
-	float		 x_viewport    = 0;
-	float		 y_viewport    = 0;
-	s32    		 width         = 0;
-	s32    		 height        = 0;
-	bool   		 is_fullscreen = false;
-	bool   		 use_VSync     = false;
-	bool         uses_opengl   = false;
-	bool         is_running    = false;
-	Keyboard    *keyboard      = 0;
-	Mouse       *mouse         = 0;
-	float        scale_x       = 1;
-	float        scale_y       = 1;
-	bool         is_keeping_aspect_ratio = false;
+	const char        *title	 	 = 0;
+	HWND   		       hWnd          = 0;
+	HDC    		       hDC           = 0;
+	HGLRC  		       hRC           = 0;
+	float		       x_viewport    = 0;
+	float		       y_viewport    = 0;
+	s32    		       width         = 0;
+	s32    		       height        = 0;
+	bool   		       is_fullscreen = false;
+	bool   		       use_VSync     = false;
+	bool               uses_opengl   = false;
+	bool               is_running    = false;
+	Keyboard          *keyboard      = 0;
+	Mouse             *mouse         = 0;
+	float              scale_x       = 1;
+	float              scale_y       = 1;
+	WINDOW_SCALE_TYPE  scale_type    = WINDOW_SCALE_EXPAND;
 
 	struct Window_Events {
 		bool on_resized = false;
@@ -527,7 +533,7 @@ instant bool
 Keyboard_Update(Keyboard *, MSG *);
 
 instant bool
-OpenGL_AdjustScaleViewport(Window *, bool);
+OpenGL_AdjustScaleViewport(Window *, WINDOW_SCALE_TYPE);
 
 instant void
 Window_ReadMessage(
@@ -554,7 +560,7 @@ Window_ReadMessage(
 			} break;
 
 			case WINDOW_RESIZE: {
-				OpenGL_AdjustScaleViewport(window_io, window_io->is_keeping_aspect_ratio);
+				OpenGL_AdjustScaleViewport(window_io, window_io->scale_type);
 			} break;
 
 			case WINDOW_TRAY_ICON_CREATE: {

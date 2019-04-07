@@ -114,7 +114,6 @@ Window_HandleEvents(
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
-		OpenGL_AdjustScaleViewport(window, false);
 		Layout_Rearrange(layout_active, window);
 
 		if (window->hotkey_triggered[KEYBOARD_HOTKEY_01])

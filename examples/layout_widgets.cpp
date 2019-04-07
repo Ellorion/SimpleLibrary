@@ -64,10 +64,7 @@ Window_HandleEvents(
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
-		OpenGL_AdjustScaleViewport(window);
-
 		Layout_Rearrange(&layout, {0, 0, window->width, window->height});
-		Layout_Arrange(&layout);
 
 		/// hold shift-key to get reverse tab order
 		Widget_Update(&ap_widgets, keyboard);

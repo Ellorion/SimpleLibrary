@@ -75,6 +75,22 @@ Font_GetSize(
 }
 
 instant void
+Font_SetScale(
+	Font *font
+) {
+	Assert(font);
+
+	font->scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
+
+	stbtt_GetFontVMetrics(&font->info, &font->ascent, &font->descent, &font->linegap);
+	font->ascent  *= font->scale;
+	font->descent *= font->scale;
+	font->linegap *= font->scale;
+
+	font->events.on_size_changed = true;
+}
+
+instant void
 Font_SetSize(
 	Font *font,
 	u32   size
@@ -85,12 +101,8 @@ Font_SetSize(
 		return;
 
 	font->size = size;
-	font->scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
 
-	stbtt_GetFontVMetrics(&font->info, &font->ascent, &font->descent, &font->linegap);
-	font->ascent  *= font->scale;
-	font->descent *= font->scale;
-	font->linegap *= font->scale;
+	Font_SetScale(font);
 
 	font->events.on_size_changed = true;
 }
@@ -475,7 +487,6 @@ Text_HasChanged(
 	bool update_changes
 ) {
 	Assert(text_io);
-	Assert(text_io->font);
 
 	bool has_changed = text_io->s_data.changed;
 
@@ -486,7 +497,8 @@ Text_HasChanged(
 		text_io->s_data.changed = false;
 	}
 
-	has_changed |= text_io->font->events.on_size_changed;
+	if (text_io->font)
+		has_changed |= text_io->font->events.on_size_changed;
 
 	return has_changed;
 }
@@ -857,7 +869,6 @@ Text_AddLines(
 				Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex);
 
 				Vertex_Buffer<float> *t_attribute;
-
 				{
 					Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
 					Array_ReserveAdd(&t_attribute->a_buffer, 2);
@@ -1896,8 +1907,9 @@ Text_Render(
 		OpenGL_Scissor(text_io->shader_set->window, text_io->data.rect);
 
 	/// DEBUG render background rect
-#if DEBUG_TEXT_DRAW_BACKGROUND
 	ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
+
+#if DEBUG_TEXT_DRAW_BACKGROUND
 	Vertex v_bgn = Vertex_Create();
 	Vertex_AddRect32(&v_bgn, text_io->data.rect, {0, 0, 1, 1});
 	Rect_Render(text_io->shader_set, &v_bgn);

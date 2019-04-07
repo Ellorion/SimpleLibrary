@@ -85,7 +85,7 @@ OpenGL_ClearScreen(
 instant bool
 OpenGL_AdjustScaleViewport(
 	Window *window_io,
-	bool keep_aspect_ratio = true
+	WINDOW_SCALE_TYPE type
 ) {
 	Assert(window_io);
 
@@ -99,58 +99,48 @@ OpenGL_AdjustScaleViewport(
 	float x = 0.f;
 	float y = 0.f;
 
-	if (!keep_aspect_ratio) {
-		result =    window_io->width  != new_width
-		         OR window_io->height != new_height;
-
-		glViewport(x, y, new_width, new_height);
-		window_io->scale_x = 1.0f;
-		window_io->scale_y = 1.0f;
-
-		window_io->width  = new_width;
-		window_io->height = new_height;
-
-		if (result)
-			window_io->events.on_resized = true;
-
-		return result;
-	}
-
-	Rect_GetAspect(
-		window_io->width,
-		window_io->height,
-		&new_width,
-		&new_height,
-		&x,
-		&y
-	);
-
-    window_io->x_viewport = x;
-    window_io->y_viewport = y;
-
 	float prev_scale_x = window_io->scale_x;
 	float prev_scale_y = window_io->scale_y;
 
-	if (window_io->width > new_width)
-		window_io->scale_x = (float)new_width / window_io->width;
-	else
-		window_io->scale_x = (float)window_io->width / new_width;
+	if (   type == WINDOW_SCALE_EXPAND
+		OR type == WINDOW_SCALE_ASPECT_RATIO
+	) {
+		if (type == WINDOW_SCALE_ASPECT_RATIO) {
+			Rect_GetAspect(
+				window_io->width,
+				window_io->height,
+				&new_width,
+				&new_height,
+				&x,
+				&y
+			);
+		}
 
+		window_io->x_viewport = x;
+		window_io->y_viewport = y;
 
-	if (window_io->height > new_height)
-		window_io->scale_y = (float)new_height / window_io->height;
-	else
-		window_io->scale_y = (float)window_io->height / new_height;
+		result =    window_io->width  != new_width
+		         OR window_io->height != new_height;
 
-	glViewport(x, y, new_width, new_height);
+		window_io->scale_x = 1.0f;
+		window_io->scale_y = 1.0f;
 
-    if (prev_scale_x != window_io->scale_x)  result = true;
-    if (prev_scale_y != window_io->scale_y)  result = true;
+		glViewport(x, y, new_width, new_height);
 
-    if (result)
+		window_io->width  = new_width;
+		window_io->height = new_height;
+	}
+	else {
+		Assert(false);
+	}
+
+	if (prev_scale_x != window_io->scale_x)  result = true;
+	if (prev_scale_y != window_io->scale_y)  result = true;
+
+	if (result)
 		window_io->events.on_resized = true;
 
-    return result;
+	return result;
 }
 
 instant s32
