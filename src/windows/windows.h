@@ -88,14 +88,18 @@ struct Window {
 	s32    		 width         = 0;
 	s32    		 height        = 0;
 	bool   		 is_fullscreen = false;
-	bool   		 use_VSync      = false;
+	bool   		 use_VSync     = false;
+	bool         uses_opengl   = false;
+	bool         is_running    = false;
 	Keyboard    *keyboard      = 0;
 	Mouse       *mouse         = 0;
 	float        scale_x       = 1;
 	float        scale_y       = 1;
-	bool         is_running    = false;
-	bool         is_zooming    = false;
-	bool         uses_opengl   = false;
+	bool         is_keeping_aspect_ratio = false;
+
+	struct Window_Events {
+		bool on_resized = false;
+	} events;
 
 	struct Icon {
 		bool enable                     = true;
@@ -142,6 +146,7 @@ LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
 		 	switch (wParam) {
 		 		case WINDOW_TRAY_ICON_ID: {
 		 			if (   lParam == WM_LBUTTONUP
+						OR lParam == WM_MBUTTONUP
 						OR lParam == WM_RBUTTONUP
 					) {
 		 				PostMessage(hWnd, WINDOW_TRAY_ICON_HIDE, wParam, lParam);
@@ -361,6 +366,7 @@ Window_Create(
 	Window_ToCenterPosition(&window);
 
 	window.is_running = true;
+	window.is_keeping_aspect_ratio = true;
 
 	if (use_opengl)
 		OpenGL_Init(&window);
@@ -549,7 +555,7 @@ Window_ReadMessage(
 			} break;
 
 			case WINDOW_RESIZE: {
-				OpenGL_AdjustScaleViewport(window_io, window_io->is_zooming);
+				OpenGL_AdjustScaleViewport(window_io, window_io->is_keeping_aspect_ratio);
 			} break;
 
 			case WINDOW_TRAY_ICON_CREATE: {
@@ -606,6 +612,8 @@ Window_UpdateAndResetInput(
 	Window *window
 ) {
 	Assert(window);
+
+	window->events = {};
 
 	/// vsync does not seem to work, when this does not execute,
 	/// so the cpu ends up doing alot more work, because of the

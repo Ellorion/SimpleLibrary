@@ -85,9 +85,11 @@ OpenGL_ClearScreen(
 instant bool
 OpenGL_AdjustScaleViewport(
 	Window *window_io,
-	bool zooming = true
+	bool keep_aspect_ratio = true
 ) {
 	Assert(window_io);
+
+	bool result = false;
 
 	RECT rect_window;
 	GetClientRect(window_io->hWnd, &rect_window);
@@ -97,15 +99,19 @@ OpenGL_AdjustScaleViewport(
 	float x = 0.f;
 	float y = 0.f;
 
-	if (!zooming) {
-		bool result =    window_io->width  != new_width
-		              OR window_io->height != new_height;
+	if (!keep_aspect_ratio) {
+		result =    window_io->width  != new_width
+		         OR window_io->height != new_height;
 
 		glViewport(x, y, new_width, new_height);
 		window_io->scale_x = 1.0f;
 		window_io->scale_y = 1.0f;
+
 		window_io->width  = new_width;
 		window_io->height = new_height;
+
+		if (result)
+			window_io->events.on_resized = true;
 
 		return result;
 	}
@@ -138,10 +144,13 @@ OpenGL_AdjustScaleViewport(
 
 	glViewport(x, y, new_width, new_height);
 
-    if (prev_scale_x != window_io->scale_x) return true;
-    if (prev_scale_y != window_io->scale_y) return true;
+    if (prev_scale_x != window_io->scale_x)  result = true;
+    if (prev_scale_y != window_io->scale_y)  result = true;
 
-    return false;
+    if (result)
+		window_io->events.on_resized = true;
+
+    return result;
 }
 
 instant s32

@@ -41,6 +41,9 @@
 ///     - nameing starts with On... (f.e. OnDidSomething)
 ///     - in case of an array of events: a_On... (f.e. a_OnDoThisAndThat)
 ///
+///		Events (non-delegates):
+///     - nameing starts with on... (f.e. on_happened_something)
+///
 ///     Postfix Pointer Parameter:
 ///     ------------------------------------------------------
 ///     Function parameters with pointers who end in name with

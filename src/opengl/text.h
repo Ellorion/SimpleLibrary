@@ -1,5 +1,7 @@
 #pragma once
 
+#define DEBUG_TEXT_DRAW_BACKGROUND	0
+
 /// ::: Font (TrueType)
 /// ===========================================================================
 struct Font;
@@ -17,13 +19,18 @@ struct Font {
 	stbtt_fontinfo info = {};
 	String s_data;
 	String s_error;
-	s32 size = 0;
+	u32 size = 0;
 	s32 ascent = 0;
 	s32 descent = 0;
 	s32 linegap = 0;
 	float scale = 0.0f;
 	bool filter_linear = false;
 	Array<Codepoint> a_codepoint;
+
+	struct Font_Events {
+		bool on_size_changed = false;
+	} events;
+
 };
 
 bool
@@ -38,6 +45,17 @@ operator == (
 	return false;
 }
 
+/// @Important: must call this at the end of each frame,
+///             in case an event trigger has fired
+instant void
+Font_ResetEvents(
+	Font *font
+) {
+	Assert(font);
+
+	font->events = {};
+}
+
 instant bool
 Font_HasError(
 	Font *font
@@ -45,6 +63,36 @@ Font_HasError(
 	Assert(font);
 
 	return (!String_IsEmpty(&font->s_error));
+}
+
+instant u32
+Font_GetSize(
+	Font *font
+) {
+	Assert(font);
+
+	return font->size;
+}
+
+instant void
+Font_SetSize(
+	Font *font,
+	u32   size
+) {
+	Assert(font);
+
+	if (font->size == size)
+		return;
+
+	font->size = size;
+	font->scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
+
+	stbtt_GetFontVMetrics(&font->info, &font->ascent, &font->descent, &font->linegap);
+	font->ascent  *= font->scale;
+	font->descent *= font->scale;
+	font->linegap *= font->scale;
+
+	font->events.on_size_changed = true;
 }
 
 instant Font
@@ -70,18 +118,11 @@ Font_Load(
 		}
 		else {
 			font.s_data = s_font_data;
-			font.size   = size;
 
 			const u8 *c_data = (u8 *)font.s_data.value;
 
 			stbtt_InitFont(&font.info, c_data, stbtt_GetFontOffsetForIndex(c_data, 0));
-
-			font.scale = stbtt_ScaleForPixelHeight(&font.info, font.size);
-
-			stbtt_GetFontVMetrics(&font.info, &font.ascent, &font.descent, &font.linegap);
-			font.ascent  *= font.scale;
-			font.descent *= font.scale;
-			font.linegap *= font.scale;
+			Font_SetSize(&font, size);
 		}
     }
 
@@ -129,11 +170,10 @@ Codepoint_ToTexture(
 
 	s32 w, h, x_off, y_off;
 
-	float scale = stbtt_ScaleForPixelHeight(&font->info, font->size);
 	unsigned char *bitmap = stbtt_GetCodepointBitmap(
 			&font->info,
 			0,
-			scale,
+			font->scale,
 			codepoint,
 			&w,
 			&h,
@@ -435,6 +475,7 @@ Text_HasChanged(
 	bool update_changes
 ) {
 	Assert(text_io);
+	Assert(text_io->font);
 
 	bool has_changed = text_io->s_data.changed;
 
@@ -444,6 +485,8 @@ Text_HasChanged(
 		text_io->data_prev = text_io->data;
 		text_io->s_data.changed = false;
 	}
+
+	has_changed |= text_io->font->events.on_size_changed;
 
 	return has_changed;
 }
@@ -628,7 +671,7 @@ Text_BuildLines(
 		/// this works without word-wrap (in the code above) due to the lack
 		/// of codepoint data retrieval
 
-		Rect  rect = text->data.rect;
+		Rect rect = text->data.rect;
 
 		Rect_AddPadding(&rect, text->data.rect_padding);
 
@@ -1851,6 +1894,15 @@ Text_Render(
 
 	if (is_fixed_size)
 		OpenGL_Scissor(text_io->shader_set->window, text_io->data.rect);
+
+	/// DEBUG render background rect
+#if DEBUG_TEXT_DRAW_BACKGROUND
+	ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
+	Vertex v_bgn = Vertex_Create();
+	Vertex_AddRect32(&v_bgn, text_io->data.rect, {0, 0, 1, 1});
+	Rect_Render(text_io->shader_set, &v_bgn);
+	Vertex_Destroy(&v_bgn);
+#endif // DEBUG_TEXT_DRAW_BACKGROUND
 
 	/// redraw selection
 	if (text_io->data.is_editable AND text_io->cursor.vertex_select.a_attributes.count) {
