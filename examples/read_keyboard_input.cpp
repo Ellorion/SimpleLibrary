@@ -29,7 +29,7 @@ Window_HandleEvents(Window *window) {
 			}
 		}
 
-		Window_UpdateAndResetInput(window);
+		Window_Render(window);
 	}
 }
 

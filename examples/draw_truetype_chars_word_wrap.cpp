@@ -44,7 +44,7 @@ Window_HandleEvents(
 		Text_Update(&text);
 		Text_Render(&text);
 
-		Window_UpdateAndResetInput(window);
+		Window_Render(window);
 		Font_ResetEvents(&font);
 
 		u32 fps = Time_GetFPS(&timer_fps);

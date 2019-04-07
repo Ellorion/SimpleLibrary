@@ -272,7 +272,7 @@ Window_HandleEvents(
 			Widget_Render(&shader_set, ap_widgets_active);
 		}
 
-		Window_UpdateAndResetInput(window);
+		Window_Render(window);
 		Widget_Reset(ap_widgets_active);
 		Font_ResetEvents(&font_16);
 		Font_ResetEvents(&font_20);

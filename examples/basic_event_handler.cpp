@@ -25,7 +25,7 @@ int main() {
 
 		/// Render
 		/// ===================================================================
-		Window_UpdateAndResetInput(&window);
+		Window_Render(&window);
 	}
 
 	Window_Destroy(&window);

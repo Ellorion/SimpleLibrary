@@ -1,7 +1,5 @@
 #pragma once
 
-#include <shlobj.h>
-
 #define WINDOW_CLOSE	 		WM_USER+0001
 #define WINDOW_RESIZE	 		WM_USER+0002
 #define WINDOW_TRAY_ICON 		WM_USER+0003
@@ -15,6 +13,9 @@
 	WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, LPSTR _cmd_text, int _cmd_show)
 
 #define Window_IsCreated(window) (window->hWnd != 0)
+
+struct Mouse;
+struct Keyboard;
 
 instant bool
 Dialog_OpenFile(
@@ -81,9 +82,6 @@ enum WINDOW_SCALE_TYPE {
 
 static const char *class_name = "OpenGL";
 
-struct Mouse;
-struct Keyboard;
-
 struct Window {
 	const char        *title	 	 = 0;
 	HWND   		       hWnd          = 0;
@@ -116,6 +114,21 @@ struct Window {
 
 	bool hotkey_triggered[KEYBOARD_HOTKEY_ID_COUNT];
 };
+
+/// forward declarations
+/// ===========================================================================
+instant void OpenGL_Init(Window *);
+instant void OpenGL_Destroy(Window *);
+instant bool OpenGL_AdjustScaleViewport(Window *, WINDOW_SCALE_TYPE);
+
+instant void Window_ResetEvents(Window *);
+
+instant bool Keyboard_Update(Keyboard *, MSG *);
+instant void Keyboard_Reset(Keyboard *, bool);
+instant void Keyboard_ResetLastKey(Keyboard *);
+
+instant bool Mouse_Update(Mouse *, Window *, MSG *);
+instant void Mouse_Reset(Mouse *);
 
 LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
 	switch (uMessage) {
@@ -166,8 +179,6 @@ LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
 
 	return DefWindowProc(hWnd, uMessage, wParam, lParam);
 }
-
-instant void OpenGL_Destroy(Window *);
 
 instant void
 Window_Destroy(
@@ -245,8 +256,6 @@ Window_Show(
 
 	return true;
 }
-
-instant void OpenGL_Init(Window *);
 
 instant Window
 Window_Create(
@@ -378,8 +387,6 @@ Window_Create(
 
 	return window;
 }
-
-instant void Keyboard_ResetLastKey(Keyboard *keyboard);
 
 instant void
 Window_AlwaysOnTop(
@@ -526,15 +533,6 @@ Window_Hide(
 	return false;
 }
 
-instant bool
-Mouse_Update(Mouse *, Window *, MSG *);
-
-instant bool
-Keyboard_Update(Keyboard *, MSG *);
-
-instant bool
-OpenGL_AdjustScaleViewport(Window *, WINDOW_SCALE_TYPE);
-
 instant void
 Window_ReadMessage(
 	Window *window_io
@@ -542,6 +540,10 @@ Window_ReadMessage(
 	Assert(window_io);
 
 	MSG msg;
+
+	Window_ResetEvents(window_io);
+	Mouse_Reset(window_io->mouse);
+	Keyboard_Reset(window_io->keyboard, false);
 
 	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
 		Memory_Set(window_io->hotkey_triggered, false, KEYBOARD_HOTKEY_ID_COUNT);
@@ -609,23 +611,24 @@ Window_IsVisible(
 	return IsWindowVisible(window->hWnd);
 }
 
-instant void Mouse_Reset(Mouse *mouse);
-instant void Keyboard_Reset(Keyboard *keyboard, bool full_reset);
-
 instant void
-Window_UpdateAndResetInput(
+Window_Render(
 	Window *window
 ) {
 	Assert(window);
-
-	window->events = {};
 
 	/// vsync does not seem to work, when this does not execute,
 	/// so the cpu ends up doing alot more work, because of the
 	/// increased speed in the loop cicle, if this would be disabled
 	/// for a hidden window
 	SwapBuffers(window->hDC);
+}
 
-	Mouse_Reset(window->mouse);
-	Keyboard_Reset(window->keyboard, false);
+instant void
+Window_ResetEvents(
+	Window *window
+) {
+	Assert(window);
+
+	window->events = {};
 }

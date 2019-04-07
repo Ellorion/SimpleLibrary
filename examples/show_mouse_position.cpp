@@ -26,7 +26,7 @@ Window_HandleEvents(
 			LOG_DEBUG("Mouse pos: x = " << t_point.x << " - y: " << t_point.y);
 		}
 
-		Window_UpdateAndResetInput(window);
+		Window_Render(window);
 	}
 }
 

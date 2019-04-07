@@ -59,7 +59,7 @@ Window_HandleEvents(
 			LOG_DEBUG(fps << " fps");
 		}
 
-		Window_UpdateAndResetInput(window);
+		Window_Render(window);
 	}
 
 	Texture_Destroy(&texture);

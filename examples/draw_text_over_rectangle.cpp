@@ -59,7 +59,7 @@ Window_HandleEvents(
 		ShaderSet_Use(&shader_set, SHADER_PROG_TEXT);
 		Text_Render(&text_box);
 
-		Window_UpdateAndResetInput(window);
+		Window_Render(window);
 		Font_ResetEvents(&font);
 	}
 

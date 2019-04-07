@@ -73,6 +73,7 @@
 #include <winsock.h>
 #include <shlwapi.h>
 #include <iphlpapi.h>
+#include <shlobj.h>
 
 __attribute__((gnu_inline, always_inline))
 __inline__ static void debug_break(void)
