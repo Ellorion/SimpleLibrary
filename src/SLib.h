@@ -18,6 +18,20 @@
 ///		-lShlwapi
 ///		-liphlpapi
 ///
+///     /* debug build*/
+///     -g
+///     /* release build*/
+///     -O2
+///     -s
+///
+///		/* release or stand-alone build */
+///		-static-libgcc
+///		-static-libstdc++
+///		-static
+///
+///		/* Removes startup console window */
+///     -mwindows
+///
 /// Compiler options:
 ///		-fno-exceptions
 ///		-fno-asynchronous-unwind-tables
