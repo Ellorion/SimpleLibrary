@@ -67,6 +67,7 @@ int main() {
 
 		Window_UpdateAndResetInput(&window);
 		Widget_Reset(&ap_widgets);
+		Font_ResetEvents(&font);
 	}
 
 	Widget_Destroy(&ap_widgets);

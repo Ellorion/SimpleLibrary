@@ -61,6 +61,7 @@ Window_HandleEvents(
 		Text_Render(&text_box);
 
 		Window_UpdateAndResetInput(window);
+		Font_ResetEvents(&font);
 	}
 
 	Text_Destroy(&text_box);

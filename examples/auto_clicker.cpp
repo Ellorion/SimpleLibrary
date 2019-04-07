@@ -76,6 +76,7 @@ Window_HandleEvents(
 
 		Window_UpdateAndResetInput(window);
 		Widget_Reset(&ap_widgets);
+		Font_ResetEvents(&font_20);
 	}
 
 	Widget_Destroy(&ap_widgets);

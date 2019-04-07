@@ -256,6 +256,7 @@ Window_HandleEvents(Window *window) {
 
 		Window_UpdateAndResetInput(window);
 		Widget_Reset(&ap_widgets);
+		Font_ResetEvents(&font);
 	}
 
 	/// save changes on exit

@@ -77,6 +77,7 @@ Window_HandleEvents(
 
 		Window_UpdateAndResetInput(window);
 		Widget_Reset(&ap_widgets);
+		Font_ResetEvents(&font_20);
 
 		u32 fps = Time_GetFPS(&timer_fps);
 
