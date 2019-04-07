@@ -366,7 +366,6 @@ Window_Create(
 	Window_ToCenterPosition(&window);
 
 	window.is_running = true;
-	window.is_keeping_aspect_ratio = true;
 
 	if (use_opengl)
 		OpenGL_Init(&window);
