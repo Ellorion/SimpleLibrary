@@ -288,11 +288,30 @@ Array_CreateBuffer(
 	return a_buffer;
 }
 
-template <typename T, typename Func>
+/// @PerformanceBoost: use __forceinline when possible in lambdas,
+///                    but non-custom sort is still faster,
+///                    because it does not use any lambda
+///                    (why does it make a difference in the first place...)
+///
+/// Example:
+/// 	Array_Sort(&a_something, [](u64 one, u64 two) __forceinline -> bool {
+///			return (one < two);
+///		});
+///
+/// Alot better example:
+///		template<typename T>
+///		instant bool
+///     OnCompare(T one, T two) {
+///			return (one > two);
+///		}
+///
+///		Array_Sort(&a_something, OnCompare);
+///
+template <typename T>
 instant void
 Array_Sort(
 	Array<T> *array_io,
-	Func OnCompare
+	bool (*OnCompare)(T one, T two)
 ) {
 	Assert(array_io);
 
@@ -321,7 +340,7 @@ Array_Sort(
 	Sort_Data<T> sort_data;
 	sort_data.begin_io  = &array_io->memory[0];
 	sort_data.end_io    = &array_io->memory[array_io->count - 1];
-	sort_data.type		= type;
+	sort_data.type      = type;
 
 	Sort_Quick(sort_data);
 }
@@ -340,7 +359,7 @@ Array_Sort_Ascending(
 	///        which would be even worst without force-inlining
 	Array_Sort(array_io, SORT_ORDER_ASCENDING);
 
-	///	Array_Sort(array_io, [](T one, T two) __forceinline {
+	///	Array_Sort(array_io, [](T one, T two) __forceinline -> bool {
 	///		return (one < two);
 	///	});
 }
@@ -359,7 +378,7 @@ Array_Sort_Descending(
 	///        which would be even worst without force-inlining
 	Array_Sort(array_io, SORT_ORDER_DESCENDING);
 
-	///	Array_Sort(array_io, [](T one, T two) __forceinline {
+	///	Array_Sort(array_io, [](T one, T two) __forceinline -> {
 	///		return (one > two);
 	///	});
 }
