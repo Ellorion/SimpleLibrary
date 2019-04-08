@@ -1599,7 +1599,7 @@ Text_GetSelection(
 	Text_Cursor *cursor = &text->cursor;
 
 	if (cursor->data.index_select_start > cursor->data.index_select_end)
-		Swap(&cursor->data.index_select_start, &cursor->data.index_select_end);
+		SWAP(u64, &cursor->data.index_select_start, &cursor->data.index_select_end);
 
 	u64 length = cursor->data.index_select_end - cursor->data.index_select_start;
 

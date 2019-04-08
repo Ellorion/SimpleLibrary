@@ -1,20 +1,17 @@
 #include "src/SLib.h"
 #include "test/core.h"
 
-template<typename T>
-bool OnCompareAscending(T one, T two) {
-	return (one > two);
-}
-
-template<typename T>
-bool OnCompareDescending(T one, T two) {
-	return (one < two);
-}
+///
+/// @Note: set DEBUG_BENCHMARK to 1
+///        in SLib.h to see measuring output
+///
 
 int main() {
 	Array<u64> a_test;
 
-	Array_AddRange(&a_test, 1, 10000);
+	FOR(10000, it) {
+		Array_Add(&a_test, (u64)rand());
+	}
 
 	MEASURE_START();
 
@@ -30,16 +27,16 @@ int main() {
 	Array_Sort_Ascending(&a_test);
 	MEASURE_END("Sort-Ascending  again\t\t");
 
-	Array_Sort(&a_test, OnCompareDescending);
+	Array_Sort(&a_test, Sort_OnCompareDescending);
 	MEASURE_END("Sort-Descending (custom)\t");
 
-	Array_Sort(&a_test, OnCompareDescending);
+	Array_Sort(&a_test, Sort_OnCompareDescending);
 	MEASURE_END("Sort-Descending (custom again)\t");
 
-	Array_Sort(&a_test, OnCompareAscending);
+	Array_Sort(&a_test, Sort_OnCompareAscending);
 	MEASURE_END("Sort-Ascending  (custom)\t");
 
-	Array_Sort(&a_test, OnCompareAscending);
+	Array_Sort(&a_test, Sort_OnCompareAscending);
 	MEASURE_END("Sort-Ascending  (custom again)\t");
 
 	return 0;

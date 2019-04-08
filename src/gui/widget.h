@@ -1606,7 +1606,7 @@ Widget_LoadDirectoryList(
 		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_DIR  , show_full_path);
 		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_FILES, show_full_path);
 
-		Array_Sort_Ascending(a_entries_out);
+		Array_Sort(a_entries_out, Directory_Entry_Compare);
 	}
 	else {
 		File_GetDrives(a_entries_out);

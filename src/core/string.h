@@ -437,7 +437,10 @@ String_IsEqual(
 	u64 length = 0,
 	bool is_case_sensitive = true
 ) {
-	return (String_Compare(S(c_first), S(c_second), length, is_case_sensitive) == 0);
+	return (String_Compare(	S(c_first),
+							S(c_second),
+							length,
+							is_case_sensitive) == 0);
 }
 
 instant bool
@@ -447,7 +450,10 @@ String_IsEqual(
 	u64 length = 0,
 	bool is_case_sensitive = true
 ) {
-	return (String_Compare(s_first, s_second, length, is_case_sensitive) == 0);
+	return (String_Compare(	s_first,
+							s_second,
+							length,
+							is_case_sensitive) == 0);
 }
 
 instant String
@@ -483,10 +489,17 @@ String_CopyBuffer(
 	if (c_length == 0)
 		Memory_Copy(c_dest, "\0", 1);
 	else
-	if (c_length  < 0)
-		Memory_Copy(c_dest, s_source.value, s_source.length);
-	else
-		Memory_Copy(c_dest, s_source.value, MIN((u64)c_length, s_source.length));
+	if (c_length  < 0) {
+		Memory_Copy(c_dest,
+					s_source.value,
+					s_source.length);
+	}
+	else {
+		Memory_Copy(c_dest,
+					s_source.value,
+					MIN((u64)c_length,
+					s_source.length));
+	}
 }
 
 instant String
@@ -529,7 +542,11 @@ String_IndexOf(
 		index_start_opt = 0;
 
 	FOR_START(index_start_opt, length_data, index) {
-		if (String_IsEqual(s_data->value + index, s_key.value, s_key.length, is_case_sensitive)) {
+		if (String_IsEqual(	s_data->value + index,
+							s_key.value,
+							s_key.length,
+							is_case_sensitive)
+		) {
 			return index;
 		}
 	}
@@ -562,7 +579,11 @@ String_IndexOfRev(
 		index_start = (s64)s_data->length - 1;
 
 	for(s64 it = index_start; it >= 0; --it) {
-		if (String_IsEqual(s_data->value + it, s_key.value, s_key.length, is_case_sensitive)) {
+		if (String_IsEqual(	s_data->value + it,
+							s_key.value,
+							s_key.length,
+							is_case_sensitive)
+		) {
 			return it;
 		}
 	}
@@ -579,7 +600,10 @@ String_StartWith(
 	if (String_IsEmpty(&s_startwith, false))  return false;
 	if (String_IsEmpty(s_data))               return false;
 
-	return (String_Compare(*s_data, s_startwith, s_startwith.length, is_case_sensitive) == 0);
+	return (String_Compare(*s_data,
+							s_startwith,
+							s_startwith.length,
+							is_case_sensitive) == 0);
 }
 
 instant bool
@@ -591,7 +615,10 @@ String_Find(
 ) {
 	Assert(s_data);
 
-	s64 t_index_found = String_IndexOf(s_data, s_find, index_start, true);
+	s64 t_index_found = String_IndexOf(	s_data,
+										s_find,
+										index_start,
+										true);
 
 	if (t_index_found < 0) {
 		t_index_found = s_data->length - index_start;
@@ -663,7 +690,10 @@ String_EndWith(
 	ts_data.value = ts_data.value + (ts_data.length - s_endwith.length);
 	ts_data.length = s_endwith.length;
 
-	return (String_Compare(ts_data, s_endwith, s_endwith.length, is_case_sensitive) == 0);
+	return (String_Compare(	ts_data,
+							s_endwith,
+							s_endwith.length,
+							is_case_sensitive) == 0);
 }
 
 instant void
@@ -677,7 +707,9 @@ String_ToLower(
 	u64 len_max = s_data_io->length + 1;
 
 	while(index < len_max) {
-		if (s_data_io->value[index] >= 'A' AND s_data_io->value[index] <= 'Z') {
+		if (    s_data_io->value[index] >= 'A'
+			AND s_data_io->value[index] <= 'Z'
+		) {
 			s_data_io->value[index] = s_data_io->value[index] + 32;
 		}
 		++index;
@@ -697,7 +729,9 @@ String_ToUpper(
 	u64 len_max = s_data_io->length + 1;
 
 	while(index < len_max) {
-		if (s_data_io->value[index] >= 'a' AND s_data_io->value[index] <= 'z') {
+		if (    s_data_io->value[index] >= 'a'
+			AND s_data_io->value[index] <= 'z'
+		) {
 			s_data_io->value[index] = s_data_io->value[index] - 32;
 		}
 		++index;
@@ -791,10 +825,14 @@ String_TrimRight(
 	u64 length = s_data_io->length;
 
 	while(length > 0) {
-		if (s_data_io->value[length - 1] <= 32 AND s_data_io->value[length - 1] != 127)
+		if (    s_data_io->value[length - 1] <= 32
+			AND s_data_io->value[length - 1] != 127
+		) {
 			--length;
-		else
+		}
+		else {
 			break;
+		}
 	}
 
 	s_data_io->length  = length;
@@ -825,7 +863,7 @@ String_Remove(
 		return 0;
 
 	if (index_start > index_end)
-		Swap(&index_start, &index_end);
+		SWAP(s64, &index_start, &index_end);
 
 	if (index_end > (s64)s_data_io->length)
 		index_end = s_data_io->length;

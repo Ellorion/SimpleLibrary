@@ -514,4 +514,23 @@ Test_Arrays(
 
 		Array_DestroyContainer(&a_numbers);
 	}
+
+	{
+		u64 max = 10000;
+
+		Array<u64> a_test;
+		Array_Fill(&a_test, max);
+
+		Array_Sort_Descending(&a_test);
+		Array_FillTest(&a_test, SORT_ORDER_DESCENDING);
+
+		Array_Sort_Ascending(&a_test);
+		Array_FillTest(&a_test, SORT_ORDER_ASCENDING);
+
+		Array_Sort(&a_test, Sort_OnCompareDescending);
+		Array_FillTest(&a_test, SORT_ORDER_DESCENDING);
+
+		Array_Sort(&a_test, Sort_OnCompareAscending);
+		Array_FillTest(&a_test, SORT_ORDER_ASCENDING);
+	}
 }

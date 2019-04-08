@@ -4,7 +4,7 @@
 #define SHOW_WARNING			1
 
 #define DEBUG_EVENT_STATUS		0
-#define DEBUG_BENCHMARK			1
+#define DEBUG_BENCHMARK			0
 
 /// Operating System: Windows
 ///
@@ -130,6 +130,9 @@ __inline__ static void debug_break(void)
 #define FOR_START(_start, _max, _it)	\
 	for(u64 _it = _start; _it < _max; ++_it)
 
+#define FOR_START_AUTO(_start, _max, _it)	\
+	for(auto _it = _start; _it < _max; ++_it)
+
 /// ::: Assert
 /// ===========================================================================
 #define	Assert(EX) \
@@ -223,19 +226,28 @@ _AssertMessage(
 #define XOR(_a, _b) \
 	(((_a) AND !(_b)) OR (!(_a) AND (_b)))
 
-template <typename T>
-instant void
-Swap(
-	T *first_io,
-	T *second_io
-) {
-	Assert(first_io);
-	Assert(second_io);
+#define SWAP(type, ptr_a, ptr_b) \
+    do { \
+		type temp = *(ptr_a); \
+		*(ptr_a)  = *(ptr_b); \
+		*(ptr_b)  = temp;     \
+    } while(0)
 
-	T temp = *first_io;
-	*first_io = *second_io;
-	*second_io = temp;
-}
+/// @Depricated: alot slower than the macro version,
+///              even when using FORCEINLINE...
+//template <typename T>
+//instant void
+//Swap(
+//	T *first_io,
+//	T *second_io
+//) {
+//	Assert(first_io);
+//	Assert(second_io);
+//
+//	T temp = *first_io;
+//	*first_io = *second_io;
+//	*second_io = temp;
+//}
 
 struct Point {
 	float x = 0.0f;
@@ -357,6 +369,7 @@ ToInt(
 
 #include "utility/clipboard.h"
 #include "utility/file_watcher.h"
+#include "utility/helper.h"
 
 /// interlocking dependencies
 #include "windows/windows.h"
