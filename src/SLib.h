@@ -196,10 +196,10 @@ _AssertMessage(
 		Time_Measure(&DEBUG_tmr_measure);
 
 	#define MEASURE_END(_text) \
-		std::cout << "Measure [" << __FUNCTION__ << "]: " << _text << Time_Measure(&DEBUG_tmr_measure) << " ms" << std::endl;
+		std::cout << "Measure [" << __FUNCTION__ << "]: " << _text << " " << Time_Measure(&DEBUG_tmr_measure) << " ms" << std::endl;
 
 #define MEASURE_END_AVG(_text, _count) \
-		std::cout << "Measure [" << __FUNCTION__ << "]: " << _text << (Time_Measure(&DEBUG_tmr_measure) / _count) << " ms" << std::endl;
+		std::cout << "Measure [" << __FUNCTION__ << "]: " << _text << " " << (Time_Measure(&DEBUG_tmr_measure) / _count) << " ms" << std::endl;
 #else
 	#define MEASURE_START()
 	#define MEASURE_END(_text)
