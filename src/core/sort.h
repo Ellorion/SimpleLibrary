@@ -30,6 +30,60 @@ struct Sort_Data {
 
 template <typename T>
 instant void
+Sort_Bubble(
+	Sort_Data<T> sort_data
+) {
+	u64 count = (sort_data.end_io - sort_data.begin_io) + 1;
+
+	if (count <= 1)
+		return;
+
+    FOR(count - 1, i) {
+		FOR(count - i - 1, j) {
+			if (sort_data.OnCompare(
+					sort_data.begin_io[j],
+					sort_data.begin_io[j+1]
+				) > 0
+			) {
+				SWAP(
+					T,
+					&sort_data.begin_io[j],
+					&sort_data.begin_io[j+1]
+				);
+			}
+		}
+    }
+}
+
+template <typename T>
+instant void
+Sort_Insertion(
+	Sort_Data<T> sort_data
+) {
+	u64 count = (sort_data.end_io - sort_data.begin_io) + 1;
+
+	if (count <= 1)
+		return;
+
+	T *element = sort_data.begin_io;
+
+    FOR_START(1, count, it) {
+        T value = element[it];
+		s64 index_find = it - 1;
+
+		while(    index_find >= 0
+			  AND (sort_data.OnCompare(element[index_find], value) > 0)
+		) {
+			element[index_find + 1] = element[index_find];
+			--index_find;
+		}
+
+		element[index_find + 1] = value;
+    }
+}
+
+template <typename T>
+instant void
 Sort_Quick(
 	Sort_Data<T> sort_data
 ) {
@@ -38,6 +92,11 @@ Sort_Quick(
 
 	/// middle of the continuous memory
 	T  pivot = *(left + ((right - left) >> 1));
+
+	if ((right - left) < 30) {
+		Sort_Insertion(sort_data);
+		return;
+	}
 
 	while(left <= right) {
         while(sort_data.OnCompare(*left , pivot) < 0)
