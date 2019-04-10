@@ -1125,7 +1125,7 @@ operator != (
 	String &s_data1,
 	String &s_data2
 ) {
-	return !String_IsEqual(s_data1, s_data2);
+	return !(s_data1 == s_data2);
 }
 
 bool
@@ -1141,24 +1141,6 @@ operator < (
 	}
 
 	if (s_data1.length < s_data2.length)  return true;
-
-	return false;
-}
-
-/// @Testing
-bool
-operator <= (
-	String &s_data1,
-	String &s_data2
-) {
-	u64 length = MIN(s_data1.length, s_data2.length);
-
-	FOR(length, it) {
-		if (s_data1.value[it] <= s_data2.value[it]) return true;
-		if (s_data1.value[it] >  s_data2.value[it]) return false;
-	}
-
-	if (s_data1.length <= s_data2.length)  return true;
 
 	return false;
 }
@@ -1182,20 +1164,20 @@ operator > (
 
 /// @Testing
 bool
+operator <= (
+	String &s_data1,
+	String &s_data2
+) {
+	return !(s_data1 > s_data2);
+}
+
+/// @Testing
+bool
 operator >= (
 	String &s_data1,
 	String &s_data2
 ) {
-	u64 length = MIN(s_data1.length, s_data2.length);
-
-	FOR(length, it) {
-		if (s_data1.value[it] >= s_data2.value[it]) return true;
-		if (s_data1.value[it] <  s_data2.value[it]) return false;
-	}
-
-	if (s_data1.length >= s_data2.length)  return true;
-
-	return false;
+	return !(s_data1 < s_data2);
 }
 
 /// string - const char *

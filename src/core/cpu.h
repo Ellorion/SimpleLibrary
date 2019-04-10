@@ -42,17 +42,18 @@ CPU_GetID(
 		: "a" (id), "c" (0));
 }
 
-instant char *
+instant String
 CPU_GetVendor() {
 	CPU_ID cpu_id;
 	CPU_GetID(0, &cpu_id);
 
-	char *vendor = Memory_Create(char, 13);
-	Memory_Copy(vendor + 0, (char*)&cpu_id.EBX, 4);
-	Memory_Copy(vendor + 4, (char*)&cpu_id.EDX, 4);
-	Memory_Copy(vendor + 8, (char*)&cpu_id.ECX, 4);
+	String s_vendor = String_CreateBuffer(12);
 
-	return vendor;
+	Memory_Copy(s_vendor.value + 0, (char*)&cpu_id.EBX, 4);
+	Memory_Copy(s_vendor.value + 4, (char*)&cpu_id.EDX, 4);
+	Memory_Copy(s_vendor.value + 8, (char*)&cpu_id.ECX, 4);
+
+	return s_vendor;
 }
 
 instant CPU_Type
@@ -74,10 +75,10 @@ CPU_GetInfo() {
 
 instant CPU_Features
 CPU_GetFeatures() {
-	char *vendor_name = CPU_GetVendor();
+	String s_vendor = CPU_GetVendor();
 
-	bool is_Intel 	= String_IsEqual(vendor_name, "GenuineIntel");
-	bool is_AMD 	= String_IsEqual(vendor_name, "AuthenticAMD");
+	bool is_Intel = (s_vendor == "GenuineIntel");
+	bool is_AMD   = (s_vendor == "AuthenticAMD");
 
 	CPU_ID cpu_id;
 	CPU_GetID(1, &cpu_id);
@@ -99,13 +100,13 @@ CPU_GetFeatures() {
 		}
 	}
 
-	Memory_Free(vendor_name);
+	String_Destroy(&s_vendor);
 
 	return (cpu_features);
 }
 
 instant Array<String>
-CPU_GetFeaturesName(
+CPU_GetFeaturesList(
 ) {
 	Array<String> a_features_out;
 
