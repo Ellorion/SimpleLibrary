@@ -1,3 +1,7 @@
+///
+/// @Obsolete since custom Array_Find implementation
+///
+
 #pragma once
 
 template <typename K, typename V>

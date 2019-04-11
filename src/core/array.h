@@ -210,6 +210,28 @@ Array_Find(
 	return false;
 }
 
+template <typename T, typename Func>
+instant bool
+Array_Find(
+	Array<T> *array,
+	T find,
+	u64 *index_opt,
+	Func OnSearch
+) {
+	Assert(array);
+
+	FOR_ARRAY(*array, it) {
+		if (OnSearch(ARRAY_IT(*array, it), find)) {
+			if (index_opt)
+				*index_opt = it;
+
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /// true if found / existed already
 template <typename T>
 instant bool

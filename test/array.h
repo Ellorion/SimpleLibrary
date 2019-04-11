@@ -1,5 +1,14 @@
 #pragma once
 
+template <typename T>
+instant bool
+Array_OnSearch(
+	T element,
+	T find
+) {
+	return (element.a == find.a);
+}
+
 void
 Test_Arrays(
 ) {
@@ -532,5 +541,46 @@ Test_Arrays(
 
 		Array_Sort(&a_test, Sort_OnCompareAscending);
 		Array_FillTest(&a_test, SORT_ORDER_ASCENDING);
+	}
+
+	{
+		struct test {
+			int  a = 0;
+			char b = 0;
+		};
+
+		Array<test> a_test;
+		Array_Add(&a_test, {1, 'a'});
+		Array_Add(&a_test, {2, 'b'});
+		Array_Add(&a_test, {3, 'c'});
+		Array_Add(&a_test, {4, 'd'});
+		Array_Add(&a_test, {5, 'e'});
+
+		u64 index = 0;
+		bool success = false;
+
+		{
+			success = Array_Find(&a_test, {3, 0}, &index, [](auto element, auto find) {
+				return (element.a == find.a);
+			});
+
+			Assert(success AND index == 2);
+
+		}
+		{
+			success = Array_Find(&a_test, {6, 0}, &index, [](auto element, auto find) {
+				return (element.a == find.a);
+			});
+
+			Assert(!success);
+		}
+		{
+			success = Array_Find(&a_test, {1, 0}, &index, Array_OnSearch<test>);
+			Assert(success AND index == 0);
+		}
+		{
+			success = Array_Find(&a_test, {0, 0}, &index, Array_OnSearch<test>);
+			Assert(!success);
+		}
 	}
 }
