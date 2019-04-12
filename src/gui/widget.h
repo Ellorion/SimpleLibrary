@@ -1190,7 +1190,7 @@ Widget_CalcActiveRowID(
 }
 
 instant void
-Widget_RadioGroup_Link(
+Widget_LinkRadiogroup(
 	Array<Widget *> *ap_radiogroup
 ) {
 	Assert(ap_radiogroup);
@@ -1202,12 +1202,16 @@ Widget_RadioGroup_Link(
 }
 
 instant void
-Widget_RadioGroup_Set(
+Widget_ToggleCheckbox(
 	Widget *widget_io
 ) {
 	Assert(widget_io);
 	Assert(widget_io->data.is_checkable);
-	Assert(widget_io->data.ap_radiogroup);
+
+	if (!widget_io->data.ap_radiogroup) {
+		widget_io->data.is_checked = !widget_io->data.is_checked;
+		return;
+	}
 
 	FOR_ARRAY(*widget_io->data.ap_radiogroup, it) {
 		Widget *t_widget = ARRAY_IT(*widget_io->data.ap_radiogroup, it);
@@ -1315,7 +1319,7 @@ Widget_UpdateInput(
 
 			/// checkbox toggle + radiogroup option
 			if (got_focus AND widget_io->data.is_checkable) {
-				Widget_RadioGroup_Set(widget_io);
+				Widget_ToggleCheckbox(widget_io);
 			}
 
 			/// focus change
@@ -1363,7 +1367,7 @@ Widget_UpdateInput(
 		if (    widget_io->data.is_checkable
 			AND (is_key_return OR is_key_space)
 		) {
-			Widget_RadioGroup_Set(widget_io);
+			Widget_ToggleCheckbox(widget_io);
 		}
 
 		if (is_scrollable_list) {
@@ -2275,6 +2279,11 @@ Widget_Reset(
 	Widget *widget_io
 ) {
 	Assert(widget_io);
+
+	FOR_ARRAY(widget_io->a_subwidgets, it) {
+		Widget *t_widget = &ARRAY_IT(widget_io->a_subwidgets, it);
+		Widget_Reset(t_widget);
+	}
 
 	/// Reset per Frame Event Data
 	widget_io->events = {};

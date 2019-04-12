@@ -15,6 +15,17 @@ struct ShaderSet {
 };
 
 instant void
+ShaderSet_SetWindow(
+	ShaderSet *shader_set,
+	Window *window
+) {
+	Assert(shader_set);
+	Assert(window);
+
+	shader_set->window = window;
+}
+
+instant void
 ShaderProgram_Add(
 	ShaderProgram *shader_prog_out,
 	u32 type,
@@ -101,18 +112,18 @@ ShaderSet_Create(
 ) {
 	Assert(window);
 
-	ShaderSet t_shader_set;
-	t_shader_set.window = window;
+	ShaderSet shader_set;
+	ShaderSet_SetWindow(&shader_set, window);
 
-	ShaderSet_Add(&t_shader_set, &shader_rect);
-	ShaderSet_Add(&t_shader_set, &shader_text);
-	ShaderSet_Add(&t_shader_set, &shader_texture_full);
-	ShaderSet_Add(&t_shader_set, &shader_texture_size);
+	ShaderSet_Add(&shader_set, &shader_rect);
+	ShaderSet_Add(&shader_set, &shader_text);
+	ShaderSet_Add(&shader_set, &shader_texture_full);
+	ShaderSet_Add(&shader_set, &shader_texture_size);
 
-	AssertMessage(	t_shader_set.a_shaders.count == SHADER_PROG_COUNT,
+	AssertMessage(	shader_set.a_shaders.count == SHADER_PROG_COUNT,
 					"[ShaderSet] Shader missing compared to SHADER_PROG_TYPE count.");
 
-	return t_shader_set;
+	return shader_set;
 }
 
 inline void
@@ -252,6 +263,30 @@ Shader_BindAndUseIndex0(
 	Shader_SetValue(shader_set, name, 0);
 }
 
+instant void
+ShaderSet_UpdateViewport(
+	ShaderSet *shader_set_io
+) {
+	if (!shader_set_io->window)
+		return;
+
+	RectF viewport;
+	Window *t_window = shader_set_io->window;
+
+	viewport.x = t_window->x_viewport;
+	viewport.y = t_window->y_viewport;
+	viewport.w = (float)t_window->width;
+	viewport.h = (float)t_window->height;
+
+	Shader_SetValue(shader_set_io, "viewport", (float *)&viewport, 4);
+
+/// @Testing
+//	Shader_SetValue(shader_set_io, "scale_x", shader_set_io->window->scale_x);
+//	Shader_SetValue(shader_set_io, "scale_y", shader_set_io->window->scale_y);
+
+	OpenGL_SetBlending(true);
+}
+
 inline void
 ShaderSet_Use(
 	ShaderSet *shader_set_io,
@@ -276,9 +311,13 @@ ShaderSet_Use(
 		} break;
 	}
 
-	/// reset uniforms
-	Shader_SetValue(shader_set_io, "x_offset", 0.0f);
-	Shader_SetValue(shader_set_io, "y_offset", 0.0f);
+/// @Testing
+//	/// reset uniforms
+//	Shader_SetValue(shader_set_io, "x_offset", 0.0f);
+//	Shader_SetValue(shader_set_io, "y_offset", 0.0f);
+
+	if (shader_set_io->window AND shader_set_io->window->events.on_resized)
+		ShaderSet_UpdateViewport(shader_set_io);
 
 	if (prev_active_id == shader_set_io->active_id)
 		return;
@@ -288,19 +327,5 @@ ShaderSet_Use(
 
 	glUseProgram(shader_prog->id);
 
-	if (shader_set_io->window) {
-		RectF viewport;
-		Window *t_window = shader_set_io->window;
-
-		viewport.x = t_window->x_viewport;
-		viewport.y = t_window->y_viewport;
-		viewport.w = (float)t_window->width;
-		viewport.h = (float)t_window->height;
-
-		Shader_SetValue(shader_set_io, "viewport", (float *)&viewport, 4);
-		Shader_SetValue(shader_set_io, "scale_x", shader_set_io->window->scale_x);
-		Shader_SetValue(shader_set_io, "scale_y", shader_set_io->window->scale_y);
-
-		OpenGL_SetBlending(true);
-	}
+	ShaderSet_UpdateViewport(shader_set_io);
 }

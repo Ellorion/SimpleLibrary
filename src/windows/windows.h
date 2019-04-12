@@ -83,23 +83,26 @@ enum WINDOW_SCALE_TYPE {
 static const char *class_name = "OpenGL";
 
 struct Window {
-	const char        *title	 	 = 0;
-	HWND   		       hWnd          = 0;
-	HDC    		       hDC           = 0;
-	HGLRC  		       hRC           = 0;
-	float		       x_viewport    = 0;
-	float		       y_viewport    = 0;
-	s32    		       width         = 0;
-	s32    		       height        = 0;
-	bool   		       is_fullscreen = false;
-	bool   		       use_VSync     = false;
-	bool               uses_opengl   = false;
-	bool               is_running    = false;
-	Keyboard          *keyboard      = 0;
-	Mouse             *mouse         = 0;
-	float              scale_x       = 1;
-	float              scale_y       = 1;
-	WINDOW_SCALE_TYPE  scale_type    = WINDOW_SCALE_EXPAND;
+	const char        *title	 	  = 0;
+	HWND   		       hWnd           = 0;
+	HDC    		       hDC            = 0;
+	HGLRC  		       hRC            = 0;
+	float		       x_viewport     = 0;
+	float		       y_viewport     = 0;
+	s32    		       width          = 0;
+	s32    		       height         = 0;
+	bool   		       is_fullscreen  = false;
+	bool   		       use_VSync      = false;
+	bool               uses_opengl    = false;
+	bool               is_running     = false;
+	Keyboard          *keyboard       = 0;
+	Mouse             *mouse          = 0;
+	float              scale_x        = 1;
+	float              scale_y        = 1;
+	WINDOW_SCALE_TYPE  scale_type     = WINDOW_SCALE_EXPAND;
+
+	s32                default_width  = 0;
+	s32                default_height = 0;
 
 	struct Window_Events {
 		bool on_resized = false;
@@ -382,6 +385,10 @@ Window_Create(
 
 	window.is_running = true;
 
+	/// for scaling factor
+	window.default_width  = window.width;
+	window.default_height = window.height;
+
 	if (use_opengl)
 		OpenGL_Init(&window);
 
@@ -631,4 +638,22 @@ Window_ResetEvents(
 	Assert(window);
 
 	window->events = {};
+}
+
+instant bool
+Window_IsRunning(
+	Window *window
+) {
+	Assert(window);
+
+	return window->is_running;
+}
+
+instant void
+Window_Close(
+	Window *window
+) {
+	Assert(window);
+
+	window->is_running = false;
 }

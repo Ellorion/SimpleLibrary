@@ -9,9 +9,7 @@ struct Vertex_Buffer {
 };
 
 struct Vertex_Settings {
-	bool  flip_h = false;
-//	float scale_x = 1.0f;
-//	float scale_y = 1.0f;
+	bool flip_h = false;
 };
 
 ///@Hint: does not take texture ownership
@@ -113,6 +111,20 @@ Vertex_Destroy(
 	Array_DestroyContainer(&vertex_out->a_attributes);
 
 	*vertex_out = {};
+}
+
+instant void
+Array_Destroy(
+	Array<Vertex> *a_vertex
+) {
+	Assert(a_vertex);
+
+	FOR_ARRAY(*a_vertex, it) {
+		Vertex *t_vertex = &ARRAY_IT(*a_vertex, it);
+		Vertex_Destroy(t_vertex);
+	}
+
+	Array_DestroyContainer(a_vertex);
 }
 
 inline void
@@ -269,6 +281,15 @@ Vertex_ClearAttributes(
 	}
 }
 
+instant void
+Array_Clear(
+	Array<Vertex> *a_vertex
+) {
+	Assert(a_vertex);
+
+	Vertex_ClearAttributes(a_vertex);
+}
+
 inline void
 Vertex_Render(
 	ShaderSet *shader_set,
@@ -292,8 +313,6 @@ Vertex_Render(
 	Assert(a_positions->group_count);
 
 	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip_h);
-//	Shader_SetValue(shader_set, "scale_x", vertex->settings.scale_x);
-//	Shader_SetValue(shader_set, "scale_y", vertex->settings.scale_y);
 
 	glDrawArrays(GL_POINTS, 0, a_positions->a_buffer.count / a_positions->group_count);
 }

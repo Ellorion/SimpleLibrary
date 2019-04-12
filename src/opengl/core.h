@@ -49,15 +49,15 @@ OpenGL_Destroy(
 
 instant void
 OpenGL_UseVSync(
-	Window *window_out,
+	Window *window_io,
 	bool enable
 ) {
-	Assert(window_out);
+	Assert(window_io);
 
 	if(wglSwapIntervalEXT)
 		wglSwapIntervalEXT(enable);
 
-	window_out->use_VSync = enable;
+	window_io->use_VSync = enable;
 
 	LOG_DEBUG("VSync: " << (enable
 							? "enabled."
@@ -122,8 +122,16 @@ OpenGL_AdjustScaleViewport(
 		result =    window_io->width  != new_width
 		         OR window_io->height != new_height;
 
-		window_io->scale_x = 1.0f;
-		window_io->scale_y = 1.0f;
+		if (window_io->default_width > new_width)
+			window_io->scale_x = (float)window_io->default_width / new_width;
+		else
+			window_io->scale_x = (float)new_width / window_io->default_width;
+
+
+		if (window_io->default_height > new_height)
+			window_io->scale_y = (float)window_io->default_height / new_height;
+		else
+			window_io->scale_y = (float)new_height / window_io->default_height;
 
 		glViewport(x, y, new_width, new_height);
 
@@ -161,10 +169,10 @@ OpenGL_Scissor(
 	Assert(window);
 
 	/// convert to right-hand coordinate system
-	float t_x = x / window->scale_x + window->x_viewport;
-	float t_y = (window->height - y - h) / window->scale_y + window->y_viewport;
-	s32   t_w = w / window->scale_x;
-	s32   t_h = h / window->scale_y;
+	float t_x = x + window->x_viewport;
+	float t_y = (window->height - y - h) + window->y_viewport;
+	s32   t_w = w;
+	s32   t_h = h;
 
 	glEnable(GL_SCISSOR_TEST);
 	glScissor(t_x, t_y, t_w, t_h);
@@ -183,10 +191,10 @@ OpenGL_Scissor(
 	s32   h = rect.h;
 
 	/// convert to right-hand coordinate system
-	float t_x = x / window->scale_x + window->x_viewport;
-	float t_y = (window->height - y - h) / window->scale_y + window->y_viewport;
-	s32   t_w = w / window->scale_x;
-	s32   t_h = h / window->scale_y;
+	float t_x = x + window->x_viewport;
+	float t_y = (window->height - y - h) + window->y_viewport;
+	s32   t_w = w;
+	s32   t_h = h;
 
 	glEnable(GL_SCISSOR_TEST);
 	glScissor(t_x, t_y, t_w, t_h);
