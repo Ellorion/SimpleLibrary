@@ -226,7 +226,8 @@ Widget_AddRow(
 	/// list contained in subwidgets
 	switch (widget_io->type) {
 		case WIDGET_COMBOBOX: {
-			widget_io = &ARRAY_IT(widget_io->a_subwidgets, 2);
+			widget_io = &ARRAY_IT(	widget_io->a_subwidgets,
+									WIDGET_COMBOBOX_LIST);
 		} break;
 
 		default: {} break;

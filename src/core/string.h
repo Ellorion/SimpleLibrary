@@ -152,8 +152,20 @@ String_AddOffset(
 	Assert(s_data_io);
 	Assert(s_data_io->is_reference);
 
-	s_data_io->value  += offset;
-	s_data_io->length -= offset;
+	u64 prev_length = s_data_io->length;
+	u64 next_length = prev_length -= offset;
+
+	/// underflow prevention
+	if (    offset > 0
+		AND next_length > prev_length
+	) {
+		s_data_io->value  += s_data_io->length;
+		s_data_io->length -= s_data_io->length;
+	}
+	else {
+		s_data_io->value  += offset;
+		s_data_io->length -= offset;
+	}
 }
 
 instant bool
@@ -1183,7 +1195,7 @@ operator >= (
 /// string - const char *
 bool
 operator == (
-	String		&s_data1,
+	String		 s_data1,
 	const char	*c_data2
 ) {
 	return String_IsEqual(s_data1, S(c_data2));
@@ -1192,14 +1204,14 @@ operator == (
 bool
 operator == (
 	const char 	*c_data1,
-	String 		&s_data2
+	String 		 s_data2
 ) {
 	return (s_data2 == c_data1);
 }
 
 bool
 operator != (
-	String		&s_data1,
+	String		 s_data1,
 	const char	*c_data2
 ) {
 	return !(s_data1 == c_data2);
@@ -1208,7 +1220,7 @@ operator != (
 bool
 operator != (
 	const char 	*c_data1,
-	String 		&s_data2
+	String 		 s_data2
 ) {
 	return !(s_data2 == c_data1);
 }

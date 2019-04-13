@@ -287,6 +287,16 @@ ShaderSet_UpdateViewport(
 	OpenGL_SetBlending(true);
 }
 
+instant void
+ShaderSet_ResetUniforms(
+	ShaderSet *shader_set
+) {
+	Assert(shader_set);
+
+	Shader_SetValue(shader_set, "x_offset", 0.0f);
+	Shader_SetValue(shader_set, "y_offset", 0.0f);
+}
+
 inline void
 ShaderSet_Use(
 	ShaderSet *shader_set_io,
@@ -312,9 +322,7 @@ ShaderSet_Use(
 	}
 
 /// @Testing
-//	/// reset uniforms
-//	Shader_SetValue(shader_set_io, "x_offset", 0.0f);
-//	Shader_SetValue(shader_set_io, "y_offset", 0.0f);
+	ShaderSet_ResetUniforms(shader_set_io);
 
 	if (shader_set_io->window AND shader_set_io->window->events.on_resized)
 		ShaderSet_UpdateViewport(shader_set_io);

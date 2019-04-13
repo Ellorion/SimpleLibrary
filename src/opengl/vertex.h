@@ -333,7 +333,7 @@ Vertex_Render(
 	}
 }
 
-instant void
+instant bool
 Vertex_FindOrAdd(
 	Array<Vertex> *a_vertex_io,
 	Texture *texture_find,
@@ -347,15 +347,17 @@ Vertex_FindOrAdd(
 	Vertex t_vertex_find;
 	t_vertex_find.texture = *texture_find;
 
-	Array_FindOrAdd(a_vertex_io, t_vertex_find, &t_vertex_entry);
+	bool found = Array_FindOrAdd(a_vertex_io, t_vertex_find, &t_vertex_entry);
 
 	if (!t_vertex_entry->array_id)
 		Vertex_Create(t_vertex_entry);
 
 	*entry_out = t_vertex_entry;
+
+	return found;
 }
 
-instant void
+instant bool
 Vertex_FindOrAddAttribute(
 	Vertex *vertex_io,
 	u32 group_count,
@@ -370,7 +372,7 @@ Vertex_FindOrAddAttribute(
 	t_attribute_find.name = c_attribute_name;
 	t_attribute_find.group_count = group_count;
 
-	Array_FindOrAdd(&vertex_io->a_attributes, t_attribute_find, a_buffer_out);
+	return Array_FindOrAdd(&vertex_io->a_attributes, t_attribute_find, a_buffer_out);
 }
 
 instant void

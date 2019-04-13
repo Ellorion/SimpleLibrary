@@ -408,6 +408,10 @@ struct Text_Cursor {
 	Vertex vertex_cursor;
 };
 
+/// @todo: - rename to text_config
+///        - make data from word split
+///        - put that in a_row_data in widget
+///        - render with updating default text
 struct Text_Data {
 	Rect rect 			= {}; /// draw area
 	Rect rect_padding 	= {};
@@ -816,10 +820,12 @@ Text_AddLines(
 	u64 width_max = rect.w;
 
 	if (!width_max) {
-		FOR_ARRAY(*a_text_lines, it_line) {
-			Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
-			width_max = MAX(width_max, t_text_line->width_pixel);
-		}
+		width_max = text->data.content_width;
+
+//		FOR_ARRAY(*a_text_lines, it_line) {
+//			Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
+//			width_max = MAX(width_max, t_text_line->width_pixel);
+//		}
 	}
 
 	float x_line_start = rect.x;
@@ -866,17 +872,25 @@ Text_AddLines(
 			/// for unavailable characters like ' '
 			if (!Texture_IsEmpty(&codepoint.texture) AND codepoint.codepoint > 32) {
 				Vertex *t_vertex;
-				Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex);
-
 				Vertex_Buffer<float> *t_attribute;
-				{
+
+				if (!Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex)) {
 					Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
+					Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
+				}
+				{
+					t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
+					Assert(S("vertex_position") == t_attribute->name);
+
 					Array_ReserveAdd(&t_attribute->a_buffer, 2);
 					Array_Add(&t_attribute->a_buffer, rect_position.x + x_align_offset);
 					Array_Add(&t_attribute->a_buffer, rect_position.y);
 				}
+
 				{
-					Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
+					t_attribute = &ARRAY_IT(t_vertex->a_attributes, 1);
+					Assert(S("text_color") == t_attribute->name);
+
 					Array_ReserveAdd(&t_attribute->a_buffer, 3);
 					Array_Add(&t_attribute->a_buffer, text->data.color.r);
 					Array_Add(&t_attribute->a_buffer, text->data.color.g);

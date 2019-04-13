@@ -1,5 +1,7 @@
 #pragma once
 
+#define DEBUG_MODE				1
+
 #define SHOW_INFO				0
 #define SHOW_WARNING			1
 
@@ -135,11 +137,19 @@ __inline__ static void debug_break(void)
 
 /// ::: Assert
 /// ===========================================================================
-#define	Assert(EX) \
-	(void)((EX) OR (_Assert(#EX, __FILE__, __LINE__), 0))
+#if DEBUG_MODE
+#define		Assert(EX) \
+				(void)((EX) OR (_Assert(#EX, __FILE__, __LINE__), 0))
+#else
+#define		Assert(EX)
+#endif // DEBUG_MODE
 
-#define AssertMessage(EX, INFO) \
-	(void)((EX) OR (_AssertMessage(INFO, __FILE__, __LINE__), 0))
+#if DEBUG_MODE
+#define		AssertMessage(EX, INFO) \
+				(void)((EX) OR (_AssertMessage(INFO, __FILE__, __LINE__), 0))
+#else
+#define		AssertMessage(EX, INFO)
+#endif // DEBUG_MODE
 
 instant void
 _Assert(
