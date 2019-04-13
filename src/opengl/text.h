@@ -805,6 +805,77 @@ Text_GetAlignOffsetX(
 }
 
 instant void
+Text_ReserveMemory(
+	Font             *font,
+	Array<Vertex>    *a_vertex_chars_io,
+	Array<Text_Line> *a_text_lines
+) {
+	Assert(font);
+	Assert(a_text_lines);
+	Assert(a_vertex_chars_io);
+
+	FOR_ARRAY(*a_text_lines, it_line) {
+		Text_Line *text_line = &ARRAY_IT(*a_text_lines, it_line);
+
+		String s_data_it = S(text_line->s_data);
+
+		while(!String_IsEmpty(&s_data_it)) {
+			Codepoint codepoint;
+			s32 utf_byte_count = 0;
+
+			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
+
+ 			Codepoint_GetDataConditional(
+				font,
+				cp,
+				&codepoint,
+				0,
+				0
+			);
+
+			/// for unavailable characters like ' '
+			if (!Texture_IsEmpty(&codepoint.texture) AND codepoint.codepoint > 32) {
+				Vertex *t_vertex;
+				Vertex_Buffer<float> *t_attribute;
+
+				if (!Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex)) {
+					Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
+					Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
+				}
+				{
+					t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
+					Assert(S("vertex_position") == t_attribute->name);
+
+					t_attribute->group_count += 2;
+				}
+
+				{
+					t_attribute = &ARRAY_IT(t_vertex->a_attributes, 1);
+					Assert(S("text_color") == t_attribute->name);
+
+					t_attribute->group_count += 3;
+				}
+			}
+
+			String_AddOffset(&s_data_it, utf_byte_count);
+		}
+	}
+
+	Vertex_Buffer<float> *t_attribute;
+
+	FOR_ARRAY(*a_vertex_chars_io, it) {
+		Vertex *t_vertex = &ARRAY_IT(*a_vertex_chars_io, it);
+		t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
+		Array_Reserve(&t_attribute->a_buffer, t_attribute->group_count);
+		t_attribute->group_count = 2;
+
+		t_attribute = &ARRAY_IT(t_vertex->a_attributes, 1);
+		Array_Reserve(&t_attribute->a_buffer, t_attribute->group_count);
+		t_attribute->group_count = 3;
+	}
+}
+
+instant void
 Text_AddLines(
 	Text *text,
 	Array<Vertex>    *a_vertex_chars_io,
@@ -998,6 +1069,14 @@ Text_Update(
 	FOR_ARRAY(text_io->a_text_lines, it_line) {
 		Text_Line *t_line = &ARRAY_IT(text_io->a_text_lines, it_line);
 		text_io->data.content_width = MAX(text_io->data.content_width, (s64)t_line->width_pixel);
+	}
+
+	u64 old_area = text_io->data_prev.content_width * text_io->data_prev.content_height;
+	u64 new_area = text_io->data.content_width      * text_io->data.content_height;
+
+	if (new_area > old_area) {
+		/// because chunky memory allocation is the devil
+		Text_ReserveMemory(text_io->font, &text_io->a_vertex_chars, &text_io->a_text_lines);
 	}
 
 	Text_Clear(text_io);
