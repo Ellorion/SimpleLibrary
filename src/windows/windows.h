@@ -266,8 +266,9 @@ Window_Create(
 	s32 width,
 	s32 height,
 	bool use_opengl,
-	Keyboard *keyboard = 0,
-	Mouse *mouse = 0,
+	bool show,
+	Keyboard *keyboard_opt,
+	Mouse *mouse_opt,
 	s32 bits = 32
 ) {
 	Window window = {};
@@ -362,11 +363,11 @@ Window_Create(
 	window.width  = width;
 	window.height = height;
 
-	if (mouse)
-		window.mouse = mouse;
+	if (mouse_opt)
+		window.mouse = mouse_opt;
 
-	if (keyboard)
-		window.keyboard = keyboard;
+	if (keyboard_opt)
+		window.keyboard = keyboard_opt;
 
 	if (File_Exists(S("tray.ico"))) {
 		NOTIFYICONDATA *nid   = &window.icon.notify_icon_data;
@@ -391,6 +392,9 @@ Window_Create(
 
 	if (use_opengl)
 		OpenGL_Init(&window);
+
+	if (show)
+		Window_Show(&window);
 
 	return window;
 }

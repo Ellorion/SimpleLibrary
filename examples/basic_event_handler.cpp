@@ -8,11 +8,10 @@ int main() {
 	Window window = Window_Create(
 		"Demo-Application",
 		800, 480,
-		true,
+		true, true,
 		&keyboard, &mouse
 	);
 
-	Window_Show(&window);
 	OpenGL_UseVSync(&window, true);
 
 	while(window.is_running) {

@@ -25,9 +25,7 @@ Window_HandleEvents(Window *window) {
 }
 
 int main() {
-	Window window = Window_Create("Hello, World!", 800, 480, true);
-	Window_Show(&window);
-
+	Window window = Window_Create("Hello, World!", 800, 480, true, true, 0, 0);
 	OpenGL_UseVSync(&window, true);
 
 	Window_HandleEvents(&window);

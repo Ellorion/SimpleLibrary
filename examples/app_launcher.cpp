@@ -310,7 +310,7 @@ APPLICATION_MAIN {
 	/// press "control + shift + l" to show application window from everywhere while running
 	Application_RegisterHotKey(KEYBOARD_HOTKEY_01, MOD_CONTROL | MOD_SHIFT, 'l');
 
-	window = Window_Create("Application-Launcher", 512, 512 / 16 * 9, true, &keyboard, &mouse);
+	window = Window_Create("Application-Launcher", 512, 512 / 16 * 9, true, false, &keyboard, &mouse);
 
 	if (hide_window_startup)
 		Window_Hide(&window);

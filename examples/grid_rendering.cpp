@@ -16,7 +16,7 @@ struct Grid {
 	Array<Rect>    a_rects;
 	Array<Color32> a_colors;
 
-	Array<Vertex> a_vertex;
+	Array<Vertex>  a_vertex;
 };
 
 instant void
@@ -26,6 +26,7 @@ Grid_Update(
 ) {
 	Assert(grid);
 
+	/// create tiles
 	Array_ClearContainer(&grid->a_rects);
 	Array_ClearContainer(&grid->a_colors);
 
@@ -46,6 +47,7 @@ Grid_Update(
 	grid->width_px  = t_rect.x + t_rect.w;
 	grid->height_px = t_rect.y + t_rect.h;
 
+	/// create vertex array
 	Array_Clear(&grid->a_vertex);
 
 	Vertex *element;
@@ -110,11 +112,10 @@ Grid_Render(
 int main() {
 	Keyboard keyboard;
 
-	Window window = Window_Create("Grid-Example", 800, 480, true, &keyboard);
-	Window_Show(&window);
+	Window window = Window_Create("Grid-Example", 800, 480, true, true, &keyboard, 0);
 
 	ShaderSet shader_set = ShaderSet_Create(&window);
-	Grid grid = Grid_Load(10, 10, {0, 1, 1, 1});
+	Grid      grid       = Grid_Load(10, 10, {0, 1, 1, 1});
 
 	grid.grid_height = (window.height - 20) / grid.y_count;
 	grid.grid_width  = (window.width  - 20) / grid.x_count;
@@ -143,4 +144,3 @@ int main() {
 
 	return 0;
 }
-

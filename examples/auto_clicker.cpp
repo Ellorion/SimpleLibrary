@@ -85,8 +85,7 @@ int main() {
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window window = Window_Create("Auto-Clicker", 320, 240, true, &keyboard, &mouse);
-	Window_Show(&window);
+	Window window = Window_Create("Auto-Clicker", 320, 240, true, true, &keyboard, &mouse);
 	Window_AlwaysOnTop(&window);
 
 	OpenGL_UseVSync(&window, true);

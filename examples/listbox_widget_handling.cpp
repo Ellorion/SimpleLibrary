@@ -94,8 +94,7 @@ int main() {
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window window = Window_Create("Hello, World!", 800, 480, true, &keyboard, &mouse);
-	Window_Show(&window);
+	Window window = Window_Create("Hello, World!", 800, 480, true, true, &keyboard, &mouse);
 
 	OpenGL_UseVSync(&window, true);
 

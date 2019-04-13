@@ -70,8 +70,7 @@ Window_HandleEvents(
 int main() {
 	Keyboard keyboard;
 
-	Window window = Window_Create("Hello, World!", 800, 480, true, &keyboard);
-	Window_Show(&window);
+	Window window = Window_Create("Hello, World!", 800, 480, true, true, &keyboard, 0);
 
 	OpenGL_UseVSync(&window, true);
 
