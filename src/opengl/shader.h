@@ -324,7 +324,7 @@ ShaderSet_Use(
 /// @Testing
 	ShaderSet_ResetUniforms(shader_set_io);
 
-	if (shader_set_io->window AND shader_set_io->window->events.on_resized)
+	if (shader_set_io->window AND shader_set_io->window->events.on_size_changed)
 		ShaderSet_UpdateViewport(shader_set_io);
 
 	if (prev_active_id == shader_set_io->active_id)

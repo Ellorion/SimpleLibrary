@@ -91,8 +91,7 @@ Array_AddEmpty(
 	Assert(element_empty_out);
 
 	T t_element_empty = {};
-	Array_Add(array_io, t_element_empty);
-	*element_empty_out = &ARRAY_IT(*array_io, array_io->count - 1);
+	*element_empty_out = Array_Add(array_io, t_element_empty);
 
 	return array_io->count - 1;
 }

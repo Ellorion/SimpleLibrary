@@ -1,7 +1,7 @@
 #pragma once
 
 struct Texture {
-	u32 ID = 0;
+	u32  ID = 0;
 	bool flip_h = false;
 };
 

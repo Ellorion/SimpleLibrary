@@ -146,7 +146,7 @@ OpenGL_AdjustScaleViewport(
 	if (prev_scale_y != window_io->scale_y)  result = true;
 
 	if (result)
-		window_io->events.on_resized = true;
+		window_io->events.on_size_changed = true;
 
 	return result;
 }

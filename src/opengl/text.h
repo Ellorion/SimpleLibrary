@@ -19,7 +19,7 @@ struct Font {
 	stbtt_fontinfo info = {};
 	String s_data;
 	String s_error;
-	u32 size = 0;
+	s32 size = 0;
 	s32 ascent = 0;
 	s32 descent = 0;
 	s32 linegap = 0;
@@ -38,8 +38,9 @@ operator == (
 	Codepoint &cp_1,
 	Codepoint &cp_2
 ) {
-	if (cp_1.codepoint == cp_2.codepoint){
-		return true;
+	if (cp_1.codepoint == cp_2.codepoint) {
+		/// check size this way
+		return (cp_1.rect_subpixel == cp_2.rect_subpixel);
 	}
 
 	return false;
@@ -93,9 +94,12 @@ Font_SetScale(
 instant void
 Font_SetSize(
 	Font *font,
-	u32   size
+	s32   size
 ) {
 	Assert(font);
+
+	if (size < 1)
+		size = 1;
 
 	if (font->size == size)
 		return;
@@ -217,24 +221,38 @@ Codepoint_GetData(
 
     u64 t_index_find;
 
+    /// when font changes (f.e. in size), comparison would not work by
+    /// just checking the event on_size_changed, since the font struct
+    /// is referenced to every codepoint. the old stored codepoints would
+    /// hold the updated font data and could not be differentiated from
+    /// the new one with a different texture size. that is why the subpixel
+    /// data is used to find out, if the fontsize has changed.
+    ///
+    /// @Important: if the font data would change during runtime
+    ///             (stored in the same referenced location) and would
+    ///             result in the same subpixel data as the prev. font
+    ///             (maybe for some codepoints?), the lookup would fail
+    ///             and retreive the old, stored texture
+    ///
+    /// @TODO:		generate a checksum for font-data and store it in the
+    ///             (referenced) font struct and each codepoint for
+    ///             comparison
+    ///
+    /// @Idea:      (maybe) use texture up/down-sampling instead to
+	///             reduce memory overhead?
     Codepoint t_codepoint_find;
-    t_codepoint_find.font      = font;
-    t_codepoint_find.codepoint = codepoint;
-
-    Codepoint *t_entry;
-
-    if (!Array_FindOrAdd(&font->a_codepoint, t_codepoint_find, &t_entry)) {
-		/// get texture
-		t_entry->texture = Codepoint_ToTexture(font, codepoint);
+    {
+		t_codepoint_find.font      = font;
+		t_codepoint_find.codepoint = codepoint;
 
 		/// get advance / left side bearing
 		stbtt_GetCodepointHMetrics(&font->info,
 									codepoint,
-									&t_entry->advance,
-									&t_entry->left_side_bearing);
+									&t_codepoint_find.advance,
+									&t_codepoint_find.left_side_bearing);
 
-		t_entry->advance *= font->scale;
-		t_entry->left_side_bearing *= font->scale;
+		t_codepoint_find.advance *= font->scale;
+		t_codepoint_find.left_side_bearing *= font->scale;
 
 		/// get subpixel
 		stbtt_GetCodepointBitmapBoxSubpixel(&font->info,
@@ -243,10 +261,17 @@ Codepoint_GetData(
 											font->scale,
 											0,
 											0,
-											&t_entry->rect_subpixel.x,
-											&t_entry->rect_subpixel.y,
-											&t_entry->rect_subpixel.w,
-											&t_entry->rect_subpixel.h);
+											&t_codepoint_find.rect_subpixel.x,
+											&t_codepoint_find.rect_subpixel.y,
+											&t_codepoint_find.rect_subpixel.w,
+											&t_codepoint_find.rect_subpixel.h);
+    }
+
+    Codepoint *t_entry;
+
+    if (!Array_FindOrAdd(&font->a_codepoint, t_codepoint_find, &t_entry)) {
+		/// get texture
+		t_entry->texture = Codepoint_ToTexture(font, codepoint);
     }
 
 	*entry_out = *t_entry;
@@ -892,11 +917,6 @@ Text_AddLines(
 
 	if (!width_max) {
 		width_max = text->data.content_width;
-
-//		FOR_ARRAY(*a_text_lines, it_line) {
-//			Text_Line *t_text_line = &ARRAY_IT(*a_text_lines, it_line);
-//			width_max = MAX(width_max, t_text_line->width_pixel);
-//		}
 	}
 
 	float x_line_start = rect.x;
@@ -1479,11 +1499,13 @@ Text_Cursor_Update(
 	u64 width_max = rect.w;
 
 	if (!width_max) {
-		FOR_ARRAY(text_io->a_text_lines, it_line) {
-			Text_Line *t_text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
+		width_max = text_io->data.content_width;
 
-			width_max = MAX(width_max, t_text_line->width_pixel);
-		}
+//		FOR_ARRAY(text_io->a_text_lines, it_line) {
+//			Text_Line *t_text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
+//
+//			width_max = MAX(width_max, t_text_line->width_pixel);
+//		}
 	}
 
 	if (!cursor->vertex_select.array_id)

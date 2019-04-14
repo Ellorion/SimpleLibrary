@@ -241,8 +241,8 @@ Rect_ClampY(
 /// ===========================================================================
 bool
 operator != (
-	Rect r1,
-	Rect r2
+	Rect &r1,
+	Rect &r2
 ) {
 	if (r1.x != r2.x)  return true;
 	if (r1.y != r2.y)  return true;
@@ -250,4 +250,17 @@ operator != (
 	if (r1.h != r2.h)  return true;
 
 	return false;
+}
+
+bool
+operator == (
+	RectI &r1,
+	RectI &r2
+) {
+	if (r1.x != r2.x)  return false;
+	if (r1.y != r2.y)  return false;
+	if (r1.w != r2.w)  return false;
+	if (r1.h != r2.h)  return false;
+
+	return true;
 }

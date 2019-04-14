@@ -105,7 +105,7 @@ struct Window {
 	s32                default_height = 0;
 
 	struct Window_Events {
-		bool on_resized = false;
+		bool on_size_changed = false;
 	} events;
 
 	struct Icon {

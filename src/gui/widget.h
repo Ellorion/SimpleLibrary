@@ -153,29 +153,6 @@ Layout_Block_SetVisible (
 	}
 }
 
-///@Depricated
-/// simply create an array of parent widgets
-///
-/// Widget_UpdateFocus will automatically take
-/// care of the child widgets, since those
-/// tab-orders are decided upon the parent widget
-/// creation anyway (if done correctly)
-//instant void
-//Widget_AddRenderTabStop(
-//	Array<Widget *> *ap_widgets,
-//	Widget *widget
-//) {
-//	Assert(ap_widgets);
-//	Assert(widget);
-//
-//	Array_Add(ap_widgets, widget);
-//
-//	FOR_ARRAY(widget->a_subwidgets, it_sub) {
-//		Widget *t_subwidget = &ARRAY_IT(widget->a_subwidgets, it_sub);
-//		Array_Add(ap_widgets, t_subwidget);
-//	}
-//}
-
 instant Widget *
 Widget_GetSubWidget(
 	Widget *widget,
@@ -295,34 +272,27 @@ Widget_HasChanged(
 ) {
 	Assert(widget_io);
 
-	bool result = false;
+	bool has_changed = false;
 
-	///@Note: updating text changed status will happen
-	///       in a Text_Update
-	result = Text_HasChanged(&widget_io->text, false);
-
-	if (!result) {
-		result = !Memory_Compare(
-							&widget_io->layout_data.settings,
-							&widget_io->layout_data.settings_prev,
-							 sizeof(widget_io->layout_data.settings)
-					  );
+	/// a list would iterate over the list items and reuse "text"
+	/// for every list element incl. might change (some) of its settings,
+	/// that is why the list data change checking will happen seperately
+	if (!Widget_IsListType(widget_io)) {
+		///@Note: updating text changed status will happen
+		///       in a Text_Update
+		has_changed |= Text_HasChanged(&widget_io->text, false);
 	}
 
-	if (!result) {
-		result = !Memory_Compare(
-							&widget_io->data,
-							&widget_io->data_prev,
-							 sizeof(widget_io->data)
-					  );
-	}
+	if (widget_io->text.font)
+		has_changed |= widget_io->text.font->events.on_size_changed;
 
-	if (!result) {
+	if (!has_changed) {
+		/// check list entries
 		FOR_ARRAY(widget_io->data.as_row_data, it) {
 			String *t_data = &ARRAY_IT(widget_io->data.as_row_data, it);
 
 			if (t_data->changed) {
-				result = true;
+				has_changed = true;
 
 				if (!update_changes)
 					break;
@@ -330,6 +300,22 @@ Widget_HasChanged(
 				t_data->changed = false;
 			}
 		}
+	}
+
+	if (!has_changed) {
+		has_changed |= !Memory_Compare(
+							&widget_io->layout_data.settings,
+							&widget_io->layout_data.settings_prev,
+							 sizeof(widget_io->layout_data.settings)
+					  );
+	}
+
+	if (!has_changed) {
+		has_changed |= !Memory_Compare(
+							&widget_io->data,
+							&widget_io->data_prev,
+							 sizeof(widget_io->data)
+					  );
 	}
 
 	if (update_changes) {
@@ -340,7 +326,7 @@ Widget_HasChanged(
 /// @NOTE: do NOT check subwidgets, since they will be added to the render list anyway
 ///        and might mess up the update checking
 
-	return result;
+	return has_changed;
 }
 
 instant void
@@ -615,6 +601,24 @@ Widget_InvalidateBackground(
 	Widget_Redraw(widget_io);
 }
 
+instant void
+Widget_GetListArrayFiltered(
+	Widget *widget,
+	Array<String> **as_row_data_out
+) {
+	Assert(widget);
+	Assert(as_row_data_out);
+
+	Array<String> *as_target = &widget->data.as_row_data;
+
+	if (widget->data.s_row_filter.length) {
+		as_target = &widget->data.as_filter_data;
+		Clamp(&widget->data.active_row_id, 0, widget->data.as_filter_data.count - 1);
+	}
+
+	*as_row_data_out = as_target;
+}
+
 instant bool
 Widget_Update(
 	Widget *widget_io
@@ -640,6 +644,8 @@ Widget_Update(
 		LOG_STATUS("\nResume update: " << widget_io->type << " ");
 	}
 
+	Text *text = &widget_io->text;
+
 	/// text needs to be processed at least once when no input in handled,
 	/// but do NOT do it for lists. lists take the list data and pass each row
 	/// through the text struct to generate text + positions.
@@ -652,12 +658,67 @@ Widget_Update(
 			Widget_InvalidateBackground(widget_io);
 		}
 
-		widget_io->events.on_text_change = Text_Update(&widget_io->text);
+		widget_io->events.on_text_change = Text_Update(text);
+	}
+	else {
+		if (Widget_HasChanged(widget_io, true)) {
+			Vertex_ClearAttributes(&widget_io->vertex_rect);
+			Text_Clear(text);
+
+			Widget_InvalidateBackground(widget_io);
+
+			text->data.rect = widget_io->layout_data.settings.rect;
+			Rect *rect_text = &text->data.rect;
+
+			s32 pad_left = 2;
+
+			rect_text->x += text->offset_x + pad_left;
+
+			widget_io->rect_content.h = 0;
+
+			Array<String> *as_target;
+			Widget_GetListArrayFiltered(widget_io, &as_target);
+
+			FOR_ARRAY(*as_target, it_row) {
+				String *ts_data = &ARRAY_IT(*as_target, it_row);
+
+				u64 number_of_lines = Array_SplitWordsBuffer(ts_data, &text->as_words);
+				rect_text->h = Text_BuildLines(text, &text->as_words, number_of_lines, &text->a_text_lines);
+
+				Color32 t_color_rect = widget_io->data.color_outline;
+
+				if (widget_io->data.active_row_id == it_row) {
+					if (widget_io->data.has_focus)
+						t_color_rect = widget_io->data.color_outline_selected;
+					else
+						t_color_rect = widget_io->data.color_outline_inactive;
+				}
+
+				Rect rect_box = *rect_text;
+				rect_box.x -= pad_left;
+				rect_box.x -= text->offset_x;
+
+				Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
+
+				Text_AddLines(text);
+
+				s32 height_row_step = rect_text->h + widget_io->data.spacing;
+				rect_text->y += height_row_step;
+				widget_io->rect_content.h += height_row_step;
+			}
+
+			if (widget_io->rect_content.h) {
+				widget_io->rect_content.h -= widget_io->data.spacing;
+			}
+
+			/// revert for scissor
+			*rect_text = widget_io->layout_data.settings.rect;
+		}
 	}
 
  	if (widget_io->trigger_autosize) {
 		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
-		Text_Data *settings = &widget_io->text.data;
+		Text_Data *settings = &text->data;
 
 		if (    layout_data->auto_width
 			AND settings->content_width
@@ -703,7 +764,6 @@ Widget_Update(
 	}
 
 	if (widget_io->data.s_row_filter.changed) {
-#if 1
 		widget_io->data.as_filter_data.by_reference = true;
 
 		Array_Filter(
@@ -719,25 +779,6 @@ Widget_Update(
 						);
 			}
 		);
-#else
-		Array_Clear(&widget_io->data.as_filter_data);
-		widget_io->data.as_filter_data.by_reference = true;
-		widget_io->data.active_row_id = 0;
-
-		if (widget_io->data.s_row_filter.length) {
-			FOR_ARRAY(widget_io->data.as_row_data, it_row) {
-				String *ts_data = &ARRAY_IT(widget_io->data.as_row_data, it_row);
-
-				if (String_IndexOf(	ts_data,
-									widget_io->data.s_row_filter,
-									0,
-									widget_io->data.is_filter_case_sensitive) >= 0
-				) {
-					Array_Add(&widget_io->data.as_filter_data, *ts_data);
-				}
-			}
-		}
-#endif // 0
 
 		widget_io->data.s_row_filter.changed = false;
 	}
@@ -745,24 +786,6 @@ Widget_Update(
 	LOG_STATUS("completed\n");
 
 	return result;
-}
-
-instant void
-Widget_GetListArrayFiltered(
-	Widget *widget,
-	Array<String> **as_row_data_out
-) {
-	Assert(widget);
-	Assert(as_row_data_out);
-
-	Array<String> *as_target = &widget->data.as_row_data;
-
-	if (widget->data.s_row_filter.length) {
-		as_target = &widget->data.as_filter_data;
-		Clamp(&widget->data.active_row_id, 0, widget->data.as_filter_data.count - 1);
-	}
-
-	*as_row_data_out = as_target;
 }
 
 /// return an non-rendered overlay widget (if exists)
@@ -822,83 +845,18 @@ Widget_Render(
 		Text_Render(&widget_io->text);
 	}
 	else {
-		Text *text = &widget_io->text;
-
 		/// do not draw a list widget,
 		/// if it should not be rendered as a popout
 		if (widget_io->data.is_floating AND (!widget_io->data.is_popout OR !render_overlay)) {
 			return widget_io;
 		}
 
-		///@Refactor:    update for list data, might make more sense
-		///              to move it into a seperate update function
-		///@Performance: and needs performance improvement with
-		///              high number of list entries
-		///@Obfuscated:  has to be simplified (alot)
-		if (Widget_HasChanged(widget_io, true)) {
-			Vertex_ClearAttributes(&widget_io->vertex_rect);
-			Widget_InvalidateBackground(widget_io);
-
-			Text_Clear(text);
-
-			text->data.rect = widget_io->layout_data.settings.rect;
-			Rect *rect_text = &text->data.rect;
-
-			s32 pad_left = 2;
-
-			rect_text->x += text->offset_x + pad_left;
-
-			widget_io->rect_content.h = 0;
-
-			Array<String> *as_target;
-			Widget_GetListArrayFiltered(widget_io, &as_target);
-
-			FOR_ARRAY(*as_target, it_row) {
-				String *ts_data = &ARRAY_IT(*as_target, it_row);
-
-				u64 number_of_lines = Array_SplitWordsBuffer(ts_data, &text->as_words);
-				rect_text->h = Text_BuildLines(text, &text->as_words, number_of_lines, &text->a_text_lines);
-
-				Color32 t_color_rect = widget_io->data.color_outline;
-
-				if (widget_io->data.active_row_id == it_row) {
-					if (widget_io->data.has_focus)
-						t_color_rect = widget_io->data.color_outline_selected;
-					else
-						t_color_rect = widget_io->data.color_outline_inactive;
-				}
-
-				Rect rect_box = *rect_text;
-				rect_box.x -= pad_left;
-				rect_box.x -= text->offset_x;
-
-				Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
-
-				Text_AddLines(text);
-
-				s32 height_row_step = rect_text->h + widget_io->data.spacing;
-				rect_text->y += height_row_step;
-				widget_io->rect_content.h += height_row_step;
-
-				if (ts_data->changed)
-					ts_data->changed = false;
-			}
-
-			if (widget_io->rect_content.h) {
-				widget_io->rect_content.h -= widget_io->data.spacing;
-			}
-
-			/// revert for scissor
-			*rect_text = widget_io->layout_data.settings.rect;
-
-			text->data_prev = text->data;
-		}
+		Text *text = &widget_io->text;
 
 		OpenGL_Scissor(shader_set->window, widget_io->layout_data.settings.rect);
 
-		///@Note: using a shader will reset uniform offsets to 0
-
 		/// static rects
+		///@Note: using a shader will reset uniform offsets to 0
 		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
 		Rect_Render(shader_set, &widget_io->vertex_rect_sublayer);
 

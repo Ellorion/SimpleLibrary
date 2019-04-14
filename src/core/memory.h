@@ -148,6 +148,10 @@ Memory_Set(
 		*c_dest++ = c_data;
 }
 
+
+/// @Inmportant: remember checking alignment buffer
+///
+/// true, if equal
 instant bool
 Memory_Compare(
 	void *data_1,

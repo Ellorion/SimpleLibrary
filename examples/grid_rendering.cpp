@@ -125,7 +125,7 @@ int main() {
 	while(Window_IsRunning(&window)) {
 		Window_ReadMessage(&window);
 
-		if (window.events.on_resized)
+		if (window.events.on_size_changed)
 			grid.scale = window.scale_y;
 
 		if (keyboard.up[VK_ESCAPE])

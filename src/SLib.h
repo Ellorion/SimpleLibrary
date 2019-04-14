@@ -1,11 +1,16 @@
 #pragma once
 
+/// @Note set this to 0 for release build
+///       to increase performance
 #define DEBUG_MODE				1
 
+/// Log-Messages
 #define SHOW_INFO				0
 #define SHOW_WARNING			1
 
 #define DEBUG_EVENT_STATUS		0
+
+/// enables timing measurement output
 #define DEBUG_BENCHMARK			0
 
 /// Operating System: Windows
@@ -71,10 +76,32 @@
 ///               optional default value
 ///     otherwise, the pointer will only be used for reading
 ///
-/// Return types: if a function returns a struct, it's memory needs to
+/// Return types: Ff a function returns a struct, it's memory needs to
 ///               be free'd to prevent memory leaks,
-///               unless that function ends with "Ref". in that case the
-///               return value does not require freeing, since it uses a reference
+///               unless that function ends with "Ref". In that case the
+///               return value does not require freeing, since it uses a reference.
+///
+/// Memory alignment:
+/// 	Fill structs for memory alignment with:
+///			bool _dummy_<number> = 0;
+///     and replace <number> with an increasing number
+///
+///		Why: When initialising a struct with {} it will set its data
+///          based on the default values given to each member inside
+///          the struct.
+///          BUT this does set the non-visible alignment buffer
+///          to 0.
+///          When using f.e. Memory_Compare, this will (very likely...)
+///          cause some (unforseen) consequences.
+///
+///			 This does at least apply (maybe randomly, but it did happen),
+///          when the alignment buffer is at the end of the struct.
+///          It did not happen with alignment buffers between known struct
+///          members... (yet).
+///
+///			 GCC/g++: use "__attribute__((packed))" to get current size
+///                   with sizeof-operator and fill-up the struct accordingly
+///
 
 //#ifdef __MINGW32__
 //#   undef  _WIN32_WINNT
