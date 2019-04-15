@@ -6,7 +6,9 @@ Window_HandleEvents(Window *window) {
 	Joypad joypad;
 	Joypad_Init_XInput(&joypad);
 
-	while(window->is_running) {
+	Memory_AddSegment(&window->a_segments_reset, window->events);
+
+	while(Window_IsRunning(window)) {
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);

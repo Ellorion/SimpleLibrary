@@ -842,6 +842,9 @@ Text_ReserveMemory(
 	Assert(a_text_lines);
 	Assert(a_vertex_chars_io);
 
+	Codepoint codepoint_space;
+	Codepoint_GetData(font, ' ', &codepoint_space);
+
 	FOR_ARRAY(*a_text_lines, it_line) {
 		Text_Line *text_line = &ARRAY_IT(*a_text_lines, it_line);
 
@@ -858,7 +861,7 @@ Text_ReserveMemory(
 				cp,
 				&codepoint,
 				0,
-				0
+				codepoint_space.advance
 			);
 
 			/// for unavailable characters like ' '

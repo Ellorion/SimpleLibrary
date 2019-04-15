@@ -46,6 +46,9 @@ int main() {
 		Layout_Add(&layout, &wg_label);
 	}
 
+	Memory_AddSegment(&window.a_segments_reset, window.events);
+	Memory_AddSegment(&window.a_segments_reset, font.events);
+
 	while(window.is_running) {
 		/// Events
 		/// ===================================================================
@@ -66,7 +69,6 @@ int main() {
 
 		Window_Render(&window);
 		Widget_Reset(&ap_widgets);
-		Font_ResetEvents(&font);
 	}
 
 	Widget_Destroy(&ap_widgets);

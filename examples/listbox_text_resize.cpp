@@ -29,6 +29,9 @@ int main() {
 	Widget_AddRow(&wg_list, S("3. row entry"));
 	Widget_AddRow(&wg_list, S("4. row entry"));
 
+	Memory_AddSegment(&window.a_segments_reset, window.events);
+	Memory_AddSegment(&window.a_segments_reset, font.events);
+
 	while (Window_IsRunning(&window)) {
 		Window_ReadMessage(&window);
 
@@ -63,7 +66,6 @@ int main() {
 		Window_Render(&window);
 
 		Widget_Reset(&ap_widgets);
-		Font_ResetEvents(&font);
 	}
 
 	Font_Destroy(&font);

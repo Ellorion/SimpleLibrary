@@ -122,6 +122,8 @@ int main() {
 
 	Grid_Update(&grid, {0, 0, 1, 1});
 
+	Memory_AddSegment(&window.a_segments_reset, window.events);
+
 	while(Window_IsRunning(&window)) {
 		Window_ReadMessage(&window);
 

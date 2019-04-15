@@ -14,16 +14,19 @@ int main() {
 
 	OpenGL_UseVSync(&window, true);
 
-	while(window.is_running) {
+	Memory_AddSegment(&window.a_segments_reset, window.events);
+
+	while(Window_IsRunning(&window)) {
 		Window_ReadMessage(&window);
 
 		/// Events
 		/// ===================================================================
 		if (keyboard.up[VK_ESCAPE])
-			window.is_running = false;
+			Window_Close(&window);
 
 		/// Render
 		/// ===================================================================
+		OpenGL_ClearScreen();
 		Window_Render(&window);
 	}
 

@@ -110,9 +110,9 @@ Window_HandleEvents(
 	Layout          *layout_active     = &layout_main;
 	Array<Widget *> *ap_widgets_active = &ap_widgets_main;
 
-	Array<Memory_Segment> a_segments;
-	Memory_AddSegment(&a_segments, font_16.events);
-	Memory_AddSegment(&a_segments, font_20.events);
+	Memory_AddSegment(&window->a_segments_reset, window->events);
+	Memory_AddSegment(&window->a_segments_reset, font_16.events);
+	Memory_AddSegment(&window->a_segments_reset, font_20.events);
 
 	while(window->is_running) {
 		/// Events
@@ -272,14 +272,11 @@ Window_HandleEvents(
 		/// ===================================================================
 		if (Window_IsVisible(window)) {
 			OpenGL_ClearScreen();
-
 			Widget_Render(&shader_set, ap_widgets_active);
 		}
 
 		Window_Render(window);
 		Widget_Reset(ap_widgets_active);
-
-		Memory_ResetSegments(&a_segments);
 	}
 
 	Widget_Destroy(&ap_widgets_main);

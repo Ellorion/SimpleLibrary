@@ -196,7 +196,10 @@ Window_HandleEvents(Window *window) {
 	Widget_LoadDirectoryList(&wg_listbox, config.basic.s_path, &a_listing, false);
 	Window_SetTitle(window, config.basic.s_path);
 
-	while(window->is_running) {
+	Memory_AddSegment(&window->a_segments_reset, window->events);
+	Memory_AddSegment(&window->a_segments_reset, font.events);
+
+	while(Window_IsRunning(window)) {
 		/// events
 		Window_ReadMessage(window);
 		Layout_Rearrange(&layout, window);
@@ -205,7 +208,7 @@ Window_HandleEvents(Window *window) {
 		Widget_Update(&ap_widgets, keyboard);
 
 		if(keyboard->up[VK_ESCAPE]) {
-			window->is_running = false;
+			Window_Close(window);
 		}
 		else
 		if (keyboard->up[VK_BACK]) {
@@ -249,7 +252,6 @@ Window_HandleEvents(Window *window) {
 
 		Window_Render(window);
 		Widget_Reset(&ap_widgets);
-		Font_ResetEvents(&font);
 	}
 
 	/// save changes on exit

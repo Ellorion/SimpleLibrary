@@ -28,14 +28,16 @@ Window_HandleEvents(
 	Text text = Text_Create(&shader_set, &font, &s_data, {10, 10, window->width - 20, window->height}, TEXT_ALIGN_X_LEFT);
 	text.data.color = {1, 0, 0, 1};
 
-	while(window->is_running) {
+	Memory_AddSegment(&window->a_segments_reset, window->events);
+	Memory_AddSegment(&window->a_segments_reset, font.events);
+
+	while(Window_IsRunning(window)) {
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
-		OpenGL_AdjustScaleViewport(window);
 
 		if (keyboard->up[VK_ESCAPE])
-			window->is_running = false;
+			Window_Close(window);
 
 		/// Render
 		/// ===================================================================
@@ -45,7 +47,6 @@ Window_HandleEvents(
 		Text_Render(&text);
 
 		Window_Render(window);
-		Font_ResetEvents(&font);
 
 		u32 fps = Time_GetFPS(&timer_fps);
 

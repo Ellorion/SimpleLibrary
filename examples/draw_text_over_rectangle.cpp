@@ -41,13 +41,16 @@ Window_HandleEvents(
 		Text_Update(&text_box);
 	}
 
-	while(window->is_running) {
+	Memory_AddSegment(&window->a_segments_reset, window->events);
+	Memory_AddSegment(&window->a_segments_reset, font.events);
+
+	while(Window_IsRunning(window)) {
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
 
 		if (keyboard->up[VK_ESCAPE])
-			window->is_running = false;
+			Window_Close(window);
 
 		/// Render
 		/// ===================================================================
@@ -60,7 +63,6 @@ Window_HandleEvents(
 		Text_Render(&text_box);
 
 		Window_Render(window);
-		Font_ResetEvents(&font);
 	}
 
 	Text_Destroy(&text_box);

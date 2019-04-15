@@ -104,6 +104,8 @@ struct Window {
 	s32                default_width  = 0;
 	s32                default_height = 0;
 
+	Array<Memory_Segment> a_segments_reset;
+
 	struct Window_Events {
 		bool on_size_changed = false;
 	} events;
@@ -552,7 +554,12 @@ Window_ReadMessage(
 
 	MSG msg;
 
-	Window_ResetEvents(window_io);
+	/// so resetting event data will not be forgotten during development
+	AssertMessage(window_io->a_segments_reset.count > 0,
+				  "Missing segment reset data for (at least) window events.");
+
+	Memory_ResetSegments(&window_io->a_segments_reset);
+
 	Mouse_Reset(window_io->mouse);
 	Keyboard_Reset(window_io->keyboard, false);
 

@@ -47,7 +47,10 @@ Window_HandleEvents(
 	Widget_AddRow(&widget_listbox, S("14"));
 	Widget_AddRow(&widget_listbox, S("15"));
 
-	while(window->is_running) {
+	Memory_AddSegment(&window->a_segments_reset, window->events);
+	Memory_AddSegment(&window->a_segments_reset, font_20.events);
+
+	while(Window_IsRunning(window)) {
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
@@ -56,7 +59,7 @@ Window_HandleEvents(
 		Widget_Update(&ap_widgets, keyboard);
 
 		if (keyboard->up[VK_ESCAPE] OR widget_exit.events.on_trigger)
-			window->is_running = false;
+			Window_Close(window);
 
 		if (widget_click_me.events.on_trigger) {
 			std::cout << "clicked" << std::endl;
@@ -76,7 +79,6 @@ Window_HandleEvents(
 
 		Window_Render(window);
 		Widget_Reset(&ap_widgets);
-		Font_ResetEvents(&font_20);
 
 		u32 fps = Time_GetFPS(&timer_fps);
 

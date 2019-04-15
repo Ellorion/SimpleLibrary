@@ -6,7 +6,9 @@ Window_HandleEvents(Window *window) {
 	Keyboard *keyboard = window->keyboard;
 	String s_keyboard;
 
-	while(window->is_running) {
+	Memory_AddSegment(&window->a_segments_reset, window->events);
+
+	while(Window_IsRunning(window)) {
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
@@ -19,7 +21,7 @@ Window_HandleEvents(Window *window) {
 			if (0) {}
 			else if (keyboard->is_up) {
 				if (keyboard->up[VK_ESCAPE])
-					window->is_running = false;
+					Window_Close(window);
 			}
 			else if (keyboard->is_down) {
 				Keyboard_AppendKey(keyboard, &s_keyboard);

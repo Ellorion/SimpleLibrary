@@ -40,6 +40,9 @@ Window_HandleEvents(
 		Layout_Add(&layout, &wg_autoclick);
 	}
 
+	Memory_AddSegment(&window->a_segments_reset, window->events);
+	Memory_AddSegment(&window->a_segments_reset, font_20.events);
+
 	while(window->is_running) {
 		/// Events
 		/// ===================================================================
@@ -74,7 +77,6 @@ Window_HandleEvents(
 
 		Window_Render(window);
 		Widget_Reset(&ap_widgets);
-		Font_ResetEvents(&font_20);
 	}
 
 	Widget_Destroy(&ap_widgets);
