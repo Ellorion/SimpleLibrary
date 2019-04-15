@@ -46,8 +46,11 @@ operator == (
 	return false;
 }
 
+
 /// @Important: must call this at the end of each frame,
 ///             in case an event trigger has fired
+///
+///				-> use Memory_Segment
 instant void
 Font_ResetEvents(
 	Font *font

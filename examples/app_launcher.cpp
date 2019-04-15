@@ -92,8 +92,8 @@ Window_HandleEvents(
 	Layout_Create(&layout_settings, {0, 0, window->width, window->height}, true);
 	{
 		Layout_CreateBlock(&layout_settings, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT);
-		Layout_Add(&layout_settings, &wg_settings_cancel);
 		Layout_Add(&layout_settings, &wg_settings_apply);
+		Layout_Add(&layout_settings, &wg_settings_cancel);
 
 		Layout_CreateBlock(&layout_settings, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
 		Layout_Add(&layout_settings, &wg_settings_text);
@@ -109,6 +109,10 @@ Window_HandleEvents(
 
 	Layout          *layout_active     = &layout_main;
 	Array<Widget *> *ap_widgets_active = &ap_widgets_main;
+
+	Array<Memory_Segment> a_segments;
+	Memory_AddSegment(&a_segments, font_16.events);
+	Memory_AddSegment(&a_segments, font_20.events);
 
 	while(window->is_running) {
 		/// Events
@@ -274,8 +278,8 @@ Window_HandleEvents(
 
 		Window_Render(window);
 		Widget_Reset(ap_widgets_active);
-		Font_ResetEvents(&font_16);
-		Font_ResetEvents(&font_20);
+
+		Memory_ResetSegments(&a_segments);
 	}
 
 	Widget_Destroy(&ap_widgets_main);

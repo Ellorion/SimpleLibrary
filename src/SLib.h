@@ -391,6 +391,7 @@ ToInt(
 #include "core/sort.h"
 #include "core/parser.h"
 #include "core/array.h"
+#include "core/memory_segment.h"
 #include "core/rect.h"
 #include "core/cpu.h"
 #include "core/array_string.h"
@@ -408,7 +409,6 @@ ToInt(
 #include "utility/file_watcher.h"
 #include "utility/helper.h"
 
-/// interlocking dependencies
 #include "windows/windows.h"
 #include "opengl/core.h"
 #include "windows/mouse.h"
