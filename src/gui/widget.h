@@ -112,6 +112,8 @@ struct Widget {
 
 		bool on_trigger = false;
 		bool on_trigger_secondary = false;
+
+		bool on_updated_input = false;
 	} events;
 
 	/// Custom Events
@@ -1239,6 +1241,9 @@ Widget_UpdateInput(
 		return;
     }
 
+    if (widget_io->events.on_updated_input)
+		return;
+
 	if (!widget_io->data.is_focusable)
 		return;
 
@@ -1445,6 +1450,8 @@ Widget_UpdateInput(
 
 		Rect_ClampY(&widget_io->rect_content, *rect_widget);
     }
+
+    widget_io->events.on_updated_input = true;
 }
 
 instant void
