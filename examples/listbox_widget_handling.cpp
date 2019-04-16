@@ -47,8 +47,9 @@ Window_HandleEvents(
 	Widget_AddRow(&widget_listbox, S("14"));
 	Widget_AddRow(&widget_listbox, S("15"));
 
-	Memory_AddSegment(&window->a_segments_reset, window->events);
-	Memory_AddSegment(&window->a_segments_reset, font_20.events);
+	MemorySegment_Add(&window->a_segments_reset, window->events);
+	MemorySegment_Add(&window->a_segments_reset, font_20.events);
+	MemorySegment_AddWidgets(&window->a_segments_reset, &ap_widgets);
 
 	while(Window_IsRunning(window)) {
 		/// Events
@@ -76,9 +77,6 @@ Window_HandleEvents(
 		OpenGL_ClearScreen();
 
 		Widget_Render(&shader_set, &ap_widgets);
-
-		Window_Render(window);
-		Widget_Reset(&ap_widgets);
 
 		u32 fps = Time_GetFPS(&timer_fps);
 

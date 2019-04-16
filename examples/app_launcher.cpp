@@ -110,9 +110,11 @@ Window_HandleEvents(
 	Layout          *layout_active     = &layout_main;
 	Array<Widget *> *ap_widgets_active = &ap_widgets_main;
 
-	Memory_AddSegment(&window->a_segments_reset, window->events);
-	Memory_AddSegment(&window->a_segments_reset, font_16.events);
-	Memory_AddSegment(&window->a_segments_reset, font_20.events);
+	MemorySegment_Add(&window->a_segments_reset, window->events);
+	MemorySegment_Add(&window->a_segments_reset, font_16.events);
+	MemorySegment_Add(&window->a_segments_reset, font_20.events);
+	MemorySegment_AddWidgets(&window->a_segments_reset, &ap_widgets_main);
+	MemorySegment_AddWidgets(&window->a_segments_reset, &ap_widgets_settings);
 
 	while(window->is_running) {
 		/// Events
@@ -127,8 +129,7 @@ Window_HandleEvents(
 
 		/// hot-load app list data
 		if (File_HasChanged(&watch_app_data)) {
-			String_Destroy(&s_app_data);
-			s_app_data = File_ReadAll(watch_app_data.s_filename);
+			File_ReadAll(&s_app_data, watch_app_data.s_filename);
 
 			if (!s_app_data.value) {
 				Window_SetTitle(window, "File: \"app.dat\" does not exists.");
@@ -274,9 +275,6 @@ Window_HandleEvents(
 			OpenGL_ClearScreen();
 			Widget_Render(&shader_set, ap_widgets_active);
 		}
-
-		Window_Render(window);
-		Widget_Reset(ap_widgets_active);
 	}
 
 	Widget_Destroy(&ap_widgets_main);

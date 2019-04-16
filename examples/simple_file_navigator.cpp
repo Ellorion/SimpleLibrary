@@ -196,8 +196,9 @@ Window_HandleEvents(Window *window) {
 	Widget_LoadDirectoryList(&wg_listbox, config.basic.s_path, &a_listing, false);
 	Window_SetTitle(window, config.basic.s_path);
 
-	Memory_AddSegment(&window->a_segments_reset, window->events);
-	Memory_AddSegment(&window->a_segments_reset, font.events);
+	MemorySegment_Add(&window->a_segments_reset, window->events);
+	MemorySegment_Add(&window->a_segments_reset, font.events);
+	MemorySegment_AddWidgets(&window->a_segments_reset, &ap_widgets);
 
 	while(Window_IsRunning(window)) {
 		/// events
@@ -249,9 +250,6 @@ Window_HandleEvents(Window *window) {
 		OpenGL_ClearScreen();
 
 		Widget_Render(&shader_set, &ap_widgets);
-
-		Window_Render(window);
-		Widget_Reset(&ap_widgets);
 	}
 
 	/// save changes on exit

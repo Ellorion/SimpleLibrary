@@ -152,35 +152,44 @@ File_Write(
     fwrite(s_data.value, sizeof(char), sizeof(char) * s_data.length, file->fp);
 }
 
-///@TODO: pass return value as a buffer, to allow
-///       file hot-reloading without destroying the string buffer
+instant bool
+File_Read(
+	File *file,
+	String *s_data_out
+) {
+	Assert(file);
+
+	String_Clear(s_data_out);
+
+	u64 file_size = File_Size(file);
+
+	if (!file_size)
+		return false;
+
+	String_Resize(s_data_out, file_size);
+	fread(s_data_out->value, sizeof(char), sizeof(char) * s_data_out->length, file->fp);
+
+	s_data_out->changed = true;
+
+	return true;
+}
+
+
 instant String
 File_Read(
 	File *file
 ) {
 	Assert(file);
 
-	u64 length = File_Size(file);
-
 	String s_data;
-	s_data.length = length;
-
-	if (!length) {
-		s_data.value = Memory_Resize(s_data.value, char, 1);
-		s_data.value[0] = '\0';
-	}
-	else {
-		s_data.value  = Memory_Resize(s_data.value, char, length);
-		fread(s_data.value, sizeof(char), sizeof(char) * length, file->fp);
-	}
-
-	s_data.changed = true;
+	File_Read(file, &s_data);
 
 	return s_data;
 }
 
-instant String
+instant bool
 File_ReadAll(
+	String *s_data_out,
 	String s_filename,
 	bool as_binary = true
 ) {
@@ -196,13 +205,22 @@ File_ReadAll(
 	if (!file.fp)
 		LOG_WARNING("File \"" << s_filename.value << "\" does not exists.");
 
-	String s_data = File_Read(&file);
+	bool success = File_Read(&file, s_data_out);
 
 	File_Close(&file);
 
-	s_data.changed = true;
-
 	MEASURE_END("(" << s_filename.value << ") ");
+
+	return success;
+}
+
+instant String
+File_ReadAll(
+	String s_filename,
+	bool as_binary = true
+) {
+	String s_data;
+	File_ReadAll(&s_data, s_filename, as_binary);
 
 	return s_data;
 }

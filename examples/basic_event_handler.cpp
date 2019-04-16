@@ -14,7 +14,7 @@ int main() {
 
 	OpenGL_UseVSync(&window, true);
 
-	Memory_AddSegment(&window.a_segments_reset, window.events);
+	MemorySegment_Add(&window.a_segments_reset, window.events);
 
 	while(Window_IsRunning(&window)) {
 		Window_ReadMessage(&window);
@@ -27,7 +27,6 @@ int main() {
 		/// Render
 		/// ===================================================================
 		OpenGL_ClearScreen();
-		Window_Render(&window);
 	}
 
 	Window_Destroy(&window);

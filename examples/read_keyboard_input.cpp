@@ -6,7 +6,7 @@ Window_HandleEvents(Window *window) {
 	Keyboard *keyboard = window->keyboard;
 	String s_keyboard;
 
-	Memory_AddSegment(&window->a_segments_reset, window->events);
+	MemorySegment_Add(&window->a_segments_reset, window->events);
 
 	while(Window_IsRunning(window)) {
 		/// Events
@@ -30,8 +30,6 @@ Window_HandleEvents(Window *window) {
 				Memory_Free(c_buffer);
 			}
 		}
-
-		Window_Render(window);
 	}
 }
 

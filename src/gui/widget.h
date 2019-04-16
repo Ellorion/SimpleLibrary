@@ -436,7 +436,7 @@ Widget_Redraw(
 			rect_layout->h = 0;
 
 			/// calc. max. visible widget height to be used for the layout system,
-			/// in order to get preper horizontal alignment
+			/// in order to get proper horizontal alignment
             FOR_ARRAY(widget_io->a_subwidgets, it) {
 				Widget *t_widget = &ARRAY_IT(widget_io->a_subwidgets, it);
 
@@ -617,6 +617,38 @@ Widget_GetListArrayFiltered(
 	}
 
 	*as_row_data_out = as_target;
+}
+
+instant void
+MemorySegment_AddWidgets(
+	Array<MemorySegment> *a_segments,
+	Array<Widget>         *a_widgets
+) {
+	Assert(a_segments);
+	Assert(a_widgets);
+
+    FOR_ARRAY(*a_widgets, it_widget) {
+		Widget *t_widget = &ARRAY_IT(*a_widgets, it_widget);
+
+		MemorySegment_AddWidgets(a_segments, &t_widget->a_subwidgets);
+		MemorySegment_Add(a_segments, t_widget->events);
+    }
+}
+
+instant void
+MemorySegment_AddWidgets(
+	Array<MemorySegment> *a_segments,
+	Array<Widget *>       *ap_widgets
+) {
+	Assert(a_segments);
+	Assert(ap_widgets);
+
+    FOR_ARRAY(*ap_widgets, it_widget) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it_widget);
+
+		MemorySegment_AddWidgets(a_segments, &t_widget->a_subwidgets);
+		MemorySegment_Add(a_segments, t_widget->events);
+    }
 }
 
 instant bool
@@ -1212,8 +1244,6 @@ Widget_UpdateInput(
 
 	if (widget_io->data.is_floating AND !widget_io->data.is_popout)
 		return;
-
-
 
 	bool got_focus = widget_io->data.has_focus;
 	u64  prev_active_row = widget_io->data.active_row_id;
@@ -2120,6 +2150,8 @@ Widget_CreateComboBox(
 ) {
 	Widget t_widget = {};
 
+	/// @todo: - automate this during mainloop when font changes?
+	///        - make an event for when widget sizes change to trigger layout system?
 	if (!rect_box.w) {
 		rect_box.w = font->size;
 		Widget_AddBorderSizes(&t_widget, &rect_box.w, 0);
@@ -2234,33 +2266,6 @@ Widget_GetTextData(
 }
 
 instant void
-Widget_Reset(
-	Widget *widget_io
-) {
-	Assert(widget_io);
-
-	FOR_ARRAY(widget_io->a_subwidgets, it) {
-		Widget *t_widget = &ARRAY_IT(widget_io->a_subwidgets, it);
-		Widget_Reset(t_widget);
-	}
-
-	/// Reset per Frame Event Data
-	widget_io->events = {};
-}
-
-instant void
-Widget_Reset(
-	Array<Widget *> *ap_widgets
-) {
-	Assert(ap_widgets);
-
-	FOR_ARRAY(*ap_widgets, it) {
-		Widget *t_widget = ARRAY_IT(*ap_widgets, it);
-		Widget_Reset(t_widget);
-	}
-}
-
-instant void
 Widget_SwapLayout(
 	Array<Widget *> **ap_widgets_active,
 	Layout          **layout_active,
@@ -2272,8 +2277,6 @@ Widget_SwapLayout(
 
 	Assert(ap_widgets_swap_to);
 	Assert(layout_swap_to);
-
-	Widget_Reset(*ap_widgets_active);
 
 	*ap_widgets_active = ap_widgets_swap_to;
 	*layout_active     = layout_swap_to;

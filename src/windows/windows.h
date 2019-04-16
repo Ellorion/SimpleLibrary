@@ -104,7 +104,7 @@ struct Window {
 	s32                default_width  = 0;
 	s32                default_height = 0;
 
-	Array<Memory_Segment> a_segments_reset;
+	Array<MemorySegment> a_segments_reset;
 
 	struct Window_Events {
 		bool on_size_changed = false;
@@ -551,6 +551,7 @@ Window_ReadMessage(
 	Window *window_io
 ) {
 	Assert(window_io);
+	Assert(window_io->hDC);
 
 	MSG msg;
 
@@ -558,10 +559,16 @@ Window_ReadMessage(
 	AssertMessage(window_io->a_segments_reset.count > 0,
 				  "Missing segment reset data for (at least) window events.");
 
-	Memory_ResetSegments(&window_io->a_segments_reset);
+	MemorySegment_Reset(&window_io->a_segments_reset);
 
 	Mouse_Reset(window_io->mouse);
 	Keyboard_Reset(window_io->keyboard, false);
+
+	/// vsync does not seem to work, when this does not execute,
+	/// so the cpu ends up doing alot more work, because of the
+	/// increased speed in the loop cicle, if this would be disabled
+	/// for a hidden window
+	SwapBuffers(window_io->hDC);
 
 	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
 		Memory_Set(window_io->hotkey_triggered, false, KEYBOARD_HOTKEY_ID_COUNT);
@@ -627,19 +634,6 @@ Window_IsVisible(
 	Assert(window);
 
 	return IsWindowVisible(window->hWnd);
-}
-
-instant void
-Window_Render(
-	Window *window
-) {
-	Assert(window);
-
-	/// vsync does not seem to work, when this does not execute,
-	/// so the cpu ends up doing alot more work, because of the
-	/// increased speed in the loop cicle, if this would be disabled
-	/// for a hidden window
-	SwapBuffers(window->hDC);
 }
 
 instant void

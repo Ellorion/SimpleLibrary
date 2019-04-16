@@ -41,8 +41,8 @@ Window_HandleEvents(
 		Text_Update(&text_box);
 	}
 
-	Memory_AddSegment(&window->a_segments_reset, window->events);
-	Memory_AddSegment(&window->a_segments_reset, font.events);
+	MemorySegment_Add(&window->a_segments_reset, window->events);
+	MemorySegment_Add(&window->a_segments_reset, font.events);
 
 	while(Window_IsRunning(window)) {
 		/// Events
@@ -61,8 +61,6 @@ Window_HandleEvents(
 
 		ShaderSet_Use(&shader_set, SHADER_PROG_TEXT);
 		Text_Render(&text_box);
-
-		Window_Render(window);
 	}
 
 	Text_Destroy(&text_box);

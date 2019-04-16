@@ -42,7 +42,7 @@ Window_HandleEvents(
 
 	Vertex_BindAttributes(&shader_set, &vertex);
 
-	Memory_AddSegment(&window->a_segments_reset, window->events);
+	MemorySegment_Add(&window->a_segments_reset, window->events);
 
 	while(Window_IsRunning(window)) {
 		/// Events
@@ -60,8 +60,6 @@ Window_HandleEvents(
 		if (Time_HasElapsed(&timer_fps_log, 1000)) {
 			LOG_DEBUG(fps << " fps");
 		}
-
-		Window_Render(window);
 	}
 
 	Texture_Destroy(&texture);

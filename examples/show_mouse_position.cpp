@@ -8,7 +8,7 @@ Window_HandleEvents(
 	Timer timer_mouse_move;
 	Time_Reset(&timer_mouse_move);
 
-	Memory_AddSegment(&window->a_segments_reset, window->events);
+	MemorySegment_Add(&window->a_segments_reset, window->events);
 
 	while(Window_IsRunning(window)) {
 		/// Events
@@ -27,8 +27,6 @@ Window_HandleEvents(
 
 			LOG_DEBUG("Mouse pos: x = " << t_point.x << " - y: " << t_point.y);
 		}
-
-		Window_Render(window);
 	}
 }
 

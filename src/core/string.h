@@ -218,11 +218,16 @@ String_Destroy(
 instant void
 String_Resize(
 	String *s_data_io,
-	s64 length_delta
+	s64 new_length
 ) {
 	Assert(s_data_io);
 
-	s_data_io->value = Memory_Resize(s_data_io->value, char, s_data_io->length + length_delta);
+	Assert(new_length > 0);
+
+	if (new_length > (s64)s_data_io->length)
+		s_data_io->value  = Memory_Resize(s_data_io->value, char, new_length);
+
+	s_data_io->length = new_length;
 }
 
 instant bool
@@ -242,10 +247,9 @@ String_Append(
 
 	Assert(length_append <= s_source.length);
 
-	String_Resize(s_dest_io, length_append);
-	Memory_Copy(s_dest_io->value + s_dest_io->length, s_source.value, length_append);
-
-	s_dest_io->length += length_append;
+	u64 index_start = s_dest_io->length;
+	String_Resize(s_dest_io, s_dest_io->length + length_append);
+	Memory_Copy(s_dest_io->value + index_start, s_source.value, length_append);
 
 	s_dest_io->changed = true;
 

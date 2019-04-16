@@ -46,8 +46,9 @@ int main() {
 		Layout_Add(&layout, &wg_label);
 	}
 
-	Memory_AddSegment(&window.a_segments_reset, window.events);
-	Memory_AddSegment(&window.a_segments_reset, font.events);
+	MemorySegment_Add(&window.a_segments_reset, window.events);
+	MemorySegment_Add(&window.a_segments_reset, font.events);
+	MemorySegment_AddWidgets(&window->a_segments_reset, &ap_widgets);
 
 	while(window.is_running) {
 		/// Events
@@ -66,9 +67,6 @@ int main() {
 			OpenGL_ClearScreen();
 			Widget_Render(&shader_set, &ap_widgets);
 		}
-
-		Window_Render(&window);
-		Widget_Reset(&ap_widgets);
 	}
 
 	Widget_Destroy(&ap_widgets);

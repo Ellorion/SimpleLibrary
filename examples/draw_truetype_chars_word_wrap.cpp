@@ -28,8 +28,8 @@ Window_HandleEvents(
 	Text text = Text_Create(&shader_set, &font, &s_data, {10, 10, window->width - 20, window->height}, TEXT_ALIGN_X_LEFT);
 	text.data.color = {1, 0, 0, 1};
 
-	Memory_AddSegment(&window->a_segments_reset, window->events);
-	Memory_AddSegment(&window->a_segments_reset, font.events);
+	MemorySegment_Add(&window->a_segments_reset, window->events);
+	MemorySegment_Add(&window->a_segments_reset, font.events);
 
 	while(Window_IsRunning(window)) {
 		/// Events
@@ -45,8 +45,6 @@ Window_HandleEvents(
 
 		Text_Update(&text);
 		Text_Render(&text);
-
-		Window_Render(window);
 
 		u32 fps = Time_GetFPS(&timer_fps);
 
