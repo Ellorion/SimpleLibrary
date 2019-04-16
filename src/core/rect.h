@@ -252,6 +252,32 @@ operator != (
 	return false;
 }
 
+Rect
+operator - (
+	Rect &r1,
+	Rect &r2
+) {
+	Rect r_result = r1;
+
+	r_result.x -= r2.x;
+	r_result.y -= r2.y;
+	r_result.w -= r2.w;
+	r_result.h -= r2.h;
+
+	return r_result;
+}
+
+void
+operator -= (
+	Rect  r1,
+	Rect  r2
+) {
+	r1.x -= r2.x;
+	r1.y -= r2.y;
+	r1.w -= r2.w;
+	r1.h -= r2.h;
+}
+
 bool
 operator == (
 	RectI &r1,

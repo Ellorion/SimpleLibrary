@@ -15,6 +15,13 @@ enum LAYOUT_DOCK_TYPE {
 	LAYOUT_DOCK_BOTTOMRIGHT
 };
 
+enum LAYOUT_SECTION_TYPE {
+	LAYOUT_SECTION_TOP,
+	LAYOUT_SECTION_RIGHT,
+	LAYOUT_SECTION_BOTTOM,
+	LAYOUT_SECTION_LEFT,
+};
+
 struct Layout_Data_Settings {
 	Rect rect = {};
 	bool auto_width  = false;
@@ -42,16 +49,30 @@ struct Layout_Block {
 	Array<Widget *> ap_widgets;
 };
 
+struct Layout;
+
+struct Layout_Section {
+	bool is_in_section = false;
+	LAYOUT_SECTION_TYPE type;
+	u32 size;
+	Rect rect_remaining;
+	Layout *layout_parent = 0;
+};
+
 struct Layout {
 	Rect rect_full;
 	Rect rect_remaining;
 	bool fill_last_block = true;
 	u32  padding = LAYOUT_PADDING;
+	Layout_Section section;
+
 	Array<Layout_Block> a_layout_blocks;
 
 	/// convenience
 	/// -> to be rendered items for this layout
 	Array<Widget *> ap_widgets;
+
+	Array<Layout> a_sublayouts;
 };
 
 instant void
@@ -95,6 +116,23 @@ Layout_Create(
 	Layout_Create(layout_out, rect_area, fill_last_block);
 }
 
+instant void
+Layout_GetLastLayout(
+	Layout  *layout,
+	Layout **last_layout_out
+) {
+	Assert(layout);
+	Assert(last_layout_out);
+
+	if (layout->a_sublayouts.count) {
+		*last_layout_out = &ARRAY_IT(layout->a_sublayouts,
+									 layout->a_sublayouts.count - 1);
+		return;
+	}
+
+	*last_layout_out = layout;
+}
+
 instant u64
 Layout_CreateBlock(
 	Layout *layout_io,
@@ -104,15 +142,17 @@ Layout_CreateBlock(
 ) {
 	Assert(layout_io);
 
+	Layout *t_layout;
 	Layout_Block *t_block;
 
-	Array_AddEmpty(&layout_io->a_layout_blocks, &t_block);
+	Layout_GetLastLayout(layout_io, &t_layout);
+	Array_AddEmpty(&t_layout->a_layout_blocks, &t_block);
 
 	t_block->type = type;
 	t_block->dock = dock_direction;
 	t_block->expand_index = expand_index;
 
-	return layout_io->a_layout_blocks.count - 1;
+	return t_layout->a_layout_blocks.count - 1;
 }
 
 instant bool
@@ -141,7 +181,7 @@ Layout_GetBlock(
 	Assert(layout);
 
 	if (!layout->a_layout_blocks.count) {
-		LOG_INFO("GetLastBlock: No blocks in layout found.");
+		LOG_INFO("GetBlock: No blocks in layout found.");
 		return false;
 	}
 
@@ -163,9 +203,11 @@ Layout_Add(
 	Assert(layout_io);
 	Assert(layout_data);
 
+	Layout *t_layout;
 	Layout_Block *current_block = 0;
 
-	Layout_GetLastBlock(layout_io, &current_block);
+	Layout_GetLastLayout(layout_io, &t_layout);
+	Layout_GetLastBlock(t_layout, &current_block);
 	Array_Add(&current_block->ap_layout_data, layout_data);
 }
 
@@ -448,10 +490,65 @@ Layout_ArrangeBlockY(
 }
 
 instant void
+Layout_ApplySection(
+	Layout *layout
+) {
+	Assert(layout);
+
+	if (!layout->section.is_in_section)
+		return;
+
+	Rect rect_remaining = layout->rect_full;
+	u32 size = layout->section.size;
+
+	/// @Note Padding of the current layout
+	///       and not the following layout.
+	///       May end up being confusing,
+	///       time will tell...
+	u32 padding = (layout->padding * 2);
+
+	/// type -> move towards
+	switch (layout->section.type) {
+		case LAYOUT_SECTION_TOP: {
+			layout->rect_full.h = size;
+
+			rect_remaining.y += size - padding;
+			rect_remaining.h -= size - padding;
+		} break;
+
+		case LAYOUT_SECTION_RIGHT: {
+			layout->rect_full.x = (layout->rect_full.x + layout->rect_full.w) - size;
+			layout->rect_full.w = size;
+
+			rect_remaining.w -= size - padding;
+		} break;
+
+		case LAYOUT_SECTION_BOTTOM: {
+			layout->rect_full.y = (layout->rect_full.y + layout->rect_full.h) - size;
+			layout->rect_full.h = size;
+
+			rect_remaining.h -= size - padding;
+		} break;
+
+		case LAYOUT_SECTION_LEFT: {
+			layout->rect_full.w = size;
+
+			rect_remaining.x += size - padding;
+			rect_remaining.w -= size - padding;
+		} break;
+	}
+
+	layout = layout->section.layout_parent;
+	layout->section.rect_remaining = rect_remaining;
+}
+
+instant void
 Layout_Arrange(
 	Layout *layout_io
 ) {
 	Assert(layout_io);
+
+	Layout_ApplySection(layout_io);
 
 	if (!layout_io->rect_full.w)  return;
 	if (!layout_io->rect_full.h)  return;
@@ -476,6 +573,13 @@ Layout_Arrange(
 		else
 		if (t_block->type == LAYOUT_TYPE_Y)
 			Layout_ArrangeBlockY(layout_io, t_block);
+	}
+
+	FOR_ARRAY(layout_io->a_sublayouts, it) {
+		Layout *t_sublayout = &ARRAY_IT(layout_io->a_sublayouts, it);
+
+		t_sublayout->rect_full = layout_io->section.rect_remaining;
+		Layout_Arrange(t_sublayout);
 	}
 }
 
@@ -532,3 +636,30 @@ Layout_Block_IsVisible (
 
 	return layout_block->is_visible;
 }
+
+instant void
+Layout_CreateSection(
+	Layout *layout,
+	LAYOUT_SECTION_TYPE type,
+	u32 size
+) {
+	Assert(layout);
+
+	Layout *t_layout;
+	Layout_GetLastLayout(layout, &t_layout);
+
+	t_layout->section.is_in_section = true;
+	t_layout->section.type = type;
+	t_layout->section.size = size;
+	t_layout->section.layout_parent = layout;
+
+	Array_AddEmpty(&layout->a_sublayouts, &t_layout);
+
+	/// rect_full will be updated with remaining size during arrangment
+	Layout_Create(t_layout, {0, 0, 0, 0}, layout->fill_last_block);
+}
+
+
+
+
+

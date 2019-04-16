@@ -56,6 +56,8 @@ int main() {
 	Array_Add(&ap_widgets, &wg_font_minus);
 	Array_Add(&ap_widgets, &wg_textbox);
 
+    /// @Note: check layout_section_demo example
+    ///        for a simple alternative solution
 	Layout layout_menu;
 	Layout_Create(&layout_menu, {0, 0, 0, 0}, true);
 	{
