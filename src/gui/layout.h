@@ -51,12 +51,12 @@ struct Layout_Block {
 
 struct Layout;
 
+/// @todo: float size and allow % based for resizing
 struct Layout_Section {
 	bool is_in_section = false;
 	LAYOUT_SECTION_TYPE type;
-	u32 size;
+	s64 size;
 	Rect rect_remaining;
-	Layout *layout_parent = 0;
 };
 
 struct Layout {
@@ -116,23 +116,6 @@ Layout_Create(
 	Layout_Create(layout_out, rect_area, fill_last_block);
 }
 
-instant void
-Layout_GetLastLayout(
-	Layout  *layout,
-	Layout **last_layout_out
-) {
-	Assert(layout);
-	Assert(last_layout_out);
-
-	if (layout->a_sublayouts.count) {
-		*last_layout_out = &ARRAY_IT(layout->a_sublayouts,
-									 layout->a_sublayouts.count - 1);
-		return;
-	}
-
-	*last_layout_out = layout;
-}
-
 instant u64
 Layout_CreateBlock(
 	Layout *layout_io,
@@ -142,17 +125,15 @@ Layout_CreateBlock(
 ) {
 	Assert(layout_io);
 
-	Layout *t_layout;
 	Layout_Block *t_block;
 
-	Layout_GetLastLayout(layout_io, &t_layout);
-	Array_AddEmpty(&t_layout->a_layout_blocks, &t_block);
+	Array_AddEmpty(&layout_io->a_layout_blocks, &t_block);
 
 	t_block->type = type;
 	t_block->dock = dock_direction;
 	t_block->expand_index = expand_index;
 
-	return t_layout->a_layout_blocks.count - 1;
+	return layout_io->a_layout_blocks.count - 1;
 }
 
 instant bool
@@ -203,11 +184,9 @@ Layout_Add(
 	Assert(layout_io);
 	Assert(layout_data);
 
-	Layout *t_layout;
 	Layout_Block *current_block = 0;
 
-	Layout_GetLastLayout(layout_io, &t_layout);
-	Layout_GetLastBlock(t_layout, &current_block);
+	Layout_GetLastBlock(layout_io, &current_block);
 	Array_Add(&current_block->ap_layout_data, layout_data);
 }
 
@@ -491,55 +470,97 @@ Layout_ArrangeBlockY(
 
 instant void
 Layout_ApplySection(
-	Layout *layout
+	Layout *layout_io
 ) {
-	Assert(layout);
+	Assert(layout_io);
 
-	if (!layout->section.is_in_section)
+	if (!layout_io->section.is_in_section)
 		return;
 
-	Rect rect_remaining = layout->rect_full;
-	u32 size = layout->section.size;
+	Rect rect_remaining = layout_io->rect_full;
+	s64 size = layout_io->section.size;
 
-	/// @Note Padding of the current layout
-	///       and not the following layout.
-	///       May end up being confusing,
-	///       time will tell...
-	u32 padding = (layout->padding * 2);
+	if (size) {
 
-	/// type -> move towards
-	switch (layout->section.type) {
-		case LAYOUT_SECTION_TOP: {
-			layout->rect_full.h = size;
+		/// @Note Padding of the current layout_io
+		///       and not the following layout_io.
+		///       May end up being confusing,
+		///       time will tell...
+		u32 padding = (layout_io->padding * 2);
 
-			rect_remaining.y += size - padding;
-			rect_remaining.h -= size - padding;
-		} break;
+		/// type -> move towards
+		switch (layout_io->section.type) {
+			case LAYOUT_SECTION_TOP: {
+				if (size > 0) {
+					layout_io->rect_full.h = size;
 
-		case LAYOUT_SECTION_RIGHT: {
-			layout->rect_full.x = (layout->rect_full.x + layout->rect_full.w) - size;
-			layout->rect_full.w = size;
+					rect_remaining.y += size - padding;
+					rect_remaining.h -= size - padding;
+				}
+				else {
+					size = -size;
 
-			rect_remaining.w -= size - padding;
-		} break;
+					rect_remaining.y = (layout_io->rect_full.y + layout_io->rect_full.h) - size;
+					rect_remaining.h = size;
 
-		case LAYOUT_SECTION_BOTTOM: {
-			layout->rect_full.y = (layout->rect_full.y + layout->rect_full.h) - size;
-			layout->rect_full.h = size;
+					layout_io->rect_full.h -= size - padding;
+				}
+			} break;
 
-			rect_remaining.h -= size - padding;
-		} break;
+			case LAYOUT_SECTION_RIGHT: {
+				if (size > 0) {
+					layout_io->rect_full.x = (layout_io->rect_full.x + layout_io->rect_full.w) - size;
+					layout_io->rect_full.w = size;
 
-		case LAYOUT_SECTION_LEFT: {
-			layout->rect_full.w = size;
+					rect_remaining.w -= size - padding;
+				}
+				else {
+					size = -size;
 
-			rect_remaining.x += size - padding;
-			rect_remaining.w -= size - padding;
-		} break;
+					layout_io->rect_full.x = (layout_io->rect_full.x + layout_io->rect_full.w) - size;
+					layout_io->rect_full.w = size;
+
+					rect_remaining.w -= size - padding;
+				}
+			} break;
+
+			case LAYOUT_SECTION_BOTTOM: {
+				if (size > 0) {
+					layout_io->rect_full.y = (layout_io->rect_full.y + layout_io->rect_full.h) - size;
+					layout_io->rect_full.h = size;
+
+					rect_remaining.h -= size - padding;
+				}
+				else {
+					size = -size;
+
+					rect_remaining.h = size;
+
+					layout_io->rect_full.y += size - padding;
+					layout_io->rect_full.h -= size - padding;
+				}
+			} break;
+
+			case LAYOUT_SECTION_LEFT: {
+				if (size > 0) {
+					layout_io->rect_full.w = size;
+
+					rect_remaining.x += size - padding;
+					rect_remaining.w -= size - padding;
+				}
+				else {
+					size = -size;
+
+					rect_remaining.x = (layout_io->rect_full.x + layout_io->rect_full.w) - size;
+					rect_remaining.w = size;
+
+					layout_io->rect_full.w -= size - padding;
+				}
+			} break;
+		}
 	}
 
-	layout = layout->section.layout_parent;
-	layout->section.rect_remaining = rect_remaining;
+	layout_io->section.rect_remaining = rect_remaining;
 }
 
 instant void
@@ -638,28 +659,24 @@ Layout_Block_IsVisible (
 }
 
 instant void
-Layout_CreateSection(
-	Layout *layout,
+Layout_SplitSection(
+	Layout  *layout_io,
+	Layout **layout_remaining_out,
 	LAYOUT_SECTION_TYPE type,
-	u32 size
+	s64 size
 ) {
-	Assert(layout);
+	Assert(layout_io);
+	Assert(layout_remaining_out);
+
+	layout_io->section.is_in_section = true;
+	layout_io->section.type = type;
+	layout_io->section.size = size;
 
 	Layout *t_layout;
-	Layout_GetLastLayout(layout, &t_layout);
-
-	t_layout->section.is_in_section = true;
-	t_layout->section.type = type;
-	t_layout->section.size = size;
-	t_layout->section.layout_parent = layout;
-
-	Array_AddEmpty(&layout->a_sublayouts, &t_layout);
+	Array_AddEmpty(&layout_io->a_sublayouts, &t_layout);
 
 	/// rect_full will be updated with remaining size during arrangment
-	Layout_Create(t_layout, {0, 0, 0, 0}, layout->fill_last_block);
+	Layout_Create(t_layout, {0, 0, 0, 0}, layout_io->fill_last_block);
+
+	*layout_remaining_out = t_layout;
 }
-
-
-
-
-

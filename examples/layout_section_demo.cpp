@@ -11,117 +11,99 @@ int main() {
 	ShaderSet 	shader_set 	= ShaderSet_Create(&window);
 	Font 		font 		= Font_Load(S("default.ttf"), 20);
 
-	Widget wg_left_1		= Widget_CreateButton(&window, &font, {}, S("L1"));
-	Widget wg_left_2		= Widget_CreateButton(&window, &font, {}, S("L2"));
-	Widget wg_left_3		= Widget_CreateButton(&window, &font, {}, S("L3"));
-	Widget wg_left_4		= Widget_CreateButton(&window, &font, {}, S("L4"));
-	Widget wg_left_text		= Widget_CreateTextBox(&window, &font, {}, true);
-
-	Widget wg_right_1		= Widget_CreateButton(&window, &font, {}, S("R1"));
-	Widget wg_right_2		= Widget_CreateButton(&window, &font, {}, S("R2"));
-	Widget wg_right_3		= Widget_CreateButton(&window, &font, {}, S("R3"));
-	Widget wg_right_4		= Widget_CreateButton(&window, &font, {}, S("R4"));
-	Widget wg_right_text	= Widget_CreateTextBox(&window, &font, {}, true);
-
-	Widget wg_top_1			= Widget_CreateButton(&window, &font, {}, S("T1"));
-	Widget wg_top_2			= Widget_CreateButton(&window, &font, {}, S("T2"));
-	Widget wg_top_3			= Widget_CreateButton(&window, &font, {}, S("T3"));
-	Widget wg_top_4			= Widget_CreateButton(&window, &font, {}, S("T4"));
 	Widget wg_top_text		= Widget_CreateTextBox(&window, &font, {}, true);
 
-	Widget wg_bottom_1		= Widget_CreateButton(&window, &font, {}, S("B1"));
-	Widget wg_bottom_2		= Widget_CreateButton(&window, &font, {}, S("B2"));
-	Widget wg_bottom_3		= Widget_CreateButton(&window, &font, {}, S("B3"));
-	Widget wg_bottom_4		= Widget_CreateButton(&window, &font, {}, S("B4"));
-	Widget wg_bottom_text	= Widget_CreateTextBox(&window, &font, {}, true);
+	Widget wg_left_1_1		= Widget_CreateButton( &window, &font, {}, S("L1_1"));
+	Widget wg_left_1_2		= Widget_CreateButton( &window, &font, {}, S("L1_2"));
+	Widget wg_left_text_1	= Widget_CreateTextBox(&window, &font, {}, true);
+
+	Widget wg_left_2_1		= Widget_CreateButton( &window, &font, {}, S("L2_1"));
+	Widget wg_left_2_2		= Widget_CreateButton( &window, &font, {}, S("L2_2"));
+	Widget wg_left_text_2	= Widget_CreateTextBox(&window, &font, {}, true);
+
+	Widget wg_left_3_1		= Widget_CreateButton( &window, &font, {}, S("L3_1"));
+	Widget wg_left_3_2		= Widget_CreateButton( &window, &font, {}, S("L3_2"));
+	Widget wg_left_text_3	= Widget_CreateTextBox(&window, &font, {}, true);
+
+	Widget wg_left_4_1		= Widget_CreateButton( &window, &font, {}, S("L4_1"));
+	Widget wg_left_4_2		= Widget_CreateButton( &window, &font, {}, S("L4_2"));
+	Widget wg_left_text_4	= Widget_CreateTextBox(&window, &font, {}, true);
+
 
 	Array<Widget *> ap_widgets;
-	Array_Add(&ap_widgets, &wg_left_1);
-	Array_Add(&ap_widgets, &wg_left_2);
-	Array_Add(&ap_widgets, &wg_left_3);
-	Array_Add(&ap_widgets, &wg_left_4);
-	Array_Add(&ap_widgets, &wg_left_text);
-
-	Array_Add(&ap_widgets, &wg_right_1);
-	Array_Add(&ap_widgets, &wg_right_2);
-	Array_Add(&ap_widgets, &wg_right_3);
-	Array_Add(&ap_widgets, &wg_right_4);
-	Array_Add(&ap_widgets, &wg_right_text);
-
-	Array_Add(&ap_widgets, &wg_top_1);
-	Array_Add(&ap_widgets, &wg_top_2);
-	Array_Add(&ap_widgets, &wg_top_3);
-	Array_Add(&ap_widgets, &wg_top_4);
 	Array_Add(&ap_widgets, &wg_top_text);
 
-	Array_Add(&ap_widgets, &wg_bottom_1);
-	Array_Add(&ap_widgets, &wg_bottom_2);
-	Array_Add(&ap_widgets, &wg_bottom_3);
-	Array_Add(&ap_widgets, &wg_bottom_4);
-	Array_Add(&ap_widgets, &wg_bottom_text);
+	Array_Add(&ap_widgets, &wg_left_1_1);
+	Array_Add(&ap_widgets, &wg_left_1_2);
+	Array_Add(&ap_widgets, &wg_left_text_1);
+
+	Array_Add(&ap_widgets, &wg_left_2_1);
+	Array_Add(&ap_widgets, &wg_left_2_2);
+	Array_Add(&ap_widgets, &wg_left_text_2);
+
+	Array_Add(&ap_widgets, &wg_left_3_1);
+	Array_Add(&ap_widgets, &wg_left_3_2);
+	Array_Add(&ap_widgets, &wg_left_text_3);
+
+	Array_Add(&ap_widgets, &wg_left_4_1);
+	Array_Add(&ap_widgets, &wg_left_4_2);
+	Array_Add(&ap_widgets, &wg_left_text_4);
+
+
+	Layout *layout_bottom;
 
 	Layout layout;
 	Layout_Create(&layout, {0, 0, 0, 0}, true);
 	{
-		/// left section
-		{
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, 0);
-			Layout_Add(&layout, &wg_left_1);
-			Layout_Add(&layout, &wg_left_2);
-
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT, 1);
-			Layout_Add(&layout, &wg_left_3);
-			Layout_Add(&layout, &wg_left_4);
-
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT);
-			Layout_Add(&layout, &wg_left_text);
-		}
-		Layout_CreateSection(&layout, LAYOUT_SECTION_LEFT, 200);
-
-		/// right section
-		{
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT, -3);
-			Layout_Add(&layout, &wg_right_1);
-			Layout_Add(&layout, &wg_right_2);
-
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT, -1);
-			Layout_Add(&layout, &wg_right_3);
-			Layout_Add(&layout, &wg_right_4);
-
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT);
-			Layout_Add(&layout, &wg_right_text);
-		}
-		Layout_CreateSection(&layout, LAYOUT_SECTION_RIGHT, 200);
-
 		/// top section
 		{
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT, -4);
-			Layout_Add(&layout, &wg_top_1);
-			Layout_Add(&layout, &wg_top_2);
-
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT, -2);
-			Layout_Add(&layout, &wg_top_3);
-			Layout_Add(&layout, &wg_top_4);
-
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
+			Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT);
 			Layout_Add(&layout, &wg_top_text);
 		}
-		Layout_CreateSection(&layout, LAYOUT_SECTION_TOP, 100);
+		Layout_SplitSection(&layout, &layout_bottom, LAYOUT_SECTION_TOP, 300);
 
-		/// bottom section
+		/// bottom first section
 		{
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
-			Layout_Add(&layout, &wg_bottom_1);
-			Layout_Add(&layout, &wg_bottom_2);
+			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT);
+			Layout_Add(layout_bottom, &wg_left_1_1);
+			Layout_Add(layout_bottom, &wg_left_1_2);
 
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT);
-			Layout_Add(&layout, &wg_bottom_3);
-			Layout_Add(&layout, &wg_bottom_4);
-
-			Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
-			Layout_Add(&layout, &wg_bottom_text);
+			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
+			Layout_Add(layout_bottom, &wg_left_text_1);
 		}
-		Layout_CreateSection(&layout, LAYOUT_SECTION_BOTTOM, 100);
+		Layout_SplitSection(layout_bottom, &layout_bottom, LAYOUT_SECTION_LEFT, 200);
+
+		/// bottom second section
+		{
+			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT);
+			Layout_Add(layout_bottom, &wg_left_2_1);
+			Layout_Add(layout_bottom, &wg_left_2_2);
+
+			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
+			Layout_Add(layout_bottom, &wg_left_text_2);
+		}
+		Layout_SplitSection(layout_bottom, &layout_bottom, LAYOUT_SECTION_LEFT, 200);
+
+		/// bottom third section
+		{
+			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT);
+			Layout_Add(layout_bottom, &wg_left_3_1);
+			Layout_Add(layout_bottom, &wg_left_3_2);
+
+			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
+			Layout_Add(layout_bottom, &wg_left_text_3);
+		}
+		Layout_SplitSection(layout_bottom, &layout_bottom, LAYOUT_SECTION_LEFT, 200);
+
+		/// bottom forth section
+		{
+			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT);
+			Layout_Add(layout_bottom, &wg_left_4_1);
+			Layout_Add(layout_bottom, &wg_left_4_2);
+
+			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
+			Layout_Add(layout_bottom, &wg_left_text_4);
+		}
 	}
 
 	MemorySegment_Add(&window.a_segments_reset, window.events);
