@@ -60,7 +60,7 @@ int main() {
 			Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT);
 			Layout_Add(&layout, &wg_top_text);
 		}
-		Layout_SplitSection(&layout, &layout_bottom, LAYOUT_SECTION_TOP, 300);
+		Layout_ReserveSection(&layout, LAYOUT_SECTION_TOP, 100, &layout_bottom);
 
 		/// bottom first section
 		{
@@ -71,7 +71,7 @@ int main() {
 			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
 			Layout_Add(layout_bottom, &wg_left_text_1);
 		}
-		Layout_SplitSection(layout_bottom, &layout_bottom, LAYOUT_SECTION_LEFT, 200);
+		Layout_ReserveSection(layout_bottom, LAYOUT_SECTION_LEFT, 200, &layout_bottom);
 
 		/// bottom second section
 		{
@@ -82,7 +82,7 @@ int main() {
 			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
 			Layout_Add(layout_bottom, &wg_left_text_2);
 		}
-		Layout_SplitSection(layout_bottom, &layout_bottom, LAYOUT_SECTION_LEFT, 200);
+		Layout_ReserveSection(layout_bottom, LAYOUT_SECTION_LEFT, 200, &layout_bottom);
 
 		/// bottom third section
 		{
@@ -93,7 +93,7 @@ int main() {
 			Layout_CreateBlock(layout_bottom, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT);
 			Layout_Add(layout_bottom, &wg_left_text_3);
 		}
-		Layout_SplitSection(layout_bottom, &layout_bottom, LAYOUT_SECTION_LEFT, 200);
+		Layout_ReserveSection(layout_bottom, LAYOUT_SECTION_LEFT, 200, &layout_bottom);
 
 		/// bottom forth section
 		{

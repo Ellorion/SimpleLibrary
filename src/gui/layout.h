@@ -57,6 +57,7 @@ struct Layout_Section {
 	LAYOUT_SECTION_TYPE type;
 	s64 size;
 	Rect rect_remaining;
+	Array<Layout> a_sublayouts;
 };
 
 struct Layout {
@@ -71,8 +72,6 @@ struct Layout {
 	/// convenience
 	/// -> to be rendered items for this layout
 	Array<Widget *> ap_widgets;
-
-	Array<Layout> a_sublayouts;
 };
 
 instant void
@@ -596,8 +595,8 @@ Layout_Arrange(
 			Layout_ArrangeBlockY(layout_io, t_block);
 	}
 
-	FOR_ARRAY(layout_io->a_sublayouts, it) {
-		Layout *t_sublayout = &ARRAY_IT(layout_io->a_sublayouts, it);
+	FOR_ARRAY(layout_io->section.a_sublayouts, it) {
+		Layout *t_sublayout = &ARRAY_IT(layout_io->section.a_sublayouts, it);
 
 		t_sublayout->rect_full = layout_io->section.rect_remaining;
 		Layout_Arrange(t_sublayout);
@@ -659,11 +658,11 @@ Layout_Block_IsVisible (
 }
 
 instant void
-Layout_SplitSection(
+Layout_ReserveSection(
 	Layout  *layout_io,
-	Layout **layout_remaining_out,
 	LAYOUT_SECTION_TYPE type,
-	s64 size
+	s64 size,
+	Layout **layout_remaining_out
 ) {
 	Assert(layout_io);
 	Assert(layout_remaining_out);
@@ -673,7 +672,7 @@ Layout_SplitSection(
 	layout_io->section.size = size;
 
 	Layout *t_layout;
-	Array_AddEmpty(&layout_io->a_sublayouts, &t_layout);
+	Array_AddEmpty(&layout_io->section.a_sublayouts, &t_layout);
 
 	/// rect_full will be updated with remaining size during arrangment
 	Layout_Create(t_layout, {0, 0, 0, 0}, layout_io->fill_last_block);
