@@ -653,6 +653,16 @@ MemorySegment_AddWidgets(
     }
 }
 
+instant void
+Widget_UseScrollDefault(
+	Widget *widget_io
+) {
+	Assert(widget_io);
+
+	widget_io->text.offset_x = 0;
+	widget_io->text.offset_y = 0;
+}
+
 instant bool
 Widget_Update(
 	Widget *widget_io
@@ -799,6 +809,8 @@ Widget_Update(
 
 	if (widget_io->data.s_row_filter.changed) {
 		widget_io->data.as_filter_data.by_reference = true;
+
+		Widget_UseScrollDefault(widget_io);
 
 		Array_Filter(
 			&widget_io->data.as_filter_data,
@@ -1540,16 +1552,13 @@ Widget_Update(
 
 instant void
 Widget_ClearRows(
-	Widget *widget_out
+	Widget *widget_io
 ) {
-	Assert(widget_out);
+	Assert(widget_io);
 
-	Array_Clear(&widget_out->data.as_row_data);
+	Array_Clear(&widget_io->data.as_row_data);
 
-//	widget_out->rect_content.x = 0;
-//	widget_out->rect_content.y = 0;
-
-	widget_out->text.offset_y = 0;
+	Widget_UseScrollDefault(widget_io);
 }
 
 instant void

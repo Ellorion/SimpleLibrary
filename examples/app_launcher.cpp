@@ -170,7 +170,10 @@ Window_HandleEvents(
 				}
 			}
 			else
-			if (keyboard->up[VK_DELETE]) {
+			/// clear filter
+			if (   keyboard->up[VK_DELETE]
+				OR keyboard->up[VK_INSERT]
+			) {
 				String *ts_data = Widget_GetTextData(&wg_filter_data);
 				String_Clear(ts_data);
 				Widget_Update(&wg_filter_data);
