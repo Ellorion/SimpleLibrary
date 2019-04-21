@@ -77,7 +77,6 @@ Dialog_OpenDirectory(
 enum WINDOW_SCALE_TYPE {
 	WINDOW_SCALE_EXPAND,
 	WINDOW_SCALE_ASPECT_RATIO,
-///	WINDOW_SCALE_STRETCH, /// @TODO(?)
 };
 
 static const char *class_name = "OpenGL";

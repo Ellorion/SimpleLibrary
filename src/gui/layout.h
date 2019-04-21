@@ -51,7 +51,6 @@ struct Layout_Block {
 
 struct Layout;
 
-/// @todo: float size and allow % based for resizing
 struct Layout_Section {
 	bool is_in_section = false;
 	LAYOUT_SECTION_TYPE type;

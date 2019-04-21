@@ -33,15 +33,14 @@ int main() {
 	OpenGL_UseVSync(&window, true);
 
 	ShaderSet 	shader_set 		= ShaderSet_Create(&window);
-	Font 		font_static 	= Font_Load(S("default.ttf"), 20);
 	Font 		font_dynamic 	= Font_Load(S("default.ttf"), 20);
 
 	String s_font_directory = S("./fonts");
 
-	Widget wg_label 		= Widget_CreateLabel(  &window, &font_static , {0, 0, 250                    , 0}, S("Dir: "));
-	Widget wg_list  		= Widget_CreateListBox(&window, &font_static , {0, 0, wg_label.rect_content.w, 0});
-	Widget wg_font_plus 	= Widget_CreateButton( &window, &font_static , {}, S("+"));
-	Widget wg_font_minus 	= Widget_CreateButton( &window, &font_static , {}, S("-"));
+	Widget wg_label 		= Widget_CreateLabel(  &window, &font_dynamic , {}, S("Dir: "));
+	Widget wg_list  		= Widget_CreateListBox(&window, &font_dynamic , {});
+	Widget wg_font_plus 	= Widget_CreateButton( &window, &font_dynamic , {}, S("+"));
+	Widget wg_font_minus 	= Widget_CreateButton( &window, &font_dynamic , {}, S("-"));
 	Widget wg_textbox 		= Widget_CreateTextBox(&window, &font_dynamic, {}, true);
 
 	String *s_data_label = Widget_GetTextData(&wg_label);
@@ -56,31 +55,36 @@ int main() {
 	Array_Add(&ap_widgets, &wg_font_minus);
 	Array_Add(&ap_widgets, &wg_textbox);
 
-    /// @Note: check layout_section_demo example
-    ///        for a simple alternative solution
-	Layout layout_menu;
-	Layout_Create(&layout_menu, {0, 0, 0, 0}, true);
-	{
-		Layout_CreateBlock(&layout_menu, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT);
-		Layout_Add(&layout_menu, &wg_font_plus);
-		Layout_Add(&layout_menu, &wg_font_minus);
+	Layout *layout_remaining;
 
-		Layout_CreateBlock(&layout_menu, LAYOUT_TYPE_Y, LAYOUT_DOCK_TOPLEFT, 1);
-		Layout_Add(&layout_menu, &wg_label);
-		Layout_Add(&layout_menu, &wg_list);
+	Layout layout;
+	Layout_Create(&layout, &window, true);
+	{
+		Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT);
+		Layout_Add(&layout, &wg_font_minus);
+		Layout_Add(&layout, &wg_font_plus);
+
+		Layout_CreateBlock(&layout, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT, 1);
+		Layout_Add(&layout, &wg_label);
+		Layout_Add(&layout, &wg_list);
 	}
-
-	Layout layout_text;
-	Layout_Create(&layout_text, {0, 0, 0, 0}, true);
+	Layout_ReserveSection(&layout, LAYOUT_SECTION_LEFT, 250, &layout_remaining);
 	{
-		Layout_CreateBlock(&layout_text, LAYOUT_TYPE_X, LAYOUT_DOCK_BOTTOMRIGHT);
-		Layout_Add(&layout_text, &wg_textbox);
+		Layout_CreateBlock(layout_remaining, LAYOUT_TYPE_Y, LAYOUT_DOCK_BOTTOMRIGHT);
+		Layout_Add(layout_remaining, &wg_textbox);
 	}
 
 	MemorySegment_Add(&window.a_segments_reset, window.events);
-	MemorySegment_Add(&window.a_segments_reset, font_static.events);
 	MemorySegment_Add(&window.a_segments_reset, font_dynamic.events);
+
+#if 1
 	MemorySegment_AddWidgets(&window.a_segments_reset, &ap_widgets);
+#else
+	/// alternative method
+	Widget_ForEach(&ap_widgets, [&](Widget *widget) {
+		MemorySegment_Add(&window.a_segments_reset, widget->events);
+	});
+#endif // 0
 
 	Array<Directory_Entry> a_font_files;
 	File_ReadDirectory(&a_font_files, s_font_directory, DIR_LIST_ONLY_FILES, true, "ttf");
@@ -111,20 +115,7 @@ int main() {
 
 	while(Window_IsRunning(&window)) {
 		Window_ReadMessage(&window);
-
-		Layout_Rearrange(&layout_menu, {
-			0,
-			0,
-			wg_label.rect_content.w,
-			window.height
-		});
-
-		Layout_Rearrange(&layout_text, {
-			(float)wg_label.rect_content.w - (layout_menu.padding * 2),
-			0,
-			window.width - wg_label.rect_content.w + ((s32)layout_menu.padding * 2),
-			window.height
-		});
+		Layout_Rearrange(&layout, &window);
 
 		Widget_Update(&ap_widgets, &keyboard);
 
@@ -148,8 +139,13 @@ int main() {
 		if (keyboard.up[VK_ESCAPE])
 			Window_Close(&window);
 
-		if (font_dynamic.events.on_size_changed)
+		if (font_dynamic.events.on_size_changed) {
+            Widget_ForEach(&ap_widgets, [](Widget *widget) {
+				widget->trigger_autosize = true;
+			});
+
 			Widget_Update(&ap_widgets, &keyboard);
+		}
 
 		OpenGL_ClearScreen();
 

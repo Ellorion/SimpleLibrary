@@ -760,31 +760,56 @@ Widget_Update(
 		}
 	}
 
+	/// Triggers
+	/// =======================================================================
  	if (widget_io->trigger_autosize) {
 		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
 		Text_Data *settings = &text->data;
 
-		if (    layout_data->auto_width
-			AND settings->content_width
-		) {
-			s32 width_auto = settings->content_width;
-			Widget_AddBorderSizes(widget_io, &width_auto, 0);
+		/// minimum width / height (to not make widgets unvisible)
+		/// -------------------------------------------------------------------
+		if (widget_io->text.font) {
+			if (!layout_data->rect.w) {
+				s32 min_width  = widget_io->text.font->size;
+				Widget_AddBorderSizes(widget_io, &min_width , 0);
 
-			if (layout_data->rect.w != width_auto) {
-				layout_data->rect.w  = width_auto;
-				result = true;
+				layout_data->rect.w = min_width;
+				settings->rect.w = min_width;
+				widget_io->rect_content.w = min_width;
+			}
+
+			if (!layout_data->rect.h) {
+				s32 min_height = Font_GetLineHeight(widget_io->text.font);
+				Widget_AddBorderSizes(widget_io, &min_height, 0);
+
+				layout_data->rect.h = min_height;
+				settings->rect.h = min_height;
+				widget_io->rect_content.h = min_height;
+			}
+		}
+		/// auto width / height (depends on content-size)
+		/// -------------------------------------------------------------------
+		if (layout_data->auto_width) {
+			if (settings->content_width) {
+				s32 width_auto = settings->content_width;
+				Widget_AddBorderSizes(widget_io, &width_auto, 0);
+
+				if (layout_data->rect.w != width_auto) {
+					layout_data->rect.w  = width_auto;
+					result = true;
+				}
 			}
 		}
 
-		if (    layout_data->auto_height
-			AND settings->content_height
-		) {
-			s32 height_auto = settings->content_height;
-			Widget_AddBorderSizes(widget_io, 0, &height_auto);
+		if (layout_data->auto_height) {
+			if (settings->content_height) {
+				s32 height_auto = settings->content_height;
+				Widget_AddBorderSizes(widget_io, 0, &height_auto);
 
-			if (layout_data->rect.h != height_auto) {
-				layout_data->rect.h  = height_auto;
-				result = true;
+				if (layout_data->rect.h != height_auto) {
+					layout_data->rect.h  = height_auto;
+					result = true;
+				}
 			}
 		}
 
@@ -1629,17 +1654,6 @@ Widget_LoadDirectoryList(
 		String ts_entry_name = t_entry->s_name;
 		ts_entry_name.is_reference = true;
 
-#if 0
-		/// @TODO: for File_ChangePath version, which "squishes" an existing path,
-		///        that includes \.. already
-		if (!show_full_path)
-			String_AddOffset(&ts_entry_name, ts_directory_buffer.length);
-
-		/// removing leading "\" to indicate file type
-		if (t_entry->type == DIR_ENTRY_FILE)
-			String_AddOffset(&ts_entry_name, 1);
-#endif // 0
-
 		Widget_AddRow(widget_io, ts_entry_name);
 	}
 
@@ -1663,30 +1677,18 @@ Widget_CreateLabel(
 
 	Rect *rect_padding = &t_widget.text.data.rect_padding;
 
-	if (!rect_box.w) {
-		rect_box.w = font->size;
-		Widget_AddBorderSizes(&t_widget, &rect_box.w, 0);
-
-		t_widget.layout_data.settings.auto_width = true;
-	}
-
-	if (!rect_box.h) {
-		rect_box.h = Font_GetLineHeight(font);
-		Widget_AddBorderSizes(&t_widget, 0, &rect_box.h);
-
-		t_widget.layout_data.settings.auto_height = true;
-	}
-
 	t_widget.type         = WIDGET_LABEL;
 	t_widget.rect_content = rect_box;
 	t_widget.window       = window;
-
-	t_widget.layout_data.settings.rect = rect_box;
 
 	t_widget.data.is_focusable = false;
 
 	t_widget.text.data.align_x    = text_align_x;
 	t_widget.text.data.rect       = rect_box;
+
+	t_widget.layout_data.settings.rect = rect_box;
+	t_widget.layout_data.settings.auto_width  = true;
+	t_widget.layout_data.settings.auto_height = true;
 
 	t_widget.text.font = font;
 
@@ -1766,6 +1768,8 @@ Widget_CreateListBox(
 
 	t_widget.text.font = font;
 
+	t_widget.trigger_autosize = true;
+
 	return t_widget;
 }
 
@@ -1828,6 +1832,8 @@ Widget_CreatePictureBox(
 		t_widget.vertex_rect.texture = *texture;
 
 	t_widget.data.is_focusable = false;
+
+	t_widget.trigger_autosize = true;
 
 	return t_widget;
 }
@@ -1942,9 +1948,6 @@ Widget_CreateNumberPicker(
 	Widget wg_button_down = Widget_CreateButton(window, font, {0, 0, 24, 24}, S(">"));
 	Widget wg_spreader    = Widget_CreateSpreader(window);
 
-	wg_button_up.trigger_autosize   = false;
-	wg_button_down.trigger_autosize = false;
-
 	wg_button_up.OwnerDraw   = Widget_RedrawNumberPickerButton;
 	wg_button_down.OwnerDraw = Widget_RedrawNumberPickerButton;
 	wg_button_up.UpdateCustomInputs   = Widget_UpdateInputNumberPicker;
@@ -1978,16 +1981,6 @@ Widget_CreateTextBox(
 
 	Rect *rect_padding = &t_widget.text.data.rect_padding;
 
-	if (!rect_box.w) {
-		rect_box.w = font->size;
-		Widget_AddBorderSizes(&t_widget, &rect_box.w, 0);
-	}
-
-	if (!rect_box.h) {
-		rect_box.h = Font_GetLineHeight(font);
-		Widget_AddBorderSizes(&t_widget, 0, &rect_box.h);
-	}
-
 	t_widget.type         = WIDGET_TEXTBOX;
 	t_widget.rect_content = rect_box;
 	t_widget.window       = window;
@@ -2009,6 +2002,8 @@ Widget_CreateTextBox(
 	else {
 		t_widget.text.data.use_no_linebreak = true;
 	}
+
+	t_widget.trigger_autosize = true;
 
 	return t_widget;
 }
@@ -2166,18 +2161,6 @@ Widget_CreateComboBox(
 ) {
 	Widget t_widget = {};
 
-	/// @todo: - automate this during mainloop when font changes?
-	///        - make an event for when widget sizes change to trigger layout system?
-	if (!rect_box.w) {
-		rect_box.w = font->size;
-		Widget_AddBorderSizes(&t_widget, &rect_box.w, 0);
-	}
-
-	if (!rect_box.h) {
-		rect_box.h = Font_GetLineHeight(font);
-		Widget_AddBorderSizes(&t_widget, 0, &rect_box.h);
-	}
-
 	t_widget.type         = WIDGET_COMBOBOX;
 	t_widget.rect_content = rect_box;
 	t_widget.window       = window;
@@ -2216,6 +2199,8 @@ Widget_CreateComboBox(
 
 	twg_list->widget_focus_on_popout = twg_text;
 
+	t_widget.trigger_autosize = true;
+
 	return t_widget;
 }
 
@@ -2227,16 +2212,6 @@ Widget_CreateProgressbar(
 	Widget_Slide slide
 ) {
 	Widget t_widget = {};
-
-	if (!rect_box.w) {
-		rect_box.w = font->size;
-		Widget_AddBorderSizes(&t_widget, &rect_box.w, 0);
-	}
-
-	if (!rect_box.h) {
-		rect_box.h = Font_GetLineHeight(font) + 2;
-		Widget_AddBorderSizes(&t_widget, 0, &rect_box.h);
-	}
 
 	t_widget.type         = WIDGET_PROGRESSBAR;
 	t_widget.rect_content = rect_box;
@@ -2251,6 +2226,8 @@ Widget_CreateProgressbar(
 
 	t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_width = true;
+
+	t_widget.trigger_autosize = true;
 
 	return t_widget;
 }
@@ -2299,4 +2276,25 @@ Widget_SwapLayout(
 
 	if ((*ap_widgets_active)->count)
 		Widget_SetFocus(ARRAY_IT((**ap_widgets_active), 0));
+}
+
+template <typename Func>
+instant void
+Widget_ForEach(
+	Array<Widget *> *ap_widgets,
+	Func OnWidgetChange
+) {
+	Assert(ap_widgets);
+
+	FOR_ARRAY(*ap_widgets, it) {
+		Widget *t_widget = ARRAY_IT(*ap_widgets, it);
+
+		OnWidgetChange(t_widget);
+
+		FOR_ARRAY(t_widget->a_subwidgets, it_sub) {
+			Widget *t_widget_sub = &ARRAY_IT(t_widget->a_subwidgets, it_sub);
+
+			OnWidgetChange(t_widget_sub);
+		}
+	}
 }

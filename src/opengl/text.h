@@ -436,10 +436,6 @@ struct Text_Cursor {
 	Vertex vertex_cursor;
 };
 
-/// @todo: - rename to text_config
-///        - make data from word split
-///        - put that in a_row_data in widget
-///        - render with updating default text
 struct Text_Data {
 	Rect rect 			= {}; /// draw area
 	Rect rect_padding 	= {};
@@ -1775,8 +1771,6 @@ Text_UpdateInput(
 	Assert(keyboard);
 
 	IF_SET(text_changed_out)   = false;
-
-	///@TODO: use (prev_)data to retrieve this info
 	IF_SET(cursor_changed_out) = false;
 
 	if (!text_io->data.is_editable)
