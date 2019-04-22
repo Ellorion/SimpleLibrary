@@ -121,6 +121,7 @@
 #include <shlwapi.h>
 #include <iphlpapi.h>
 #include <shlobj.h>
+#include <time.h>
 
 __attribute__((gnu_inline, always_inline))
 __inline__ static void debug_break(void)
@@ -385,6 +386,7 @@ ToInt(
 	return result;
 }
 
+#include "core/random.h"
 #include "core/mutex.h"
 #include "core/thread.h"
 #include "core/time.h"

@@ -232,7 +232,9 @@ Test_Arrays(
 		typedef bool (*OnKeepIfMatch)(s64);
 
 		Array<s64> a_numbers;
-		Array_AddRange(&a_numbers, 1, 30);
+		Array_AddRange(&a_numbers, 1, 30, [](auto data_ptr, auto it){
+			*data_ptr = it;
+		});
 
 		/// useable variants
 		OnKeepIfMatch   fn_2 =       [](s64 value)         { return value % 2 != 0; };
@@ -277,7 +279,9 @@ Test_Arrays(
 
 	{
 		Array<s64> a_numbers;
-		Array_AddRange(&a_numbers, 1, 30);
+		Array_AddRange(&a_numbers, 1, 30, [](auto data_ptr, auto it){
+			*data_ptr = it;
+		});
 
 		bool (*OnKeepIfMatch)(s64) = [](s64 value) {
 			if (value % 2 == 0)  return false;
@@ -318,7 +322,9 @@ Test_Arrays(
 
 	{
 		Array<s64> a_numbers;
-		Array_AddRange(&a_numbers, 1, 30);
+		Array_AddRange(&a_numbers, 1, 30, [](auto data_ptr, auto it){
+			*data_ptr = it;
+		});
 
 		auto OnKeepIfMatch = [](s64 value) -> bool {
 			if (value % 2 == 0)  return false;
@@ -359,7 +365,9 @@ Test_Arrays(
 
 	{
 		Array<s64> a_numbers;
-		Array_AddRange(&a_numbers, 1, 30);
+		Array_AddRange(&a_numbers, 1, 30, [](auto data_ptr, auto it){
+			*data_ptr = it;
+		});
 
 		/// auto function parameter variance
 		auto OnKeepIfMatch = [](auto value) -> bool {
@@ -401,7 +409,9 @@ Test_Arrays(
 
 	{
 		Array<s64> a_numbers;
-		Array_AddRange(&a_numbers, 1, 30);
+		Array_AddRange(&a_numbers, 1, 30, [](auto data_ptr, auto it){
+			*data_ptr = it;
+		});
 
 		/// auto function parameter variance
 		auto OnKeepIfMatch = [](s64 value) {
@@ -443,7 +453,9 @@ Test_Arrays(
 
 	{
 		Array<s64> a_numbers;
-		Array_AddRange(&a_numbers, 1, 30);
+		Array_AddRange(&a_numbers, 1, 30, [](auto data_ptr, auto it){
+			*data_ptr = it;
+		});
 
 		/// auto function parameter variance
 		auto OnKeepIfMatch = [](auto value) {
@@ -485,7 +497,9 @@ Test_Arrays(
 
 	{
 		Array<s64> a_numbers;
-		Array_AddRange(&a_numbers, 1, 30);
+		Array_AddRange(&a_numbers, 1, 30, [](auto data_ptr, auto it){
+			*data_ptr = it;
+		});
 
 		Array_Filter(&a_numbers,
 			[](s64 value) {

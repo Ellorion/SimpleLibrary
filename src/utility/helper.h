@@ -1,83 +1,5 @@
 #pragma once
 
-instant void
-Array_AddRange(
-	Array<s64> *a_data_io,
-	s64 min,
-	s64 max
-) {
-	Assert(a_data_io);
-
-	s64 t_min = MIN(min, max);
-	s64 t_max = MAX(min, max);
-
-	s64 t_delta = t_max - t_min;
-
-	for(s64 it = t_min; it < t_max; ++it) {
-		Array_Add(a_data_io, it);
-	}
-}
-
-instant void
-Array_AddRange(
-	Array<u64> *a_data_io,
-	u64 min,
-	u64 max
-) {
-	Assert(a_data_io);
-
-	u64 t_min = MIN(min, max);
-	u64 t_max = MAX(min, max);
-
-	u64 t_delta = t_max - t_min;
-
-	for(u64 it = t_min; it < t_max; ++it) {
-		Array_Add(a_data_io, it);
-	}
-}
-
-template <typename Func>
-instant void
-Array_AddRange(
-	Array<s64> *a_data_io,
-	s64 min,
-	s64 max,
-	Func OnModifyData
-) {
-	Assert(a_data_io);
-
-	s64 t_min = MIN(min, max);
-	s64 t_max = MAX(min, max);
-
-	s64 t_delta = t_max - t_min;
-
-	for(s64 it = t_min; it < t_max; ++it) {
-		s64 value = OnModifyData(it);
-		Array_Add(a_data_io, value);
-	}
-}
-
-template <typename Func>
-instant void
-Array_AddRange(
-	Array<u64> *a_data_io,
-	u64 min,
-	u64 max,
-	Func OnModifyData
-) {
-	Assert(a_data_io);
-
-	u64 t_min = MIN(min, max);
-	u64 t_max = MAX(min, max);
-
-	u64 t_delta = t_max - t_min;
-
-	for(u64 it = t_min; it < t_max; ++it) {
-		u64 value = OnModifyData(it);
-		Array_Add(a_data_io, value);
-	}
-}
-
 template <typename T, typename Func>
 instant void
 Array_AddRange(
@@ -93,7 +15,7 @@ Array_AddRange(
 
 	u64 t_delta = t_max - t_min;
 
-	for(u64 it = t_min; it < t_max; ++it) {
+	FOR_START(t_min, t_max, it) {
 		T data;
 		OnAssignData(&data, it);
 		Array_Add(a_data_io, data);
