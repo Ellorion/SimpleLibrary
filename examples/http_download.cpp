@@ -11,7 +11,7 @@ int main() {
 /// host adress as the one requesting to.
 /// @Note: do not call the host-string "s_host", or winsock.h will complain
 /// because of a macro, that is used there. Thank you, microsoft.
-	Network network = Network_Connect(s_host_adress, 80);
+	Network network = Network_Connect(SOCKET_TCP, s_host_adress, 80);
 
 	Network_HTTP_Request(&network, s_host_adress, S(""));
 	Network_HTTP_GetResponseRef(&network, &s_header);

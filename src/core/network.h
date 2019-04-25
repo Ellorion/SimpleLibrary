@@ -3,6 +3,11 @@
 /// Server: socket() -> bind() -> listen() -> accept() |-> send()/recv() -> close()
 /// Client: socket() -> connect()                      |-> send()/recv() -> close()
 
+enum SOCKET_TYPE {
+	SOCKET_TCP,
+	SOCKET_UDP
+};
+
 enum NETWORK_HTTP_STAGE {
 	NETWORK_HTTP_STAGE_IDLE = 0,
 	NETWORK_HTTP_STAGE_REQUESTED,
@@ -231,13 +236,26 @@ Network_Destroy(
 
 instant Network
 Network_Create(
+	SOCKET_TYPE type
 ) {
 	Network network = {};
 
 	if (!Network_Init())
 		return network;
 
-	network.socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	switch (type) {
+		case SOCKET_TCP: {
+			network.socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		} break;
+
+		case SOCKET_UDP: {
+			network.socket = socket(AF_INET, SOCK_DGRAM, 0);
+		} break;
+
+		default: {
+			AssertMessage(false, "Unknown socket type.");
+		}
+	}
 
 	if (network.socket == INVALID_SOCKET)
 		network.s_error = S("Network socket is invalid.");
@@ -249,7 +267,7 @@ instant Network
 Network_Listen(
 	u16 port
 ) {
-	Network network = Network_Create();
+	Network network = Network_Create(SOCKET_TCP);
 
 	sockaddr_in socket_addr;
 	socket_addr.sin_family      = AF_INET;
@@ -304,10 +322,11 @@ Network_GetIPByName(
 
 instant Network
 Network_Connect(
+	SOCKET_TYPE type,
 	String s_host_adress,
 	u16 port
 ) {
-	Network network = Network_Create();
+	Network network = Network_Create(type);
 
 	if (Network_HasError(&network)) {
 		return network;
@@ -325,10 +344,15 @@ Network_Connect(
 	socket_addr.sin_addr.s_addr = inet_addr(s_ip_address.value);
 	socket_addr.sin_port        = htons(port);
 
+	LOG_STATUS("Network [" << s_host_adress.value << ":" << port << "] connecting...");
+
 	s32 result = connect(network.socket, (SOCKADDR *)&socket_addr, sizeof(socket_addr));
 
 	if (result == SOCKET_ERROR) {
 		network.s_error = S("Network socket connection failed.");
+	}
+	else {
+		LOG_STATUS("Network connected to: " << s_host_adress.value);
 	}
 
 	return network;
@@ -381,6 +405,9 @@ Network_Send(
 ) {
 	Assert(network);
 
+	if (Network_HasError(network))
+		return false;
+
 	if (!Network_IsSocketValid(network)) {
 		network->s_error = S("Invalid network socket [send].\n\tForgot to connect to a host?");
 		return false;
@@ -403,6 +430,9 @@ Network_Receive(
 	Assert(network);
 	Assert(s_buffer_out);
 	Assert(s_buffer_out->length);
+
+	if (Network_HasError(network))
+		return false;
 
 	if (!Network_IsSocketValid(network)) {
 		network->s_error = S("Invalid network socket [recv].\n\tForgot to connect to a host?");
@@ -647,7 +677,7 @@ Network_HTTP_Request(
 	Assert(network);
 
 	if (!Network_IsSocketValid(network)) {
-		*network = Network_Connect(s_ip, 80);
+		*network = Network_Connect(SOCKET_TCP, s_ip, 80);
 
 		if (Network_HasError(network))
 			return false;
@@ -707,7 +737,7 @@ Network_HTTP_Request(
 	}
 
 	if (!Network_IsSocketValid(network)) {
-		*network = Network_Connect(uri.s_domain, uri.port);
+		*network = Network_Connect(SOCKET_TCP, uri.s_domain, uri.port);
 
 		if (Network_HasError(network)) {
 			Network_HTTP_DestroyURI(&uri);
@@ -1012,4 +1042,51 @@ Network_HTTP_DownloadData(
 
 	*has_error = false;
 	return s_result;
+}
+
+/// - returns unix timestamp
+/// - on error -> returns 0
+instant u64
+Network_NTP_GetTimestamp(
+	String s_ntp_server
+) {
+	const s32 NTP_PACKET_SIZE = 48;
+
+	Network network = Network_Connect(SOCKET_UDP, s_ntp_server, 123);
+
+	static String s_ntp_packet = String_CreateBuffer(NTP_PACKET_SIZE);
+
+	Memory_Set(s_ntp_packet.value, 0, NTP_PACKET_SIZE);
+	s_ntp_packet.value[00] = 0b11100011;
+	s_ntp_packet.value[01] = 0;
+	s_ntp_packet.value[02] = 6;
+	s_ntp_packet.value[03] = 0xEC;
+	s_ntp_packet.value[12] = 49;
+	s_ntp_packet.value[13] = 0x4E;
+	s_ntp_packet.value[14] = 49;
+	s_ntp_packet.value[15] = 52;
+
+    Network_Send(&network, s_ntp_packet);
+
+    s32 recv = Network_Receive(&network, &s_ntp_packet, false);
+
+    u64 timestamp_unix_sec = 0;
+
+	if (    !Network_HasError(&network)
+		AND (recv == NTP_PACKET_SIZE)
+	) {
+		u64 word_high = (s_ntp_packet.value[40] << 8 | s_ntp_packet.value[41]);
+		u64 word_low  = (s_ntp_packet.value[42] << 8 | s_ntp_packet.value[43]);
+
+		/// a ntp server can send bogus data...
+		if (word_high > word_low) {
+			/// number of seconds since January 1, 1970 at 00:00:00 GMT
+			timestamp_unix_sec  = (word_high << 16) | word_low;
+			timestamp_unix_sec -= 2208988800;
+		}
+	}
+
+	Network_Close(&network);
+
+	return timestamp_unix_sec;
 }

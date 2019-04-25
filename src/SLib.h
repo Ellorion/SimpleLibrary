@@ -4,14 +4,29 @@
 ///       to increase performance
 #define DEBUG_MODE				1
 
-/// Log-Messages
-#define SHOW_INFO				0
-#define SHOW_WARNING			1
+/// ===========================================================================
+#if DEBUG_MODE
 
-#define DEBUG_EVENT_STATUS		0
+/// Log-Messages
+#	define SHOW_INFO			0
+#	define SHOW_WARNING			1
 
 /// enables timing measurement output
-#define DEBUG_BENCHMARK			0
+#	define DEBUG_BENCHMARK		0
+#	define DEBUG_EVENT_STATUS	0
+
+#else
+
+/// Log-Messages
+#	define SHOW_INFO			0
+#	define SHOW_WARNING			0
+
+/// enables timing measurement output
+#	define DEBUG_BENCHMARK		0
+#	define DEBUG_EVENT_STATUS	0
+
+#endif // DEBUG_MODE
+/// ===========================================================================
 
 /// Operating System: Windows
 ///
@@ -211,7 +226,7 @@ _AssertMessage(
 /// ::: Messages
 /// ===========================================================================
 #if DEBUG_EVENT_STATUS
-#	define LOG_STATUS(_text) std::cout << _text;
+#	define LOG_STATUS(_text) std::cout << _text << std::endl;
 #else
 #	define LOG_STATUS(_text)
 #endif
