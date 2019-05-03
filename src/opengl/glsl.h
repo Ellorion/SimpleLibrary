@@ -5,6 +5,7 @@ enum SHADER_PROG_TYPE {
 	SHADER_PROG_TEXT,
 	SHADER_PROG_TEXTURE_FULL,
 	SHADER_PROG_TEXTURE_SIZE,
+	SHADER_PROG_TRIANGLE_STRIP,
 	SHADER_PROG_COUNT
 };
 
@@ -22,8 +23,8 @@ R"(
 	uniform float scale_x = 1.0f;
 	uniform float scale_y = 1.0f;
 
-	uniform float x_offset = 0.0f;
-	uniform float y_offset = 0.0f;
+	uniform float offset_x = 0.0f;
+	uniform float offset_y = 0.0f;
 
 	in vec4 vertex_position;
 	in vec4 rect_color;
@@ -54,17 +55,17 @@ R"(
 		mat4 proj_matrix;
 		mat4 scale_matrix;
 		vec4 rect_color;
-	} o_Vertex;
+	} out_vertex;
 
 	void main() {
-		gl_Position           = vec4(vertex_position.x + x_offset,
-									 vertex_position.y + y_offset,
-									 vertex_position.z + x_offset,
-									 vertex_position.w + y_offset);
+		gl_Position = vec4(vertex_position.x + offset_x,
+                           vertex_position.y + offset_y,
+                           vertex_position.z + offset_x,
+                           vertex_position.w + offset_y);
 
-		o_Vertex.proj_matrix  = proj_matrix;
-		o_Vertex.scale_matrix = scale_matrix;
-		o_Vertex.rect_color   = rect_color;
+		out_vertex.proj_matrix  = proj_matrix;
+		out_vertex.scale_matrix = scale_matrix;
+		out_vertex.rect_color   = rect_color;
 	}
 )",
 
@@ -83,14 +84,14 @@ R"(
 		mat4 proj_matrix;
 		mat4 scale_matrix;
 		vec4 rect_color;
-	} i_Vertex[];
+	} in_vertex[];
 
 	out vec4 rect_color;
 
 	void main() {
 		vec4 pt           = gl_in[0].gl_Position;
-		mat4 proj_matrix  = i_Vertex[0].proj_matrix;
-		mat4 scale_matrix = i_Vertex[0].scale_matrix;
+		mat4 proj_matrix  = in_vertex[0].proj_matrix;
+		mat4 scale_matrix = in_vertex[0].scale_matrix;
 
 		mat4 matrix_mod = proj_matrix;
 
@@ -101,30 +102,30 @@ R"(
 
 		// ---------------------------------
 		gl_Position = v_pos_1;
-		rect_color = i_Vertex[0].rect_color;
+		rect_color = in_vertex[0].rect_color;
 		EmitVertex();
 
 		gl_Position = v_pos_2;
-		rect_color = i_Vertex[0].rect_color;
+		rect_color = in_vertex[0].rect_color;
 		EmitVertex();
 
 		gl_Position = v_pos_3;
-		rect_color = i_Vertex[0].rect_color;
+		rect_color = in_vertex[0].rect_color;
 		EmitVertex();
 
 		// ---------------------------------
 		gl_Position = v_pos_4;
-		rect_color = i_Vertex[0].rect_color;
+		rect_color = in_vertex[0].rect_color;
 		EmitVertex();
 
 		gl_Position = v_pos_1;
-		rect_color = i_Vertex[0].rect_color;
+		rect_color = in_vertex[0].rect_color;
 		EmitVertex();
 
 		// ---------------------------------
 
 		gl_Position = v_pos_2;
-		rect_color = i_Vertex[0].rect_color;
+		rect_color = in_vertex[0].rect_color;
 		EmitVertex();
 
 		EndPrimitive();
@@ -153,8 +154,8 @@ R"(
 	uniform float scale_x  = 1.0f;
 	uniform float scale_y  = 1.0f;
 
-	uniform float x_offset = 0.0f;
-	uniform float y_offset = 0.0f;
+	uniform float offset_x = 0.0f;
+	uniform float offset_y = 0.0f;
 
 	in vec2 vertex_position;
 	in vec3 text_color;
@@ -188,8 +189,8 @@ R"(
 	} o_Vertex;
 
 	void main() {
-		gl_Position = vec4( vertex_position.x + x_offset,
-							vertex_position.y + y_offset,
+		gl_Position = vec4( vertex_position.x + offset_x,
+							vertex_position.y + offset_y,
 							0,
 							1);
 
@@ -540,3 +541,75 @@ R"(
 		out_frag_color = texture2D(fragment_texture, tex_coords);
 	}
 )"};
+
+static const Shader shader_triangle_strip = {
+	SHADER_PROG_TRIANGLE_STRIP,
+R"(
+	#version 330 core
+
+	uniform vec4 viewport = vec4(0, 0, 800, 480);
+	uniform float scale_x = 1.0f;
+	uniform float scale_y = 1.0f;
+
+	uniform float offset_x = 0.0f;
+	uniform float offset_y = 0.0f;
+
+	in vec3 vertex_position;
+	in vec4 vertex_color;
+
+	float left   = 0.0f;
+	float right  = viewport.z;
+	float top    = 0.0f;
+	float bottom = viewport.w;
+
+    mat4 proj_matrix = mat4(
+		 2.0f / (right - left), 0                    ,  0,  0,
+		 0                    , 2.0f / (top - bottom),  0,  0,
+		 0                    , 0                    ,  1,  0,
+		-(right + left)   / (right - left),
+		-(top   + bottom) / (top   - bottom),
+		 0,
+		 1
+	);
+
+	mat4 scale_matrix = mat4(
+		scale_x , 0      , 0, 0,
+		0       , scale_y, 0, 0,
+		0       , 0      , 1, 0,
+		0       , 0      , 0, 1
+	);
+
+	out Vertex_Data {
+		vec4 color;
+	} out_vertex;
+
+	void main() {
+		gl_Position = proj_matrix *
+		              vec4(vertex_position.x + offset_x,
+                           vertex_position.y + offset_y,
+                           vertex_position.z,
+                           1)
+					  * scale_matrix;
+
+		out_vertex.color = vertex_color;
+	}
+)",
+
+0,
+
+R"(
+	#version 330 core
+
+	layout(origin_upper_left) in vec4 gl_FragCoord;
+
+	in Vertex_Data {
+		vec4 color;
+	} in_vertex;
+
+	out vec4 out_frag_color;
+
+	void main() {
+		out_frag_color = in_vertex.color;
+	}
+)"};
+

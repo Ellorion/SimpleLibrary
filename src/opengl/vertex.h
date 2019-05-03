@@ -1,5 +1,10 @@
 #pragma once
 
+enum VERTEX_TYPE {
+	VERTEX_RECT,
+	VERTEX_TRIANGLE_STRIP
+};
+
 template <typename T>
 struct Vertex_Buffer {
 	u32 id = 0;
@@ -20,6 +25,7 @@ struct Vertex {
 	Texture texture;
 	Array<Vertex_Buffer<float>> a_attributes;
 	Vertex_Settings settings;
+	VERTEX_TYPE type;
 };
 
 bool
@@ -146,20 +152,24 @@ Vertex_SetTexture(
 
 instant void
 Vertex_Create(
-	Vertex *vertex_out
+	Vertex *vertex_out,
+	VERTEX_TYPE type
 ) {
 	Assert(vertex_out);
 	Assert(vertex_out->array_id == 0);
 
 	glGenVertexArrays(1, &vertex_out->array_id);
+
+	vertex_out->type = type;
 }
 
 instant Vertex
 Vertex_Create(
+	VERTEX_TYPE type
 ) {
 	Vertex vertex = {};
 
-	Vertex_Create(&vertex);
+	Vertex_Create(&vertex, type);
 
 	return vertex;
 }
@@ -180,6 +190,8 @@ Vertex_Create(
 
 	glGenVertexArrays(1, &vertex.array_id);
 
+	vertex.type = VERTEX_RECT;
+
 	return vertex;
 }
 
@@ -191,7 +203,11 @@ Vertex_Load(
 	Assert(shader_set);
 	Assert(vertex);
 
-	AssertMessage(shader_set->active_id >= 0, "[Vertex] No Shader initialized.");
+	AssertMessage(shader_set->active_id >= 0, "[Vertex] No Shader initialized.\n"
+				                              "    Shader has to be set manually, "
+											  "since uniforms require shaders to "
+											  "be in use before setting them.");
+
 	Assert((u64)shader_set->active_id < shader_set->a_shaders.count);
 
 	ShaderProgram *shader_prog = &ARRAY_IT(shader_set->a_shaders, shader_set->active_id);
@@ -247,7 +263,11 @@ Vertex_BindAttributes(
 			glGenBuffers(1, &t_buffer->id);
 
 		glBindBuffer(GL_ARRAY_BUFFER, t_buffer->id);
-		glBufferData(GL_ARRAY_BUFFER, t_buffer->a_buffer.count * sizeof(float), t_buffer->a_buffer.memory, GL_DYNAMIC_DRAW);
+
+		glBufferData(GL_ARRAY_BUFFER,
+					 t_buffer->a_buffer.count * sizeof(float),
+					 t_buffer->a_buffer.memory,
+					 GL_DYNAMIC_DRAW);
 	}
 
 	Vertex_Load(shader_set, vertex);
@@ -314,7 +334,19 @@ Vertex_Render(
 
 	Shader_SetValue(shader_set, "flip_h" , vertex->settings.flip_h);
 
-	glDrawArrays(GL_POINTS, 0, a_positions->a_buffer.count / a_positions->group_count);
+	switch (vertex->type) {
+		case VERTEX_RECT: {
+			glDrawArrays(GL_POINTS,         0, a_positions->a_buffer.count / a_positions->group_count);
+		} break;
+
+		case VERTEX_TRIANGLE_STRIP: {
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, a_positions->a_buffer.count / a_positions->group_count);
+		} break;
+
+		default: {
+			AssertMessage(false, "[Vertex] Attempting to render unhandled vertex type.");
+		}
+	}
 }
 
 instant void
@@ -398,6 +430,7 @@ Vertex_AddRect32(
 	Color32 color
 ) {
 	Assert(vertex_io);
+	Assert(vertex_io->type == VERTEX_RECT);
 
 	Vertex_Buffer<float> *t_attribute;
 
@@ -417,11 +450,38 @@ Vertex_AddRect32(
 }
 
 instant void
+Vertex_AddPoint(
+	Vertex *vertex_io,
+	Point point,
+	Color32 color
+) {
+	Assert(vertex_io);
+	Assert(vertex_io->type == VERTEX_TRIANGLE_STRIP);
+
+	Vertex_Buffer<float> *t_attribute;
+
+	Vertex_FindOrAddAttribute(vertex_io, 3, "vertex_position", &t_attribute);
+
+	Array_Reserve(&t_attribute->a_buffer, 3);
+	Array_Add(&t_attribute->a_buffer, point.x);
+	Array_Add(&t_attribute->a_buffer, point.y);
+	Array_Add(&t_attribute->a_buffer, point.z);
+
+	Vertex_FindOrAddAttribute(vertex_io, 4, "vertex_color", &t_attribute);
+	Array_Reserve(&t_attribute->a_buffer, 4);
+	Array_Add(&t_attribute->a_buffer, (float)color.r);
+	Array_Add(&t_attribute->a_buffer, (float)color.g);
+	Array_Add(&t_attribute->a_buffer, (float)color.b);
+	Array_Add(&t_attribute->a_buffer, (float)color.a);
+}
+
+instant void
 Vertex_AddRectTexture(
 	Vertex *vertex_io,
 	Rect rect
 ) {
 	Assert(vertex_io);
+	Assert(vertex_io->type == VERTEX_RECT);
 
 	Vertex_Buffer<float> *t_attribute;
 
@@ -441,6 +501,7 @@ Rect_Render(
 	Assert(shader_set);
 	Assert(shader_set->window);
 	Assert(vertex);
+	Assert(vertex->type == VERTEX_RECT);
 
 	if (vertex->a_attributes.count) {
 		Vertex_BindAttributes(shader_set, vertex);

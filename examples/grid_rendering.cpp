@@ -104,8 +104,8 @@ Grid_Render(
 	ShaderSet_Use(shader_set, SHADER_PROG_RECT);
 	Shader_SetValue(shader_set, "scale_x", floor(grid->scale));
 	Shader_SetValue(shader_set, "scale_y", floor(grid->scale));
-	Shader_SetValue(shader_set, "x_offset", center_x);
-	Shader_SetValue(shader_set, "y_offset", center_y);
+	Shader_SetValue(shader_set, "offset_x", center_x);
+	Shader_SetValue(shader_set, "offset_x", center_y);
     Vertex_Render(shader_set, &grid->a_vertex);
 }
 

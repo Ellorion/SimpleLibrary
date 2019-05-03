@@ -2034,8 +2034,8 @@ Text_Render(
 	/// redraw selection
 	if (text_io->data.is_editable AND text_io->cursor.vertex_select.a_attributes.count) {
 		ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
-		Shader_SetValue(text_io->shader_set, "x_offset", text_io->offset_x);
-		Shader_SetValue(text_io->shader_set, "y_offset", text_io->offset_y);
+		Shader_SetValue(text_io->shader_set, "offset_x", text_io->offset_x);
+		Shader_SetValue(text_io->shader_set, "offset_y", text_io->offset_y);
 
 		Rect_Render(text_io->shader_set, &text_io->cursor.vertex_select);
 	}
@@ -2053,8 +2053,8 @@ Text_Render(
 			AssertMessage(!Vertex_IsEmpty(&text_io->cursor.vertex_cursor), "[Text] Cursor vertex data does not exists.");
 
 			ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
-			Shader_SetValue(text_io->shader_set, "x_offset", text_io->offset_x);
-			Shader_SetValue(text_io->shader_set, "y_offset", text_io->offset_y);
+			Shader_SetValue(text_io->shader_set, "offset_x", text_io->offset_x);
+			Shader_SetValue(text_io->shader_set, "offset_y", text_io->offset_y);
 
 			Rect_Render(text_io->shader_set, &text_io->cursor.vertex_cursor);
 		}
@@ -2063,8 +2063,8 @@ Text_Render(
 	if (text_io->a_vertex_chars.count) {
 		/// redraw last computed text
 		ShaderSet_Use(text_io->shader_set, SHADER_PROG_TEXT);
-		Shader_SetValue(text_io->shader_set, "x_offset", text_io->offset_x);
-		Shader_SetValue(text_io->shader_set, "y_offset", text_io->offset_y);
+		Shader_SetValue(text_io->shader_set, "offset_x", text_io->offset_x);
+		Shader_SetValue(text_io->shader_set, "offset_y", text_io->offset_y);
 
 		Vertex_Render(text_io->shader_set, &text_io->a_vertex_chars);
 	}

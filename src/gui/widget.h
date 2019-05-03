@@ -933,8 +933,8 @@ Widget_Render(
 
 		/// dynamic rects
 		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
-		Shader_SetValue(text->shader_set, "x_offset", text->offset_x);
-		Shader_SetValue(text->shader_set, "y_offset", text->offset_y);
+		Shader_SetValue(text->shader_set, "offset_x", text->offset_x);
+		Shader_SetValue(text->shader_set, "offset_y", text->offset_y);
 		Rect_Render(shader_set, &widget_io->vertex_rect);
 
 		Text_Render(&widget_io->text);
