@@ -1262,7 +1262,7 @@ Text_Cursor_Render(
 	rect_cursor.w = width_cursor;
 
 	if (!cursor->vertex_cursor.array_id)
-		cursor->vertex_cursor = Vertex_Create();
+		cursor->vertex_cursor = Vertex_Create(VERTEX_RECT);
 
 	Vertex_ClearAttributes(&cursor->vertex_cursor);
 
@@ -1502,16 +1502,10 @@ Text_Cursor_Update(
 
 	if (!width_max) {
 		width_max = text_io->data.content_width;
-
-//		FOR_ARRAY(text_io->a_text_lines, it_line) {
-//			Text_Line *t_text_line = &ARRAY_IT(text_io->a_text_lines, it_line);
-//
-//			width_max = MAX(width_max, t_text_line->width_pixel);
-//		}
 	}
 
 	if (!cursor->vertex_select.array_id)
-		cursor->vertex_select = Vertex_Create();
+		cursor->vertex_select = Vertex_Create(VERTEX_RECT);
 
 	Vertex_ClearAttributes(&cursor->vertex_select);
 

@@ -382,7 +382,7 @@ Vertex_FindOrAdd(
 	bool found = Array_FindOrAdd(a_vertex_io, t_vertex_find, &t_vertex_entry);
 
 	if (!t_vertex_entry->array_id)
-		Vertex_Create(t_vertex_entry);
+		Vertex_Create(t_vertex_entry, VERTEX_RECT);
 
 	*entry_out = t_vertex_entry;
 

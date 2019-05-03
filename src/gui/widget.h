@@ -406,7 +406,7 @@ Widget_Redraw(
 	Vertex *t_vertex_static = &widget_io->vertex_rect_sublayer;
 
 	if (!t_vertex_static->array_id)
-		Vertex_Create(t_vertex_static);
+		Vertex_Create(t_vertex_static, VERTEX_RECT);
 	else
 		Vertex_ClearAttributes(t_vertex_static);
 
@@ -415,7 +415,7 @@ Widget_Redraw(
 	Vertex *t_vertex_dynamic = &widget_io->vertex_rect;
 
 	if (!t_vertex_dynamic->array_id)
-		Vertex_Create(t_vertex_dynamic);
+		Vertex_Create(t_vertex_dynamic, VERTEX_RECT);
 	else
 		Vertex_ClearAttributes(t_vertex_dynamic);
 	/// -----------------------------------------------------------------------
@@ -903,7 +903,7 @@ Widget_Render(
 			Rect rect_tex_aspect = widget_io->layout_data.settings.rect;
 			Rect_GetAspect(&rect_tex_aspect, width, height);
 
-			static Vertex vertex_texture = Vertex_Create();
+			static Vertex vertex_texture = Vertex_Create(VERTEX_RECT);
 			Vertex_SetTexture(shader_set, &vertex_texture, &widget_io->vertex_rect.texture);
 			vertex_texture.settings = widget_io->vertex_rect.settings;
 
@@ -1908,7 +1908,7 @@ Widget_RedrawNumberPickerButton(
 	Vertex *t_vertex = &widget_io->vertex_rect_sublayer;
 	Rect    rect_box =  widget_io->layout_data.settings.rect;
 
-	if (!t_vertex->array_id) Vertex_Create(t_vertex);
+	if (!t_vertex->array_id) Vertex_Create(t_vertex, VERTEX_RECT);
 	else                     Vertex_ClearAttributes(t_vertex);
 
 	if (widget_io->data.has_focus)
