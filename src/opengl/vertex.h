@@ -159,7 +159,8 @@ Vertex_Create(
 	Assert(vertex_out);
 	Assert(vertex_out->array_id == 0);
 
-	glGenVertexArrays(1, &vertex_out->array_id);
+	if (!vertex_out->array_id)
+		glGenVertexArrays(1, &vertex_out->array_id);
 
 	vertex_out->type = type;
 }
@@ -363,8 +364,8 @@ Vertex_Render(
 
 	FOR_ARRAY(*a_vertex, it) {
 		Vertex *t_vertex = &ARRAY_IT(*a_vertex, it);
-		Vertex_BindAttributes(shader_set, t_vertex);
 
+		Vertex_BindAttributes(shader_set, t_vertex);
 		Vertex_Render(shader_set, t_vertex);
 	}
 }
@@ -519,16 +520,19 @@ Rect_Render(
 	}
 }
 
-instant Vertex
-Vertex_CreateCircle(
+instant void
+Vertex_CreateCircleBuffer(
+	Vertex *vertex_out,
 	Point pt_center,
 	float radius,
 	Color32 color
 ) {
 	u16 steps = 50;
 
-	Vertex vertex = Vertex_Create(VERTEX_TRIANGLE_FAN);
-	Vertex_AddPoint(&vertex, pt_center, color);
+	Vertex_ClearAttributes(vertex_out);
+	Vertex_Create(vertex_out, VERTEX_TRIANGLE_FAN);
+
+	Vertex_AddPoint(vertex_out, pt_center, color);
 
 	/// one more step to get connected
 	/// to the first point of the steps
@@ -541,8 +545,17 @@ Vertex_CreateCircle(
 		Point pt_offset = { cos(angle) * radius,
 							sin(angle) * radius };
 
-		Vertex_AddPoint(&vertex, pt_center + pt_offset, color);
+		Vertex_AddPoint(vertex_out, pt_center + pt_offset, color);
 	}
+}
 
+instant Vertex
+Vertex_CreateCircle(
+	Point pt_center,
+	float radius,
+	Color32 color
+) {
+	Vertex vertex;
+	Vertex_CreateCircleBuffer(&vertex, pt_center, radius, color);
 	return vertex;
 }

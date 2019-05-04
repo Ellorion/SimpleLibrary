@@ -123,7 +123,8 @@ struct Widget {
 	/// Rendering
 	Text   text;
 	Vertex vertex_rect;
-	Vertex vertex_rect_sublayer; /// f.e. hover, check-status (color changes)
+	Vertex vertex_rect_sublayer;	/// f.e. hover, check-status (color changes)
+	Array<Vertex> a_vertex_fans;	/// f.e. circles
 
 	/// Layout / Size
 	Layout_Data layout_data;
@@ -344,7 +345,7 @@ Widget_AddBorderSizes(
 	if (min_width_io) {
 		*min_width_io += rect_padding->x + rect_padding->w;
 
-		/// border size is used for the checbox,
+		/// border size is used for the checkbox,
 		/// not the border of the widget itself
 		if (widget->type != WIDGET_CHECKBOX)
 			*min_width_io += widget->data.border_size << 1;
@@ -356,7 +357,7 @@ Widget_AddBorderSizes(
 	if (min_height_io) {
 		*min_height_io += rect_padding->y + rect_padding->h;
 
-		/// border size is used for the checbox,
+		/// border size is used for the checbkox,
 		/// not the border of the widget itself
 		if (widget->type != WIDGET_CHECKBOX)
 			*min_height_io += widget->data.border_size << 1;
@@ -515,13 +516,6 @@ Widget_Redraw(
 			s32 check_h = widget_io->text.font->size - (check_offset << 1);
 			s32 check_w = check_h;
 
-			Rect rect_check = {
-				rect_box.x + check_offset + widget_io->text.data.rect_padding.x,
-				rect_box.y + check_offset + widget_io->text.data.rect_padding.y,
-				check_w,
-				check_h
-			};
-
 			widget_io->text.data.rect_margin = {
 				(float)check_offset * 2 + check_w + 2,
 				0,
@@ -529,22 +523,88 @@ Widget_Redraw(
 				0
 			};
 
-			if (widget_io->data.has_focus)
-				Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_outline_selected);
-			else
-				Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_outline_inactive);
+			float radius = (check_w / 2.0f);
 
-			Assert(widget_io->data.border_size);
-			Assert(widget_io->data.border_size < 20);
+			Rect rect_check = {
+				rect_box.x + check_offset + widget_io->text.data.rect_padding.x,
+				rect_box.y + check_offset + widget_io->text.data.rect_padding.y,
+				check_w,
+				check_h
+			};
 
-			widget_io->data.border_size = (widget_io->text.font->size / 10);
 
-			Rect_Resize(&rect_check, -widget_io->data.border_size);
-			Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_background);
+			/// draw radiobuttons when radiogroup is used
+			if (widget_io->data.ap_radiogroup) {
+				Point pt_center = {
+					rect_check.x + radius,
+					rect_check.y + radius,
+				};
 
-			if (widget_io->data.is_checked) {
-				Rect_Resize(&rect_check, -1);
-				Vertex_AddRect32(t_vertex_static, rect_check, widget_io->data.color_outline_checked);
+				Array_Destroy(&widget_io->a_vertex_fans);
+
+				Vertex *vertex_new;
+				Array_AddEmpty(&widget_io->a_vertex_fans, &vertex_new);
+
+				if (widget_io->data.has_focus) {
+					Vertex_CreateCircleBuffer(vertex_new,
+											  pt_center,
+											  radius,
+											  widget_io->data.color_outline_selected);
+				}
+				else {
+					Vertex_CreateCircleBuffer(vertex_new,
+											  pt_center,
+											  radius,
+											  widget_io->data.color_outline_inactive);
+				}
+
+				widget_io->data.border_size = (widget_io->text.font->size / 10);
+
+				Array_AddEmpty(&widget_io->a_vertex_fans, &vertex_new);
+
+				Vertex_CreateCircleBuffer(vertex_new,
+										  pt_center,
+										  radius - widget_io->data.border_size,
+										  widget_io->data.color_background);
+
+				if (widget_io->data.is_checked) {
+					Array_AddEmpty(&widget_io->a_vertex_fans, &vertex_new);
+
+					Vertex_CreateCircleBuffer(vertex_new,
+										  pt_center,
+										  radius - widget_io->data.border_size - 1,
+										  widget_io->data.color_outline_checked);
+				}
+			}
+			/// draw checkboxes when radiogroup is not used
+			else {
+				if (widget_io->data.has_focus) {
+					Vertex_AddRect32(t_vertex_static,
+									 rect_check,
+									 widget_io->data.color_outline_selected);
+				}
+				else {
+					Vertex_AddRect32(t_vertex_static,
+									 rect_check,
+									 widget_io->data.color_outline_inactive);
+
+				}
+
+				widget_io->data.border_size = (widget_io->text.font->size / 10);
+
+				Rect_Resize(&rect_check, -widget_io->data.border_size);
+
+				Vertex_AddRect32(t_vertex_static,
+								 rect_check,
+								 widget_io->data.color_background);
+
+				if (widget_io->data.is_checked) {
+					Rect_Resize(&rect_check, -1);
+
+					Vertex_AddRect32(t_vertex_static,
+									 rect_check,
+									 widget_io->data.color_outline_checked);
+				}
 			}
 		} break;
 
@@ -886,6 +946,12 @@ Widget_Render(
 			Rect_Render(shader_set, &widget_io->vertex_rect_sublayer);
 		}
 
+		/// for input changing circles
+		if (widget_io->a_vertex_fans.count) {
+			ShaderSet_Use(shader_set, SHADER_PROG_TRIANGLE_FAN);
+			Vertex_Render(shader_set, &widget_io->a_vertex_fans);
+		}
+
 		/// - draws rects
 		/// - draws rects beneath assigned texture, in case it is
 		///   rendered smaller to keep aspect ratio
@@ -930,6 +996,9 @@ Widget_Render(
 		///@Note: using a shader will reset uniform offsets to 0
 		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
 		Rect_Render(shader_set, &widget_io->vertex_rect_sublayer);
+
+		ShaderSet_Use(shader_set, SHADER_PROG_TRIANGLE_FAN);
+		Vertex_Render(shader_set, &widget_io->a_vertex_fans);
 
 		/// dynamic rects
 		ShaderSet_Use(shader_set, SHADER_PROG_RECT);
@@ -990,6 +1059,7 @@ Widget_Destroy(
 	Text_Destroy(&widget_out->text);
 	Vertex_Destroy(&widget_out->vertex_rect);
 	Vertex_Destroy(&widget_out->vertex_rect_sublayer);
+	Array_Destroy(&widget_out->a_vertex_fans);
 }
 
 instant void
@@ -1004,6 +1074,7 @@ Widget_Destroy(
 		Text_Destroy(&t_widget->text);
 		Vertex_Destroy(&t_widget->vertex_rect);
 		Vertex_Destroy(&t_widget->vertex_rect_sublayer);
+		Array_Destroy(&t_widget->a_vertex_fans);
     }
 }
 
