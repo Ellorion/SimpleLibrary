@@ -6,6 +6,7 @@ enum SHADER_PROG_TYPE {
 	SHADER_PROG_TEXTURE_FULL,
 	SHADER_PROG_TEXTURE_SIZE,
 	SHADER_PROG_TRIANGLE_STRIP,
+	SHADER_PROG_TRIANGLE_FAN,
 	SHADER_PROG_COUNT
 };
 
@@ -613,3 +614,73 @@ R"(
 	}
 )"};
 
+static const Shader shader_triangle_fan = {
+	SHADER_PROG_TRIANGLE_FAN,
+R"(
+	#version 330 core
+
+	uniform vec4 viewport = vec4(0, 0, 800, 480);
+	uniform float scale_x = 1.0f;
+	uniform float scale_y = 1.0f;
+
+	uniform float offset_x = 0.0f;
+	uniform float offset_y = 0.0f;
+
+	in vec3 vertex_position;
+	in vec4 vertex_color;
+
+	float left   = 0.0f;
+	float right  = viewport.z;
+	float top    = 0.0f;
+	float bottom = viewport.w;
+
+    mat4 proj_matrix = mat4(
+		 2.0f / (right - left), 0                    ,  0,  0,
+		 0                    , 2.0f / (top - bottom),  0,  0,
+		 0                    , 0                    ,  1,  0,
+		-(right + left)   / (right - left),
+		-(top   + bottom) / (top   - bottom),
+		 0,
+		 1
+	);
+
+	mat4 scale_matrix = mat4(
+		scale_x , 0      , 0, 0,
+		0       , scale_y, 0, 0,
+		0       , 0      , 1, 0,
+		0       , 0      , 0, 1
+	);
+
+	out Vertex_Data {
+		vec4 color;
+	} out_vertex;
+
+	void main() {
+		gl_Position = proj_matrix *
+		              vec4(vertex_position.x + offset_x,
+                           vertex_position.y + offset_y,
+                           vertex_position.z,
+                           1)
+					  * scale_matrix;
+
+		out_vertex.color = vertex_color;
+	}
+)",
+
+0,
+
+R"(
+	#version 330 core
+
+	layout(origin_upper_left) in vec4 gl_FragCoord;
+
+	in Vertex_Data {
+		vec4 color;
+	} in_vertex;
+
+	out vec4 out_frag_color;
+
+	void main() {
+		out_frag_color = in_vertex.color;
+	}
+)"};

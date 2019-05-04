@@ -2,7 +2,8 @@
 
 enum VERTEX_TYPE {
 	VERTEX_RECT,
-	VERTEX_TRIANGLE_STRIP
+	VERTEX_TRIANGLE_STRIP,
+	VERTEX_TRIANGLE_FAN,
 };
 
 template <typename T>
@@ -244,7 +245,6 @@ Vertex_Load(
 	if (vertex->texture.ID) {
 		Vertex_SetTexture(shader_set, vertex, &vertex->texture);
 	}
-
 }
 
 inline void
@@ -341,6 +341,10 @@ Vertex_Render(
 
 		case VERTEX_TRIANGLE_STRIP: {
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, a_positions->a_buffer.count / a_positions->group_count);
+		} break;
+
+		case VERTEX_TRIANGLE_FAN: {
+			glDrawArrays(GL_TRIANGLE_FAN,   0, a_positions->a_buffer.count / a_positions->group_count);
 		} break;
 
 		default: {
@@ -456,7 +460,10 @@ Vertex_AddPoint(
 	Color32 color
 ) {
 	Assert(vertex_io);
-	Assert(vertex_io->type == VERTEX_TRIANGLE_STRIP);
+	Assert(
+	      vertex_io->type == VERTEX_TRIANGLE_STRIP
+	   OR vertex_io->type == VERTEX_TRIANGLE_FAN
+	);
 
 	Vertex_Buffer<float> *t_attribute;
 
@@ -510,4 +517,32 @@ Rect_Render(
 	else {
 		LOG_WARNING("No rectangle data to render set");
 	}
+}
+
+instant Vertex
+Vertex_CreateCircle(
+	Point pt_center,
+	float radius,
+	Color32 color
+) {
+	u16 steps = 50;
+
+	Vertex vertex = Vertex_Create(VERTEX_TRIANGLE_FAN);
+	Vertex_AddPoint(&vertex, pt_center, color);
+
+	/// one more step to get connected
+	/// to the first point of the steps
+	FOR((steps + 1u), it) {
+		/// angle for each step,
+		/// beginning at the base for 360 deg.
+		float circle = MATH_PI * 2.0f;
+		float angle  = circle / steps * it;
+
+		Point pt_offset = { cos(angle) * radius,
+							sin(angle) * radius };
+
+		Vertex_AddPoint(&vertex, pt_center + pt_offset, color);
+	}
+
+	return vertex;
 }

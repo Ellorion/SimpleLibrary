@@ -120,6 +120,7 @@ ShaderSet_Create(
 	ShaderSet_Add(&shader_set, &shader_texture_full);
 	ShaderSet_Add(&shader_set, &shader_texture_size);
 	ShaderSet_Add(&shader_set, &shader_triangle_strip);
+	ShaderSet_Add(&shader_set, &shader_triangle_fan);
 
 	AssertMessage(	shader_set.a_shaders.count == SHADER_PROG_COUNT,
 					"[ShaderSet] Shader missing compared to SHADER_PROG_TYPE count.");
@@ -313,7 +314,8 @@ ShaderSet_Use(
 		case SHADER_PROG_TEXT:
 		case SHADER_PROG_TEXTURE_FULL:
 		case SHADER_PROG_TEXTURE_SIZE:
-		case SHADER_PROG_TRIANGLE_STRIP: {
+		case SHADER_PROG_TRIANGLE_STRIP:
+		case SHADER_PROG_TRIANGLE_FAN: {
 			shader_set_io->active_id = type;
 		} break;
 

@@ -6,7 +6,10 @@ struct MemorySegment {
 };
 
 bool
-operator == (MemorySegment &mem1, MemorySegment &mem2) {
+operator == (
+	MemorySegment &mem1,
+	MemorySegment &mem2
+) {
 	return mem1.memory == mem2.memory;
 }
 

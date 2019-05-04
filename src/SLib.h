@@ -157,6 +157,8 @@ __inline__ static void debug_break(void)
 #define AND &&
 #define OR  ||
 
+#define MATH_PI 3.1415926
+
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "external/stb_truetype.h"
 
@@ -302,12 +304,6 @@ _AssertMessage(
 //	*second_io = temp;
 //}
 
-struct Point {
-	float x = 0.0f;
-	float y = 0.0f;
-	float z = 0.0f;
-};
-
 struct Color32 {
 	float r = 0.0f;
 	float g = 0.0f;
@@ -320,6 +316,26 @@ struct Tuple {
 	K first;
 	L second;
 };
+
+struct Point {
+	float x = 0.0f;
+	float y = 0.0f;
+	float z = 0.0f;
+};
+
+Point
+operator + (
+	Point &pt1,
+	Point &pt2
+) {
+	Point pt;
+
+	pt.x = pt1.x + pt2.x;
+	pt.y = pt1.y + pt2.y;
+	pt.z = pt1.z + pt2.z;
+
+	return pt;
+}
 
 instant Color32
 Color_MakeGrey(
