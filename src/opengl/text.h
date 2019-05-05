@@ -2019,7 +2019,7 @@ Text_Render(
 	ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
 
 #if DEBUG_TEXT_DRAW_BACKGROUND
-	Vertex v_bgn = Vertex_Create();
+	Vertex v_bgn = Vertex_Create(VERTEX_RECT);
 	Vertex_AddRect32(&v_bgn, text_io->data.rect, {0, 0, 1, 1});
 	Rect_Render(text_io->shader_set, &v_bgn);
 	Vertex_Destroy(&v_bgn);

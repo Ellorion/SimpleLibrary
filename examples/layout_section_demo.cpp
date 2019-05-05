@@ -113,7 +113,7 @@ int main() {
 	/// to calc. remaining layout region beforehand
 	Layout_Rearrange(&layout, &window);
 
-	Vertex vertex = Vertex_Create();
+	Vertex vertex = Vertex_Create(VERTEX_RECT);
 	Vertex_AddRect32(&vertex, layout.section.rect_remaining, {0, 0, 1, 1});
 
 	while(Window_IsRunning(&window)) {

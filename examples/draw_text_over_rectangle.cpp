@@ -15,7 +15,7 @@ Window_HandleEvents(
 
 	Rect rect_box = {10, 20, 300, 200};
 
-	Vertex vertex_rect = Vertex_Create();
+	Vertex vertex_rect = Vertex_Create(VERTEX_RECT);
 	Vertex_AddRect32(&vertex_rect, rect_box, Color_MakeGrey(1.0f));
 
 	Rect_Resize(&rect_box, -1);
