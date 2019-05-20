@@ -1126,6 +1126,13 @@ String_Overwrite(
 	String_Append(s_dest_io, s_source);
 }
 
+instant void
+String_Flush(
+	String *s_data
+) {
+	Memory_Set(s_data->value, 0, s_data->length);
+}
+
 /// operator
 /// string - string
 bool

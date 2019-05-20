@@ -27,6 +27,8 @@ struct Array {
 	u64   count  = 0;
 	u64   max    = 0;
 
+	u64   last_search_index_found = 0;
+
 	/// f.e. for string chunks
 	bool  by_reference = false;
 };
@@ -197,7 +199,19 @@ Array_Find(
 ) {
 	Assert(array);
 
-	FOR_ARRAY(*array, it) {
+	/// in case of content removal
+	Clamp(&array->last_search_index_found, 0, array->count);
+
+	FOR_START(array->last_search_index_found, array->count, it) {
+		if (ARRAY_IT(*array, it) == find) {
+			if (index)
+				*index = it;
+
+			return true;
+		}
+	}
+
+	FOR_START(0, array->last_search_index_found, it) {
 		if (ARRAY_IT(*array, it) == find) {
 			if (index)
 				*index = it;
@@ -219,10 +233,26 @@ Array_Find(
 ) {
 	Assert(array);
 
-	FOR_ARRAY(*array, it) {
+	/// in case of content removal
+	Clamp(&array->last_search_index_found, 0, array->count);
+
+	FOR_START(array->last_search_index_found, array->count, it) {
 		if (OnSearch(ARRAY_IT(*array, it), find)) {
 			if (index_opt)
 				*index_opt = it;
+
+			array->last_search_index_found = it;
+
+			return true;
+		}
+	}
+
+	FOR_START(0, array->last_search_index_found, it) {
+		if (OnSearch(ARRAY_IT(*array, it), find)) {
+			if (index_opt)
+				*index_opt = it;
+
+			array->last_search_index_found = it;
 
 			return true;
 		}
