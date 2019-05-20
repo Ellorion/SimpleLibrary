@@ -12,7 +12,7 @@
 #	define SHOW_WARNING			1
 
 /// enables timing measurement output
-#	define DEBUG_BENCHMARK		0
+#	define DEBUG_BENCHMARK		1
 #	define DEBUG_EVENT_STATUS	0
 
 #else

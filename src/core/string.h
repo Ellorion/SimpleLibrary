@@ -448,28 +448,31 @@ String_Compare(
 
 instant bool
 String_IsEqual(
-	const char *c_first,
-	const char *c_second,
+	String s_first,
+	String s_second,
 	u64 length = 0,
 	bool is_case_sensitive = true
 ) {
-	return (String_Compare(	S(c_first),
-							S(c_second),
+	if (s_first.length != s_second.length)
+		return false;
+
+	return (String_Compare(	s_first,
+							s_second,
 							length,
 							is_case_sensitive) == 0);
 }
 
 instant bool
 String_IsEqual(
-	String s_first,
-	String s_second,
+	const char *c_first,
+	const char *c_second,
 	u64 length = 0,
 	bool is_case_sensitive = true
 ) {
-	return (String_Compare(	s_first,
-							s_second,
+	return String_IsEqual(	S(c_first),
+							S(c_second),
 							length,
-							is_case_sensitive) == 0);
+							is_case_sensitive);
 }
 
 instant String
