@@ -2,6 +2,9 @@
 
 #define String_Split Array_Split
 
+/// set to 0 to disable it
+#define STRING_BUFFER_DEFAULT_SIZE	14
+
 enum STRING_LENGTH_TYPE {
 	STRING_LENGTH_BYTES,
 	STRING_LENGTH_CODEPOINTS
@@ -12,6 +15,7 @@ struct String {
 	bool  changed      = false;
 	u64   length = 0;
 	char *value  = 0;
+	char  value_buffer[STRING_BUFFER_DEFAULT_SIZE];
 };
 
 #include "utf8.h"
@@ -207,8 +211,10 @@ String_Destroy(
 ) {
 	Assert(s_data_io);
 
-	if (!s_data_io->is_reference)
-		Memory_Free(s_data_io->value);
+	if (!s_data_io->is_reference) {
+		if (s_data_io->value != s_data_io->value_buffer)
+			Memory_Free(s_data_io->value);
+	}
 
 	*s_data_io = {};
 
@@ -224,8 +230,15 @@ String_Resize(
 
 	Assert(new_length > 0);
 
-	if (new_length > (s64)s_data_io->length)
-		s_data_io->value  = Memory_Resize(s_data_io->value, char, new_length);
+	if (   (!s_data_io->value OR s_data_io->value == s_data_io->value_buffer)
+		AND new_length < STRING_BUFFER_DEFAULT_SIZE
+	) {
+		s_data_io->value = s_data_io->value_buffer;
+	}
+	else
+	if (new_length > (s64)s_data_io->length) {
+		s_data_io->value = Memory_Resize(s_data_io->value, char, new_length);
+	}
 
 	s_data_io->length = new_length;
 }
