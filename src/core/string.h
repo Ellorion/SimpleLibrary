@@ -11,8 +11,9 @@ enum STRING_LENGTH_TYPE {
 };
 
 struct String {
-	bool  is_reference = false;
-	bool  changed      = false;
+	bool  is_reference     = false;
+	bool  changed          = false;
+	bool  reference_exists = false;
 	u64   length = 0;
 	char *value  = 0;
 	char  value_buffer[STRING_BUFFER_DEFAULT_SIZE];
@@ -85,13 +86,15 @@ instant String
 S(
 	String s_data
 ) {
- 	String s_data_it;
-	s_data_it = s_data;
+ 	String s_data_ref;
+	s_data_ref = s_data;
 
-	s_data_it.is_reference = true;
-	s_data_it.changed      = true;
+	s_data_ref.is_reference = true;
+	s_data_ref.changed      = true;
 
-	return s_data_it;
+	s_data.reference_exists = true;
+
+	return s_data_ref;
 }
 
 instant String
@@ -99,15 +102,17 @@ S(
 	String s_data,
 	u64 length
 ) {
- 	String s_data_it;
+ 	String s_data_ref;
 
-	s_data_it.value  = s_data.value;
-	s_data_it.length = length;
+	s_data_ref.value  = s_data.value;
+	s_data_ref.length = length;
 
-	s_data_it.is_reference = true;
-	s_data_it.changed      = true;
+	s_data_ref.is_reference = true;
+	s_data_ref.changed      = true;
 
-	return s_data_it;
+	s_data.reference_exists = true;
+
+	return s_data_ref;
 }
 
 instant void
@@ -212,8 +217,12 @@ String_Destroy(
 	Assert(s_data_io);
 
 	if (!s_data_io->is_reference) {
-		if (s_data_io->value != s_data_io->value_buffer)
+		if (s_data_io->value != s_data_io->value_buffer) {
+			if (s_data_io->reference_exists)
+				LOG_WARNING("Freeing base valid. All references to it become invalid.");
+
 			Memory_Free(s_data_io->value);
+		}
 	}
 
 	*s_data_io = {};
@@ -237,7 +246,11 @@ String_Resize(
 	}
 	else
 	if (new_length > (s64)s_data_io->length) {
-		s_data_io->value = Memory_Resize(s_data_io->value, char, new_length);
+		char *t_value_old = s_data_io->value;
+		s_data_io->value = Memory_Resize(t_value_old, char, new_length);
+
+		if (s_data_io->reference_exists AND t_value_old != s_data_io->value)
+			LOG_WARNING("Changing base pointer. All references to it become invalid.");
 	}
 
 	s_data_io->length = new_length;
@@ -255,8 +268,10 @@ String_Append(
     if (length_append == 0)
 		length_append = s_source.length;
 
-    if (length_append == 0)
+    if (length_append == 0) {
+		LOG_WARNING("Source string length was set at 0.");
 		return false;
+    }
 
 	Assert(length_append <= s_source.length);
 
@@ -316,7 +331,7 @@ To_StringBuffer(
 }
 
 instant String
-ToString(
+To_String(
 	const char *c_data,
 	u64 c_length = 0
 ) {
@@ -466,7 +481,7 @@ String_IsEqual(
 	u64 length = 0,
 	bool is_case_sensitive = true
 ) {
-	if (s_first.length != s_second.length)
+	if (!length AND s_first.length != s_second.length)
 		return false;
 
 	return (String_Compare(	s_first,
@@ -504,8 +519,9 @@ String_Copy(
 	Memory_Copy(s_result.value, c_source, length);
 	s_result.length = length;
 
-	s_result.changed      = true;
-	s_result.is_reference = false;
+	s_result.changed          = true;
+	s_result.is_reference     = false;
+	s_result.reference_exists = false;
 
 	return s_result;
 }
@@ -653,12 +669,15 @@ String_Find(
 										true);
 
 	if (t_index_found < 0) {
-		t_index_found = s_data->length - index_start;
+		/// useful?
+		{
+			t_index_found = s_data->length - index_start;
 
-		if (t_index_found < 0)
-			t_index_found = 0;
+			if (t_index_found < 0)
+				t_index_found = 0;
 
-		if (index_found) *index_found = t_index_found;
+			if (index_found) *index_found = t_index_found;
+		}
 		return false;
 	}
 
@@ -1144,9 +1163,12 @@ String_Overwrite(
 
 instant void
 String_Flush(
-	String *s_data
+	String *s_data_io
 ) {
-	Memory_Set(s_data->value, 0, s_data->length);
+	if (!s_data_io->value)
+		s_data_io->value = s_data_io->value_buffer;
+
+	Memory_Set(s_data_io->value, 0, s_data_io->length);
 }
 
 /// operator
