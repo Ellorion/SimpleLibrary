@@ -547,3 +547,28 @@ Parser_Token_IsMatch(
 
 	return true;
 }
+
+instant void
+Parser_SkipUntil(
+	Parser *parser_io,
+	String  s_find,
+	bool    skip_past_token
+) {
+	Assert(parser_io);
+
+	s64 index_found;
+
+	if (Parser_HasError(parser_io))
+		return;
+
+	if (String_Find(&parser_io->s_data, s_find, &index_found, 0)) {
+		Parser_AddOffset(parser_io, index_found);
+
+		if (skip_past_token)
+			Parser_AddOffset(parser_io, s_find.length);
+	}
+	else {
+		Parser_AddOffset(parser_io, parser_io->s_data.length);
+	}
+}
+

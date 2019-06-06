@@ -590,10 +590,13 @@ String_IndexOf(
 		index_start_opt = 0;
 
 	FOR_START(index_start_opt, length_data, index) {
-		if (String_IsEqual(	s_data->value + index,
-							s_key.value,
+		String s_data_ref = S(*s_data);
+		String_AddOffset(&s_data_ref, index);
+
+		if (String_Compare(	s_data_ref,
+							s_key,
 							s_key.length,
-							is_case_sensitive)
+							is_case_sensitive) == 0
 		) {
 			return index;
 		}
