@@ -840,7 +840,7 @@ Network_HTTP_GetResponseRef(
 
 		switch (network->HTTP.response_code) {
 			case 200: {		/// everything is awesome
-				Parser parser_header = Parser_Load(*s_response_out, true);
+				Parser parser_header = Parser_Load(*s_response_out, S("#"));
 
 				String s_data;
 				while(Parser_IsRunning(&parser_header)) {
@@ -864,7 +864,7 @@ Network_HTTP_GetResponseRef(
 
 			case 301:		/// Moved Permanently
 			case 302: {		/// Moved Temporarily
-				Parser parser_header = Parser_Load(*s_response_out, true);
+				Parser parser_header = Parser_Load(*s_response_out, S("#"));
 
 				String s_data;
 				while(Parser_IsRunning(&parser_header)) {

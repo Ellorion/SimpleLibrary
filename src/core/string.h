@@ -699,7 +699,7 @@ String_FindRev(
 ) {
 	Assert(s_data);
 
-	s64 t_pos_found = String_IndexOfRev(s_data, s_find, true);
+	s64 t_pos_found = String_IndexOfRev(s_data, s_find, true, pos_start);
 
 	if (t_pos_found < 0) {
 		if (pos_found) *pos_found = t_pos_found;

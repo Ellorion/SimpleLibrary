@@ -20,7 +20,7 @@ Profiler_AnalyseDependencies(
 
 	String s_file_data = File_ReadAll(s_filepath);
 
-	Parser parser = Parser_Load(s_file_data, false);
+	Parser parser = Parser_Load(s_file_data, S(""));
 	String s_token;
 
 	while (Parser_IsRunning(&parser)) {

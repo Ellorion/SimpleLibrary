@@ -9,7 +9,7 @@
 
 struct Parser {
 	String s_data;
-	bool skip_whitespace_and_comments = true;
+	String s_comment_identifier;
 
 	bool has_error = false;
 	String s_error;
@@ -75,7 +75,9 @@ Parser_SkipUntilToken(
 		}
 
 		/// skip comment
-		if (ch == '#' OR is_comment) {
+		if (   parser_io->s_data.value == parser_io->s_comment_identifier
+			OR is_comment
+		) {
 			is_comment = true;
 
 			if (!(ch == '\r' OR ch == '\n')) {
@@ -111,16 +113,16 @@ Parser_Destroy(
 instant Parser
 Parser_Load(
 	String s_data,
-	bool skip_whitespace_and_comments = true
+	String s_comment_identifier_opt = S("")
 ) {
 	Parser parser = {};
 
 	parser.s_data         = s_data;
 	parser.s_data.changed = true;
-	parser.s_data.is_reference = true;
-	parser.skip_whitespace_and_comments = skip_whitespace_and_comments;
+	parser.s_data.is_reference  = true;
+	parser.s_comment_identifier = s_comment_identifier_opt;
 
-	if (parser.skip_whitespace_and_comments)
+	if (!String_IsEmpty(&parser.s_comment_identifier))
 		Parser_SkipUntilToken(&parser);
 
 	return parser;
@@ -151,7 +153,7 @@ Parser_IsString(
 
 	Parser_AddOffset(parser_io, s_data.length);
 
-	if (parser_io->skip_whitespace_and_comments)
+	if (!String_IsEmpty(&parser_io->s_comment_identifier))
 		Parser_SkipUntilToken(parser_io);
 }
 
@@ -188,7 +190,7 @@ Parser_GetStringRef(
 	if (type == PARSER_MODE_SEEK) {
 		Parser_AddOffset(parser_io, index_found + s_until_match.length);
 
-		if (parser_io->skip_whitespace_and_comments)
+		if (!String_IsEmpty(&parser_io->s_comment_identifier))
 			Parser_SkipUntilToken(parser_io);
 	}
 }
@@ -241,7 +243,7 @@ Parser_GetStringRef(
 			/// include ending '\"'
 			Parser_AddOffset(parser_io, index_found + 1);
 
-			if (parser_io->skip_whitespace_and_comments)
+			if (!String_IsEmpty(&parser_io->s_comment_identifier))
 				Parser_SkipUntilToken(parser_io);
 		}
 
@@ -271,7 +273,7 @@ Parser_GetStringRef(
 		Parser_AddOffset(parser_io, -s_data_out->length);
 	else
 	if (type == PARSER_MODE_SEEK) {
-		if (parser_io->skip_whitespace_and_comments)
+		if (!String_IsEmpty(&parser_io->s_comment_identifier))
 			Parser_SkipUntilToken(parser_io);
 	}
 }
@@ -298,7 +300,7 @@ Parser_GetBoolean(
 		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
 
-			if (parser_io->skip_whitespace_and_comments)
+			if (!String_IsEmpty(&parser_io->s_comment_identifier))
 				Parser_SkipUntilToken(parser_io);
 
 			*is_true_out = false;
@@ -317,7 +319,7 @@ Parser_GetBoolean(
 		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
 
-			if (parser_io->skip_whitespace_and_comments)
+			if (!String_IsEmpty(&parser_io->s_comment_identifier))
 				Parser_SkipUntilToken(parser_io);
 
 			*is_true_out = true;
@@ -396,7 +398,7 @@ Parser_GetNumber(
 		return;
 	}
 
-	if (parser_io->skip_whitespace_and_comments)
+	if (!String_IsEmpty(&parser_io->s_comment_identifier))
 		Parser_SkipUntilToken(parser_io);
 }
 
@@ -467,7 +469,7 @@ Parser_Token_Peek(
 	if (Parser_HasError(parser))
 		return;
 
-	if (parser->skip_whitespace_and_comments)
+	if (!String_IsEmpty(&parser->s_comment_identifier))
 		Parser_SkipUntilToken(parser);
 
 	String s_data_it = S(parser->s_data);
@@ -571,4 +573,3 @@ Parser_SkipUntil(
 		Parser_AddOffset(parser_io, parser_io->s_data.length);
 	}
 }
-

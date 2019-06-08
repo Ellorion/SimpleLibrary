@@ -442,6 +442,7 @@ ToInt(
 #include "utility/clipboard.h"
 #include "utility/file_watcher.h"
 #include "utility/helper.h"
+#include "utility/profiler.h"
 
 #include "windows/windows.h"
 #include "opengl/core.h"
