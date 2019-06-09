@@ -322,12 +322,12 @@ template <typename T>
 instant bool
 Array_AddUnique(
 	Array<T> *array_io,
-	T element
+	T   element,
+	T** added_element = 0
 ) {
 	Assert(array_io);
 
-	T *t_element_found;
-	return !Array_FindOrAdd(array_io, element, &t_element_found);
+	return !Array_FindOrAdd(array_io, element, added_element);
 }
 
 /// Returns T, so dynamic memory can still be free'd

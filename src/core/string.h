@@ -57,12 +57,13 @@ S(
 	const char *c_data
 ) {
  	String s_data;
+ 	{
+		s_data.value  = (char *)c_data;
+		s_data.length = String_GetLength(c_data);
 
-	s_data.value  = (char *)c_data;
-	s_data.length = String_GetLength(c_data);
-
-	s_data.is_reference = true;
-	s_data.changed      = true;
+		s_data.is_reference = true;
+		s_data.changed      = true;
+ 	}
 
 	return s_data;
 }
@@ -73,11 +74,13 @@ S(
 	u64 length
 ) {
  	String s_data;
-	s_data.value  = (char *)c_data;
-	s_data.length = length;
+ 	{
+		s_data.value  = (char *)c_data;
+		s_data.length = length;
 
-	s_data.is_reference = true;
-	s_data.changed      = true;
+		s_data.is_reference = true;
+		s_data.changed      = true;
+ 	}
 
 	return s_data;
 }
@@ -86,13 +89,13 @@ instant String
 S(
 	String s_data
 ) {
- 	String s_data_ref;
-	s_data_ref = s_data;
+ 	String s_data_ref       = s_data;
+ 	{
+		s_data_ref.is_reference = true;
+		s_data_ref.changed      = true;
 
-	s_data_ref.is_reference = true;
-	s_data_ref.changed      = true;
-
-	s_data.reference_exists = true;
+		s_data.reference_exists = true;
+ 	}
 
 	return s_data_ref;
 }
@@ -103,14 +106,15 @@ S(
 	u64 length
 ) {
  	String s_data_ref;
+	{
+		s_data_ref.value  = s_data.value;
+		s_data_ref.length = length;
 
-	s_data_ref.value  = s_data.value;
-	s_data_ref.length = length;
+		s_data_ref.is_reference = true;
+		s_data_ref.changed      = true;
 
-	s_data_ref.is_reference = true;
-	s_data_ref.changed      = true;
-
-	s_data.reference_exists = true;
+		s_data.reference_exists = true;
+	}
 
 	return s_data_ref;
 }
@@ -230,6 +234,29 @@ String_Destroy(
 	s_data_io->changed = true;
 }
 
+instant String
+String_Copy(
+	const char *c_source,
+	u32 length = 0
+) {
+	Assert(c_source);
+
+	if (length == 0)
+		length = String_GetLength(c_source);
+
+	String s_result = {};
+
+	s_result.value = Memory_Create(char, length);
+	Memory_Copy(s_result.value, c_source, length);
+	s_result.length = length;
+
+	s_result.changed          = true;
+	s_result.is_reference     = false;
+	s_result.reference_exists = false;
+
+	return s_result;
+}
+
 instant void
 String_Resize(
 	String *s_data_io,
@@ -246,6 +273,9 @@ String_Resize(
 	}
 	else
 	if (new_length > (s64)s_data_io->length) {
+		if (s_data_io->value == s_data_io->value_buffer)
+			*s_data_io = String_Copy(s_data_io->value_buffer, s_data_io->length);
+
 		char *t_value_old = s_data_io->value;
 		s_data_io->value = Memory_Resize(t_value_old, char, new_length);
 
@@ -501,29 +531,6 @@ String_IsEqual(
 							S(c_second),
 							length,
 							is_case_sensitive);
-}
-
-instant String
-String_Copy(
-	const char *c_source,
-	u32 length = 0
-) {
-	Assert(c_source);
-
-	if (length == 0)
-		length = String_GetLength(c_source);
-
-	String s_result = {};
-
-	s_result.value = Memory_Create(char, length);
-	Memory_Copy(s_result.value, c_source, length);
-	s_result.length = length;
-
-	s_result.changed          = true;
-	s_result.is_reference     = false;
-	s_result.reference_exists = false;
-
-	return s_result;
 }
 
 instant void

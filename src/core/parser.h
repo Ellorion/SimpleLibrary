@@ -117,9 +117,7 @@ Parser_Load(
 ) {
 	Parser parser = {};
 
-	parser.s_data         = s_data;
-	parser.s_data.changed = true;
-	parser.s_data.is_reference  = true;
+	parser.s_data               = S(s_data);
 	parser.s_comment_identifier = s_comment_identifier_opt;
 
 	if (!String_IsEmpty(&parser.s_comment_identifier))
