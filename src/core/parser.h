@@ -57,13 +57,14 @@ Parser_AddOffset(
 
 /// ignores whitespaces, linebreaks and
 /// comments starting with # until newline
-instant void
+instant u64
 Parser_SkipUntilToken(
 	Parser *parser_io
 ) {
     Assert(parser_io);
 
-    bool is_comment = false;
+    u64 bytes_skipped = 0;
+    bool is_comment   = false;
 
     while(Parser_IsRunning(parser_io)) {
 		char ch = parser_io->s_data.value[0];
@@ -71,6 +72,7 @@ Parser_SkipUntilToken(
 		/// skip whitespaces
 		if (ch == ' ' OR ch == '\t') {
 			Parser_AddOffset(parser_io, 1);
+			bytes_skipped += 1;
 			continue;
 		}
 
@@ -82,6 +84,7 @@ Parser_SkipUntilToken(
 
 			if (!(ch == '\r' OR ch == '\n')) {
 				Parser_AddOffset(parser_io, 1);
+				bytes_skipped += 1;
 				continue;
 			}
 
@@ -92,11 +95,14 @@ Parser_SkipUntilToken(
 		/// skip newline
 		if (ch == '\r' OR ch == '\n') {
 			Parser_AddOffset(parser_io, 1);
+			bytes_skipped += 1;
 			continue;
 		}
 
 		break;
     }
+
+    return bytes_skipped;
 }
 
 instant void
@@ -120,8 +126,7 @@ Parser_Load(
 	parser.s_data               = S(s_data);
 	parser.s_comment_identifier = s_comment_identifier_opt;
 
-	if (!String_IsEmpty(&parser.s_comment_identifier))
-		Parser_SkipUntilToken(&parser);
+	Parser_SkipUntilToken(&parser);
 
 	return parser;
 }
@@ -150,9 +155,6 @@ Parser_IsString(
 	}
 
 	Parser_AddOffset(parser_io, s_data.length);
-
-	if (!String_IsEmpty(&parser_io->s_comment_identifier))
-		Parser_SkipUntilToken(parser_io);
 }
 
 instant void
@@ -167,6 +169,8 @@ Parser_GetStringRef(
 
 	if (Parser_HasError(parser_io))
 		return;
+
+	Parser_SkipUntilToken(parser_io);
 
 	s64 index_found;
 	if (!String_Find(&parser_io->s_data, s_until_match, &index_found)) {
@@ -185,12 +189,8 @@ Parser_GetStringRef(
 	s_data_out->changed = true;
 	s_data_out->is_reference = true;
 
-	if (type == PARSER_MODE_SEEK) {
+	if (type == PARSER_MODE_SEEK)
 		Parser_AddOffset(parser_io, index_found + s_until_match.length);
-
-		if (!String_IsEmpty(&parser_io->s_comment_identifier))
-			Parser_SkipUntilToken(parser_io);
-	}
 }
 
 instant void
@@ -207,6 +207,8 @@ Parser_GetStringRef(
 		return;
 
 	String_Destroy(s_data_out);
+
+	Parser_SkipUntilToken(parser_io);
 
 	s64 offset_parser = 0;
 
@@ -240,9 +242,6 @@ Parser_GetStringRef(
 		if (type == PARSER_MODE_SEEK) {
 			/// include ending '\"'
 			Parser_AddOffset(parser_io, index_found + 1);
-
-			if (!String_IsEmpty(&parser_io->s_comment_identifier))
-				Parser_SkipUntilToken(parser_io);
 		}
 
 		return;
@@ -269,11 +268,6 @@ Parser_GetStringRef(
 
 	if (type == PARSER_MODE_PEEK)
 		Parser_AddOffset(parser_io, -s_data_out->length);
-	else
-	if (type == PARSER_MODE_SEEK) {
-		if (!String_IsEmpty(&parser_io->s_comment_identifier))
-			Parser_SkipUntilToken(parser_io);
-	}
 }
 
 instant void
@@ -287,6 +281,8 @@ Parser_GetBoolean(
 	if (Parser_HasError(parser_io))
 		return;
 
+	Parser_SkipUntilToken(parser_io);
+
 	const char *values_false[] = {
 		"0",
 		"false"
@@ -297,9 +293,6 @@ Parser_GetBoolean(
 
 		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
-
-			if (!String_IsEmpty(&parser_io->s_comment_identifier))
-				Parser_SkipUntilToken(parser_io);
 
 			*is_true_out = false;
 			return;
@@ -316,9 +309,6 @@ Parser_GetBoolean(
 
 		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
-
-			if (!String_IsEmpty(&parser_io->s_comment_identifier))
-				Parser_SkipUntilToken(parser_io);
 
 			*is_true_out = true;
 			return;
@@ -341,6 +331,8 @@ Parser_GetNumber(
 
 	if (Parser_HasError(parser_io))
 		return;
+
+	Parser_SkipUntilToken(parser_io);
 
 	s_number_out->value   = parser_io->s_data.value;
 	s_number_out->length  = 0;
@@ -395,9 +387,6 @@ Parser_GetNumber(
 
 		return;
 	}
-
-	if (!String_IsEmpty(&parser_io->s_comment_identifier))
-		Parser_SkipUntilToken(parser_io);
 }
 
 instant bool
@@ -467,8 +456,7 @@ Parser_Token_Peek(
 	if (Parser_HasError(parser))
 		return;
 
-	if (!String_IsEmpty(&parser->s_comment_identifier))
-		Parser_SkipUntilToken(parser);
+	Parser_SkipUntilToken(parser);
 
 	String s_data_it = S(parser->s_data);
 

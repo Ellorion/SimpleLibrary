@@ -16,7 +16,6 @@ struct String {
 	bool  reference_exists = false;
 	u64   length = 0;
 	char *value  = 0;
-	char  value_buffer[STRING_BUFFER_DEFAULT_SIZE];
 };
 
 #include "utf8.h"
@@ -177,7 +176,12 @@ String_AddOffset(
 	}
 	else {
 		s_data_io->value  += offset;
-		s_data_io->length -= offset;
+
+		/// underflow check
+		if (s_data_io->length - offset < s_data_io->length)
+			s_data_io->length -= offset;
+		else
+			s_data_io->length  = 0;
 	}
 }
 
@@ -221,12 +225,7 @@ String_Destroy(
 	Assert(s_data_io);
 
 	if (!s_data_io->is_reference) {
-		if (s_data_io->value != s_data_io->value_buffer) {
-			if (s_data_io->reference_exists)
-				LOG_WARNING("Freeing base valid. All references to it become invalid.");
-
-			Memory_Free(s_data_io->value);
-		}
+		Memory_Free(s_data_io->value);
 	}
 
 	*s_data_io = {};
@@ -266,16 +265,7 @@ String_Resize(
 
 	Assert(new_length > 0);
 
-	if (   (!s_data_io->value OR s_data_io->value == s_data_io->value_buffer)
-		AND new_length < STRING_BUFFER_DEFAULT_SIZE
-	) {
-		s_data_io->value = s_data_io->value_buffer;
-	}
-	else
 	if (new_length > (s64)s_data_io->length) {
-		if (s_data_io->value == s_data_io->value_buffer)
-			*s_data_io = String_Copy(s_data_io->value_buffer, s_data_io->length);
-
 		char *t_value_old = s_data_io->value;
 		s_data_io->value = Memory_Resize(t_value_old, char, new_length);
 
@@ -322,22 +312,18 @@ String_Insert(
 ) {
 	Assert(s_dest_io);
  	Assert(!s_dest_io->is_reference);
-	Assert(index_start <= s_dest_io->length);
 
-	String s_dest_io_it = S(*s_dest_io);
+	u64 dest_length_old = s_dest_io->length;
 
-	String s_buffer;
+	String_Resize(s_dest_io, s_dest_io->length + s_source.length);
 
-	if (index_start)
-		String_Append(&s_buffer, s_dest_io_it, index_start);
+	Memory_Copy(s_dest_io->value + index_start + s_source.length,
+				s_dest_io->value + index_start,
+				dest_length_old - index_start);
 
- 	String_Append(&s_buffer, s_source);
-
-	String_AddOffset(&s_dest_io_it, index_start);
-	String_Append(&s_buffer, s_dest_io_it);
-
-	String_Destroy(s_dest_io);
-	*s_dest_io = s_buffer;
+	Memory_Copy(s_dest_io->value + index_start,
+				s_source.value,
+				s_source.length);
 
 	return s_source.length;
 }
@@ -700,8 +686,8 @@ instant bool
 String_FindRev(
 	String *s_data,
 	String s_find,
-	s64 *pos_found = 0,
-	s64  pos_start = 0,
+	s64 *pos_found =  0,
+	s64  pos_start = -1,
 	bool pos_after_find = false
 ) {
 	Assert(s_data);
@@ -1175,9 +1161,6 @@ instant void
 String_Flush(
 	String *s_data_io
 ) {
-	if (!s_data_io->value)
-		s_data_io->value = s_data_io->value_buffer;
-
 	Memory_Set(s_data_io->value, 0, s_data_io->length);
 }
 
@@ -1257,7 +1240,8 @@ operator == (
 	String		 s_data1,
 	const char	*c_data2
 ) {
-	return String_IsEqual(s_data1, S(c_data2));
+ 	String ts_data2 = S(c_data2);
+	return (String_Compare(s_data1, ts_data2, ts_data2.length, true) == 0);
 }
 
 bool

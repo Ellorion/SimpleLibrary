@@ -14,4 +14,6 @@ Test_Run(
 	Test_Arrays();
 	Test_Files();
 	Test_Parser();
+
+	LOG_DEBUG("tests completed");
 }

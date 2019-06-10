@@ -40,8 +40,8 @@ Test_Arrays(
 		String_Append(s_item, S("bla"));
 
 		FOR_ARRAY(as_test, it) {
-			String ts_data = ARRAY_IT(as_test, it);
-			AssertMessage(ts_data == "bla", "[Test] Array_AddEmpty failed.");
+			String *ts_data = &ARRAY_IT(as_test, it);
+			AssertMessage(*ts_data == "bla", "[Test] Array_AddEmpty failed.");
 		}
 
 		Array_AddEmpty(&as_test, &s_item);
@@ -91,7 +91,7 @@ Test_Arrays(
 		String_Append(&s_split, S("aaa\nbbb"));
 
 		Array<String> as_split;
-		as_split = String_Split(&s_split, S("\n"), DELIMITER_IGNORE, true);
+		as_split = String_Split(&s_split, S("\n", 1), DELIMITER_IGNORE, true);
 
 		AssertMessage(as_split.count == 2, "[Test] Incorrect amount of items split from string (2).");
 		AssertMessage(ARRAY_IT(as_split, 0) == "aaa", "[Test] First Array item does not match.");
