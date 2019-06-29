@@ -13,7 +13,11 @@ enum STRING_LENGTH_TYPE {
 struct String {
 	bool  is_reference     = false;
 	bool  changed          = false;
-	bool  reference_exists = false;
+
+#if DEBUG_MODE
+	bool  DEBUG_reference_exists = false;
+#endif // DEBUG_MODE
+
 	u64   length = 0;
 	char *value  = 0;
 };
@@ -93,7 +97,9 @@ S(
 		s_data_ref.is_reference = true;
 		s_data_ref.changed      = true;
 
-		s_data.reference_exists = true;
+#if DEBUG_MODE
+		s_data.DEBUG_reference_exists = true;
+#endif // DEBUG_MODE
  	}
 
 	return s_data_ref;
@@ -112,7 +118,9 @@ S(
 		s_data_ref.is_reference = true;
 		s_data_ref.changed      = true;
 
-		s_data.reference_exists = true;
+#if DEBUG_MODE
+		s_data.DEBUG_reference_exists = true;
+#endif // DEBUG_MODE
 	}
 
 	return s_data_ref;
@@ -251,7 +259,10 @@ String_Copy(
 
 	s_result.changed          = true;
 	s_result.is_reference     = false;
-	s_result.reference_exists = false;
+
+#if DEBUG_MODE
+	s_result.DEBUG_reference_exists = false;
+#endif // DEBUG_MODE
 
 	return s_result;
 }
@@ -269,8 +280,10 @@ String_Resize(
 		char *t_value_old = s_data_io->value;
 		s_data_io->value = Memory_Resize(t_value_old, char, new_length);
 
-		if (s_data_io->reference_exists AND t_value_old != s_data_io->value)
+#if DEBUG_MODE
+		if (s_data_io->DEBUG_reference_exists AND t_value_old != s_data_io->value)
 			LOG_WARNING("Changing base pointer. All references to it become invalid.");
+#endif // DEBUG_MODE
 	}
 
 	s_data_io->length = new_length;
