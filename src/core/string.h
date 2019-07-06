@@ -473,6 +473,10 @@ String_Compare(
 	u64 length_opt,
 	bool is_case_sensitive
 ) {
+	/// const value comparison
+	if (s_data_1.value == s_data_2.value)
+		return 0;
+
 	u64 length = length_opt;
 
 	if (!length)

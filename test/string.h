@@ -159,6 +159,14 @@ Test_Strings(
 		String_Destroy(&s_data);
     }
 
+    {
+    	String s_test = S("Greenpeace");
+
+		if (s_test != "Greenpeace") {
+			AssertMessage(false, "[Test] Const string value comparison check failed.");
+		}
+    }
+
     /// UTF-8 tests
     {
     	String_Destroy(&s_data);
