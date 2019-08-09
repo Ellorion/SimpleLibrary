@@ -31,7 +31,7 @@ int main() {
 
 	MemorySegment_Add(&window.a_segments_reset, window.events);
 	MemorySegment_Add(&window.a_segments_reset, font.events);
-	MemorySegment_AddWidgets(&window->a_segments_reset, &ap_widgets);
+	MemorySegment_AddWidgets(&window.a_segments_reset, &ap_widgets);
 
 	while (Window_IsRunning(&window)) {
 		Window_ReadMessage(&window);

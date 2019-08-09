@@ -381,7 +381,7 @@ Vertex_FindOrAdd(
 	Assert(entry_out);
 
 	Vertex *t_vertex_entry;
-	Vertex t_vertex_find;
+	Vertex  t_vertex_find;
 	t_vertex_find.texture = *texture_find;
 
 	bool found = Array_FindOrAdd(a_vertex_io, t_vertex_find, &t_vertex_entry);

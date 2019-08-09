@@ -267,24 +267,20 @@ instant bool
 Array_FindOrAdd(
 	Array<T> *array_io,
 	T find,
-	T **entry_out
+	T **entry_out_opt = 0
 ) {
 	Assert(array_io);
-	Assert(entry_out);
 
 	u64 t_index_find;
 	bool found_element = Array_Find(array_io, find, &t_index_find);
 
-	if (found_element) {
-		*entry_out = &ARRAY_IT(*array_io, t_index_find);
+	if (!found_element) {
+		Array_Add(array_io, find);
+		t_index_find = array_io->count - 1;
 	}
-	else {
-        Array_AddEmpty(array_io, entry_out);
 
-        /// store what you want to find, if it does not exists,
-        /// so it does not have to be assigned manually all the time
-        **entry_out = find;
-	}
+	if (entry_out_opt)
+		*entry_out_opt = &ARRAY_IT(*array_io, t_index_find);
 
 	return found_element;
 }

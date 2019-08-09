@@ -38,12 +38,17 @@ operator == (
 	Codepoint &cp_1,
 	Codepoint &cp_2
 ) {
-	if (cp_1.codepoint == cp_2.codepoint) {
-		/// check size this way
-		return (cp_1.rect_subpixel == cp_2.rect_subpixel);
-	}
+	if (cp_1.codepoint != cp_2.codepoint)
+		return false;
 
-	return false;
+	/// check size this way
+	if (!(cp_1.rect_subpixel == cp_2.rect_subpixel))
+		return false;
+
+	if (!Memory_Compare(cp_1.font, cp_2.font, sizeof(*cp_1.font)))
+		return false;
+
+	return true;
 }
 
 
@@ -405,7 +410,7 @@ enum CURSOR_MOVE_TYPE {
 };
 
 struct Text_Line {
-	u64 width_pixel;
+	u64 width_in_pixel;
 	String s_data;
 };
 
@@ -686,7 +691,7 @@ Text_BuildLines(
 									ts_word
 								);
 
-			text_line->width_pixel += advance_word;
+			text_line->width_in_pixel += advance_word;
 
 			index_data += ts_word->length;
 
@@ -780,7 +785,7 @@ Text_BuildLines(
 			}
 
 			rect_line_current.x    += advance_word;
-			text_line->width_pixel += advance_word;
+			text_line->width_in_pixel += advance_word;
 			line_start = false;
 		}
 
@@ -796,33 +801,34 @@ Text_BuildLines(
 ///       a line, if text editing is allowed
 instant u64
 Text_GetAlignOffsetX(
-	Text *text,
-	u64 max_width,
+	Font *font,
+	TEXT_ALIGN_X_TYPE align_x,
+	String s_data,
 	s32 advance_space,
-	Text_Line *text_line
+	u64 max_width
 ) {
-	Assert(text);
-	Assert(text_line);
+	Assert(font);
 
 	u64 x_align_offset = 0;
 
-	if (    text->data.align_x != TEXT_ALIGN_X_LEFT
-		AND text_line->width_pixel == 0
+	if (    align_x   != TEXT_ALIGN_X_LEFT
+		AND max_width != 0
 	) {
-		text_line->width_pixel = Codepoint_GetStringAdvance(
-									text->font,
-									0.0f,
-									advance_space,
-									&text_line->s_data
-								);
-	}
+		u64 width_in_pixel = Codepoint_GetStringAdvance(
+							font,
+							0.0f,
+							advance_space,
+							&s_data
+						 );
 
-	if (max_width > text_line->width_pixel) {
-		if (text->data.align_x == TEXT_ALIGN_X_MIDDLE)
-			x_align_offset = (max_width - text_line->width_pixel) >> 1;
-		else
-		if (text->data.align_x == TEXT_ALIGN_X_RIGHT)
-			x_align_offset = (max_width - text_line->width_pixel);
+		if (max_width > width_in_pixel) {
+			if (     align_x == TEXT_ALIGN_X_MIDDLE) {
+				x_align_offset = (max_width - width_in_pixel) >> 1;
+			}
+			else if (align_x == TEXT_ALIGN_X_RIGHT ) {
+				x_align_offset = (max_width - width_in_pixel);
+			}
+		}
 	}
 
 	return x_align_offset;
@@ -903,10 +909,104 @@ Text_ReserveMemory(
 }
 
 instant void
+Vertex_AddText(
+	Array<Vertex>     *a_vertex_chars_io,
+	ShaderSet         *shader_set,
+	Font              *font,
+	Rect               rect,
+	Color32            color,
+	TEXT_ALIGN_X_TYPE  align_x,
+	String             s_data
+) {
+	RectF rect_position = {	rect.x, rect.y, 0, 0 };
+
+	Codepoint codepoint_space;
+	Codepoint_GetData(font, ' ', &codepoint_space);
+
+	String s_data_it = S(s_data);
+
+	u64 x_align_offset = Text_GetAlignOffsetX(font, align_x, s_data, codepoint_space.advance, rect.w);
+
+	while (!String_IsEmpty(&s_data_it)) {
+		Codepoint codepoint;
+		s32 utf_byte_count = 0;
+
+		s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
+
+		Codepoint_GetDataConditional(
+			font,
+			cp,
+			&codepoint,
+			rect_position.x - rect.x,
+			codepoint_space.advance
+		);
+
+		rect_position.x += codepoint.left_side_bearing;
+		rect_position.y  =
+				rect.y
+			+ 	codepoint.rect_subpixel.y
+			+ 	Font_GetLineHeight(font)
+			+ 	codepoint.font->descent
+		;
+
+
+		/// for unavailable characters like ' '
+		if (!Texture_IsEmpty(&codepoint.texture) AND codepoint.codepoint > 32) {
+			Vertex *t_vertex;
+			Vertex_Buffer<float> *t_attribute;
+
+			if (!Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex)) {
+				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
+				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
+			}
+			{
+				t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
+				Assert(S("vertex_position") == t_attribute->name);
+
+				Array_ReserveAdd(&t_attribute->a_buffer, 2);
+				Array_Add(&t_attribute->a_buffer, rect_position.x + x_align_offset);
+				Array_Add(&t_attribute->a_buffer, rect_position.y);
+			}
+
+			{
+				t_attribute = &ARRAY_IT(t_vertex->a_attributes, 1);
+				Assert(S("text_color") == t_attribute->name);
+
+				Array_ReserveAdd(&t_attribute->a_buffer, 3);
+				Array_Add(&t_attribute->a_buffer, color.r);
+				Array_Add(&t_attribute->a_buffer, color.g);
+				Array_Add(&t_attribute->a_buffer, color.b);
+			}
+		}
+
+		rect_position.x += codepoint.advance - codepoint.left_side_bearing;
+
+		String_AddOffset(&s_data_it, utf_byte_count);
+	}
+}
+
+instant void
+Vertex_RenderText(
+	ShaderSet     *shader_set,
+	Array<Vertex> *a_vertex_chars
+) {
+	Assert(shader_set);
+	assert(a_vertex_chars);
+
+	/// redraw last computed text
+	if (a_vertex_chars->count) {
+		ShaderSet_Use(shader_set, SHADER_PROG_TEXT);
+		Vertex_Render(shader_set, a_vertex_chars);
+	}
+}
+
+/// modal style
+instant void
 Text_AddLines(
 	Text *text,
 	Array<Vertex>    *a_vertex_chars_io,
-	Array<Text_Line> *a_text_lines
+	Array<Text_Line> *a_text_lines,
+	bool as_columns = false
 ) {
 	Assert(a_text_lines);
 
@@ -915,89 +1015,25 @@ Text_AddLines(
 	Rect_AddPadding(&rect, text->data.rect_margin);
 	Rect_AddPadding(&rect, text->data.rect_padding);
 
-	u64 width_max = rect.w;
-
-	if (!width_max) {
-		width_max = text->data.content_width;
-	}
-
-	float x_line_start = rect.x;
-
-	RectF rect_position = {	x_line_start, rect.y, 0, 0 };
+	if (!rect.w)
+		rect.w = text->data.content_width;
 
 	bool has_cursor = text->data.is_editable;
 
 	if (has_cursor)
 		Vertex_ClearAttributes(&text->cursor.vertex_select);
 
-	Codepoint codepoint_space;
-	Codepoint_GetData(text->font, ' ', &codepoint_space);
-
 	FOR_ARRAY(*a_text_lines, it_line) {
 		Text_Line *text_line = &ARRAY_IT(*a_text_lines, it_line);
 
-		String s_data_it = S(text_line->s_data);
+		Vertex_AddText( a_vertex_chars_io, text->shader_set,
+						text->font, rect, text->data.color,
+						text->data.align_x, text_line->s_data);
 
-		while(!String_IsEmpty(&s_data_it)) {
-			Codepoint codepoint;
-			s32 utf_byte_count = 0;
-
-			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
-
- 			Codepoint_GetDataConditional(
-				text->font,
-				cp,
-				&codepoint,
-				rect_position.x - x_line_start,
-				codepoint_space.advance
-			);
-
-			rect_position.x += codepoint.left_side_bearing;
-			rect_position.y  =
-					rect.y
-				+ 	codepoint.rect_subpixel.y
-				+ 	Font_GetLineHeight(text->font)
-				+ 	codepoint.font->descent
-			;
-
-			u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, codepoint_space.advance, text_line);
-
-			/// for unavailable characters like ' '
-			if (!Texture_IsEmpty(&codepoint.texture) AND codepoint.codepoint > 32) {
-				Vertex *t_vertex;
-				Vertex_Buffer<float> *t_attribute;
-
-				if (!Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex)) {
-					Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
-					Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
-				}
-				{
-					t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
-					Assert(S("vertex_position") == t_attribute->name);
-
-					Array_ReserveAdd(&t_attribute->a_buffer, 2);
-					Array_Add(&t_attribute->a_buffer, rect_position.x + x_align_offset);
-					Array_Add(&t_attribute->a_buffer, rect_position.y);
-				}
-
-				{
-					t_attribute = &ARRAY_IT(t_vertex->a_attributes, 1);
-					Assert(S("text_color") == t_attribute->name);
-
-					Array_ReserveAdd(&t_attribute->a_buffer, 3);
-					Array_Add(&t_attribute->a_buffer, text->data.color.r);
-					Array_Add(&t_attribute->a_buffer, text->data.color.g);
-					Array_Add(&t_attribute->a_buffer, text->data.color.b);
-				}
-			}
-
-			rect_position.x += codepoint.advance - codepoint.left_side_bearing;
-
-			String_AddOffset(&s_data_it, utf_byte_count);
-		}
-
-		rect_position.x  = x_line_start;
-		rect.y          += Font_GetLineHeight(text->font);
+		if (as_columns)
+			rect.x += text_line->width_in_pixel;
+		else
+			rect.y += Font_GetLineHeight(text->font);
 	}
 }
 
@@ -1090,7 +1126,7 @@ Text_Update(
 
 	FOR_ARRAY(text_io->a_text_lines, it_line) {
 		Text_Line *t_line = &ARRAY_IT(text_io->a_text_lines, it_line);
-		text_io->data.content_width = MAX(text_io->data.content_width, (s64)t_line->width_pixel);
+		text_io->data.content_width = MAX(text_io->data.content_width, (s64)t_line->width_in_pixel);
 	}
 
 	u64 old_area = text_io->data_prev.content_width * text_io->data_prev.content_height;
@@ -1140,7 +1176,7 @@ Text_Cursor_FindIndex(
 		FOR_ARRAY(text->a_text_lines, it_line) {
 			Text_Line *t_text_line = &ARRAY_IT(text->a_text_lines, it_line);
 
-			width_max = MAX(width_max, t_text_line->width_pixel);
+			width_max = MAX(width_max, t_text_line->width_in_pixel);
 		}
 	}
 
@@ -1169,7 +1205,8 @@ Text_Cursor_FindIndex(
 			continue;
 		}
 
-		u64 x_align_offset = Text_GetAlignOffsetX(text, width_max, codepoint_space.advance, text_line);
+		u64 x_align_offset = Text_GetAlignOffsetX(	text->font, text->data.align_x, text_line->s_data,
+													codepoint_space.advance, width_max);
 		rect_position_it.x += x_align_offset;
 
 		bool is_newline_char_once = false;
@@ -1556,7 +1593,8 @@ Text_Cursor_Update(
 			continue;
 		}
 
-		u64 x_align_offset = Text_GetAlignOffsetX(text_io, width_max, codepoint_space.advance, text_line);
+		u64 x_align_offset = Text_GetAlignOffsetX(	text_io->font, text_io->data.align_x, text_line->s_data,
+													codepoint_space.advance, width_max);
 		rect_position_it.x += x_align_offset;
 
 		bool is_newline_char_once = false;
