@@ -7,6 +7,9 @@ typedef void (*Widget_OwnerDraw)
 typedef void (*Widget_UpdateCustomInputsSub)
 	(Widget *widget_parent_io, u64 sub_index);
 
+instant bool
+Widget_Update(Widget *widget_io);
+
 enum WIDGET_TYPE {
 	WIDGET_LABEL,
 	WIDGET_BUTTON,
@@ -17,7 +20,8 @@ enum WIDGET_TYPE {
 	WIDGET_NUMBERPICKER,
 	WIDGET_TEXTBOX,
 	WIDGET_COMBOBOX,
-	WIDGET_PROGRESSBAR
+	WIDGET_PROGRESSBAR,
+	WIDGET_LISTVIEW
 };
 
 enum WIDGET_COMBOBOX_TYPE {
@@ -130,6 +134,10 @@ struct Widget {
 	Layout_Data layout_data;
 	Rect rect_content; /// x,y = offsets
 
+	/// Listview Data
+	Array<Text_Line>      a_tableheaders;
+	Array<Array<String>> *a_tabledata = 0;
+
 	/// Content
 	Array<Widget> a_subwidgets;
 };
@@ -193,13 +201,14 @@ Widget_IsListType(
 ) {
 	Assert(widget);
 
-	if (widget->type == WIDGET_LISTBOX)  return true;
+	if (widget->type == WIDGET_LISTBOX)   return true;
+	if (widget->type == WIDGET_LISTVIEW)  return true;
 
 	return false;
 }
 
 instant void
-Widget_AddRow(
+Widget_AddRowSingle(
 	Widget *widget_io,
 	String s_row_data
 ) {
@@ -219,7 +228,7 @@ Widget_AddRow(
 }
 
 instant void
-Widget_AddRows(
+Widget_AddRowsSingle(
 	Widget *widget_io,
 	Array<String> *as_list
 ) {
@@ -229,7 +238,7 @@ Widget_AddRows(
 	FOR_ARRAY(*as_list, it) {
 		String *ts_item = &ARRAY_IT(*as_list, it);
 
-		Widget_AddRow(widget_io, *ts_item);
+		Widget_AddRowSingle(widget_io, *ts_item);
 	}
 }
 
@@ -485,7 +494,8 @@ Widget_Redraw(
 		} break;
 
 		case WIDGET_PICTUREBOX:
-		case WIDGET_LISTBOX: {
+		case WIDGET_LISTBOX:
+		case WIDGET_LISTVIEW: {
 			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 		} break;
 
@@ -723,6 +733,127 @@ Widget_UseScrollDefault(
 	widget_io->text.offset_y = 0;
 }
 
+instant void
+Widget_UpdateListBox(
+	Widget *widget_io
+) {
+	Assert(widget_io);
+
+	if (widget_io->type != WIDGET_LISTBOX)
+		return;
+
+	if (!Widget_HasChanged(widget_io, true))
+		return;
+
+	Text *text = &widget_io->text;
+
+	Vertex_ClearAttributes(&widget_io->vertex_rect);
+	Text_Clear(text);
+
+	Widget_InvalidateBackground(widget_io);
+
+	text->data.rect = widget_io->layout_data.settings.rect;
+	Rect *rect_text = &text->data.rect;
+
+	s32 pad_left = 2;
+
+	rect_text->x += text->offset_x + pad_left;
+
+	widget_io->rect_content.h = 0;
+
+	Array<String> *as_target;
+	Widget_GetListArrayFiltered(widget_io, &as_target);
+
+	FOR_ARRAY(*as_target, it_row) {
+		String *ts_data = &ARRAY_IT(*as_target, it_row);
+
+		u64 number_of_lines = Array_SplitWordsBuffer(ts_data, &text->as_words);
+		rect_text->h = Text_BuildLines(text, &text->as_words, number_of_lines, &text->a_text_lines);
+
+		Color32 t_color_rect = widget_io->data.color_outline;
+
+		if (widget_io->data.active_row_id == it_row) {
+			if (widget_io->data.has_focus)
+				t_color_rect = widget_io->data.color_outline_selected;
+			else
+				t_color_rect = widget_io->data.color_outline_inactive;
+		}
+
+		Rect rect_box = *rect_text;
+		rect_box.x -= pad_left;
+		rect_box.x -= text->offset_x;
+
+		Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
+
+		Text_AddLines(text);
+
+		s32 height_row_step = rect_text->h + widget_io->data.spacing;
+		rect_text->y += height_row_step;
+		widget_io->rect_content.h += height_row_step;
+	}
+
+	if (widget_io->rect_content.h) {
+		widget_io->rect_content.h -= widget_io->data.spacing;
+	}
+
+	/// revert for scissor
+	*rect_text = widget_io->layout_data.settings.rect;
+}
+
+/// display only at this point, without any other features
+instant void
+Widget_UpdateListView(
+	Widget *widget_io
+) {
+	Assert(widget_io);
+
+	if (widget_io->type != WIDGET_LISTVIEW)
+		return;
+
+	if (!Widget_HasChanged(widget_io, true))
+		return;
+
+	Text *text      = &widget_io->text;
+	text->data.rect = widget_io->layout_data.settings.rect;
+
+	Text_Clear(text);
+
+	Rect rect = Text_GetRect(text);
+	s32 line_height = Font_GetLineHeight(text->font);
+
+	Widget_InvalidateBackground(widget_io);
+
+	{ /// only needed, if headers are drawn, which they always are for now
+		Text_AddLines(text, &text->a_vertex_chars, &widget_io->a_tableheaders, true);
+		rect.y += line_height;
+	}
+
+	float rect_x_base = rect.x;
+
+	if (!widget_io->a_tabledata)
+		return;
+
+	FOR_ARRAY(*widget_io->a_tabledata, it_rows) {
+		Array<String> *as_items = &ARRAY_IT(*widget_io->a_tabledata, it_rows);
+
+		AssertMessage(as_items->count == widget_io->a_tableheaders.count,
+					  "Amount of header does not match table column count.");
+
+		FOR_ARRAY(*as_items, it_item) {
+			String *s_item = &ARRAY_IT(*as_items, it_item);
+
+			Vertex_AddText(&text->a_vertex_chars, text->shader_set, text->font,
+							rect, text->data.color, text->data.align_x, *s_item);
+
+			Text_Line *header_column = &ARRAY_IT(widget_io->a_tableheaders, it_item);
+			rect.x += header_column->width_in_pixel;
+		}
+
+		rect.x  = rect_x_base;
+		rect.y += line_height;
+	}
+}
+
 instant bool
 Widget_Update(
 	Widget *widget_io
@@ -765,59 +896,8 @@ Widget_Update(
 		widget_io->events.on_text_change = Text_Update(text);
 	}
 	else {
-		if (Widget_HasChanged(widget_io, true)) {
-			Vertex_ClearAttributes(&widget_io->vertex_rect);
-			Text_Clear(text);
-
-			Widget_InvalidateBackground(widget_io);
-
-			text->data.rect = widget_io->layout_data.settings.rect;
-			Rect *rect_text = &text->data.rect;
-
-			s32 pad_left = 2;
-
-			rect_text->x += text->offset_x + pad_left;
-
-			widget_io->rect_content.h = 0;
-
-			Array<String> *as_target;
-			Widget_GetListArrayFiltered(widget_io, &as_target);
-
-			FOR_ARRAY(*as_target, it_row) {
-				String *ts_data = &ARRAY_IT(*as_target, it_row);
-
-				u64 number_of_lines = Array_SplitWordsBuffer(ts_data, &text->as_words);
-				rect_text->h = Text_BuildLines(text, &text->as_words, number_of_lines, &text->a_text_lines);
-
-				Color32 t_color_rect = widget_io->data.color_outline;
-
-				if (widget_io->data.active_row_id == it_row) {
-					if (widget_io->data.has_focus)
-						t_color_rect = widget_io->data.color_outline_selected;
-					else
-						t_color_rect = widget_io->data.color_outline_inactive;
-				}
-
-				Rect rect_box = *rect_text;
-				rect_box.x -= pad_left;
-				rect_box.x -= text->offset_x;
-
-				Vertex_AddRect32(&widget_io->vertex_rect, rect_box, t_color_rect);
-
-				Text_AddLines(text);
-
-				s32 height_row_step = rect_text->h + widget_io->data.spacing;
-				rect_text->y += height_row_step;
-				widget_io->rect_content.h += height_row_step;
-			}
-
-			if (widget_io->rect_content.h) {
-				widget_io->rect_content.h -= widget_io->data.spacing;
-			}
-
-			/// revert for scissor
-			*rect_text = widget_io->layout_data.settings.rect;
-		}
+		Widget_UpdateListBox(widget_io);
+		Widget_UpdateListView(widget_io);
 	}
 
 	/// Triggers
@@ -1651,6 +1731,7 @@ Widget_ClearRows(
 	Widget *widget_io
 ) {
 	Assert(widget_io);
+	Assert(widget_io->type == WIDGET_LISTBOX);
 
 	Array_Clear(&widget_io->data.as_row_data);
 
@@ -1725,7 +1806,7 @@ Widget_LoadDirectoryList(
 		String ts_entry_name = t_entry->s_name;
 		ts_entry_name.is_reference = true;
 
-		Widget_AddRow(widget_io, ts_entry_name);
+		Widget_AddRowSingle(widget_io, ts_entry_name);
 	}
 
 	String_Clear(&ts_directory_buffer);
@@ -2223,6 +2304,15 @@ Widget_UpdateInputComboBox(
 	}
 }
 
+instant String *
+Widget_GetTextData(
+	Widget *widget
+) {
+	Assert(widget);
+
+	return &widget->text.s_data;
+}
+
 instant Widget
 Widget_CreateComboBox(
 	Window *window,
@@ -2303,6 +2393,45 @@ Widget_CreateProgressbar(
 	return t_widget;
 }
 
+instant Widget
+Widget_CreateListView(
+	Window *window,
+	Font *font,
+	Rect rect_box
+) {
+	Assert(window);
+	Assert(font);
+
+	Widget t_widget = {};
+
+	t_widget.type         = WIDGET_LISTVIEW;
+	t_widget.rect_content = rect_box;
+	t_widget.window       = window;
+
+	t_widget.layout_data.settings.rect = rect_box;
+	t_widget.layout_data.settings.auto_width = true;
+
+	t_widget.text.font = font;
+	t_widget.text.data.rect = rect_box;
+
+	return t_widget;
+}
+
+instant void
+Widget_AddHeader(
+	Widget *widget_io,
+	String s_header,
+	u64 width_in_pixel
+) {
+	Assert(widget_io);
+
+	Text_Line header;
+	header.s_data          = String_Copy(s_header);
+	header.width_in_pixel  = width_in_pixel;
+
+	Array_Add(&widget_io->a_tableheaders, header);
+}
+
 instant void
 Widget_LoadFile(
 	Widget *widget_io,
@@ -2318,15 +2447,6 @@ Widget_LoadFile(
 
 	String_Clear(s_data);
 	String_Append(s_data, File_ReadAll(s_filename, true));
-}
-
-instant String *
-Widget_GetTextData(
-	Widget *widget
-) {
-	Assert(widget);
-
-	return &widget->text.s_data;
 }
 
 instant void
@@ -2368,4 +2488,23 @@ Widget_ForEach(
 			OnWidgetChange(t_widget_sub);
 		}
 	}
+}
+
+instant void
+Widget_LinkTableData(
+	Widget *widget_io,
+	Array<Array<String>> *a_tabledata
+) {
+	Assert(widget_io);
+	Assert(widget_io->type == WIDGET_LISTVIEW);
+
+	Assert(a_tabledata);
+
+	if (a_tabledata->count) {
+		Array<String> *as_row = &ARRAY_IT(*a_tabledata, 0);
+		AssertMessage(as_row->count == widget_io->a_tableheaders.count,
+					  "Amount of header does not match table column count.");
+	}
+
+	widget_io->a_tabledata = a_tabledata;
 }

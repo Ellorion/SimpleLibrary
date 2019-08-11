@@ -24,10 +24,10 @@ int main() {
 	}
 	Layout_Rearrange(&layout, &window);
 
-	Widget_AddRow(&wg_list, S("1. row entry"));
-	Widget_AddRow(&wg_list, S("2. row entry"));
-	Widget_AddRow(&wg_list, S("3. row entry"));
-	Widget_AddRow(&wg_list, S("4. row entry"));
+	Widget_AddRowSingle(&wg_list, S("1. row entry"));
+	Widget_AddRowSingle(&wg_list, S("2. row entry"));
+	Widget_AddRowSingle(&wg_list, S("3. row entry"));
+	Widget_AddRowSingle(&wg_list, S("4. row entry"));
 
 	MemorySegment_Add(&window.a_segments_reset, window.events);
 	MemorySegment_Add(&window.a_segments_reset, font.events);

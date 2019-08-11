@@ -31,21 +31,21 @@ Window_HandleEvents(
 	Array_Add(&ap_widgets, &widget_click_me);
 	Array_Add(&ap_widgets, &widget_exit);
 
-	Widget_AddRow(&widget_listbox, S("1"));
-	Widget_AddRow(&widget_listbox, S("2"));
-	Widget_AddRow(&widget_listbox, S("3"));
-	Widget_AddRow(&widget_listbox, S("4"));
-	Widget_AddRow(&widget_listbox, S("5"));
-	Widget_AddRow(&widget_listbox, S("6"));
-	Widget_AddRow(&widget_listbox, S("7"));
-	Widget_AddRow(&widget_listbox, S("8"));
-	Widget_AddRow(&widget_listbox, S("9"));
-	Widget_AddRow(&widget_listbox, S("10"));
-	Widget_AddRow(&widget_listbox, S("11"));
-	Widget_AddRow(&widget_listbox, S("12"));
-	Widget_AddRow(&widget_listbox, S("13"));
-	Widget_AddRow(&widget_listbox, S("14"));
-	Widget_AddRow(&widget_listbox, S("15"));
+	Widget_AddRowSingle(&widget_listbox, S("1"));
+	Widget_AddRowSingle(&widget_listbox, S("2"));
+	Widget_AddRowSingle(&widget_listbox, S("3"));
+	Widget_AddRowSingle(&widget_listbox, S("4"));
+	Widget_AddRowSingle(&widget_listbox, S("5"));
+	Widget_AddRowSingle(&widget_listbox, S("6"));
+	Widget_AddRowSingle(&widget_listbox, S("7"));
+	Widget_AddRowSingle(&widget_listbox, S("8"));
+	Widget_AddRowSingle(&widget_listbox, S("9"));
+	Widget_AddRowSingle(&widget_listbox, S("10"));
+	Widget_AddRowSingle(&widget_listbox, S("11"));
+	Widget_AddRowSingle(&widget_listbox, S("12"));
+	Widget_AddRowSingle(&widget_listbox, S("13"));
+	Widget_AddRowSingle(&widget_listbox, S("14"));
+	Widget_AddRowSingle(&widget_listbox, S("15"));
 
 	MemorySegment_Add(&window->a_segments_reset, window->events);
 	MemorySegment_Add(&window->a_segments_reset, font_20.events);

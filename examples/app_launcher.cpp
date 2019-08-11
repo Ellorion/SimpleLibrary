@@ -149,7 +149,7 @@ Window_HandleEvents(
 						continue;
 
 					String s_section = String_GetDelimiterSectionRef(ts_line, S(","), 0);
-					Widget_AddRow(&wg_list, s_section);
+					Widget_AddRowSingle(&wg_list, s_section);
 				}
 			}
 		}

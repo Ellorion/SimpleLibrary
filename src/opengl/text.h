@@ -1001,6 +1001,23 @@ Vertex_RenderText(
 	}
 }
 
+instant Rect
+Text_GetRect(
+	Text *text
+) {
+	Assert(text);
+
+	Rect rect = text->data.rect;
+
+	Rect_AddPadding(&rect, text->data.rect_margin);
+	Rect_AddPadding(&rect, text->data.rect_padding);
+
+	if (!rect.w)
+		rect.w = text->data.content_width;
+
+	return rect;
+}
+
 /// modal style
 instant void
 Text_AddLines(
@@ -1011,13 +1028,7 @@ Text_AddLines(
 ) {
 	Assert(a_text_lines);
 
-	Rect rect = text->data.rect;
-
-	Rect_AddPadding(&rect, text->data.rect_margin);
-	Rect_AddPadding(&rect, text->data.rect_padding);
-
-	if (!rect.w)
-		rect.w = text->data.content_width;
+	Rect rect = Text_GetRect(text);
 
 	bool has_cursor = text->data.is_editable;
 

@@ -23,7 +23,7 @@ Window_HandleEvents(
 
 	Widget *w_combo_list = &ARRAY_IT(w_combobox.a_subwidgets, 2);
 
-	Widget_AddRow(&w_combobox, S("Hello"));
+	Widget_AddRowSingle(&w_combobox, S("Hello"));
 
 	w_combo_list->data.color_background = Color_MakeGrey(0.5f);
 

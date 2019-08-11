@@ -98,7 +98,7 @@ int main() {
 		if (String_StartWith(&s_font_file, S("\\"), true))
 			String_AddOffset(&s_font_file, 1);
 
-		Widget_AddRow(&wg_list, S(s_font_file, s_font_file.length -4));
+		Widget_AddRowSingle(&wg_list, S(s_font_file, s_font_file.length -4));
 	}
 
 	String *ts_data = Widget_GetTextData(&wg_textbox);
