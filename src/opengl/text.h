@@ -812,14 +812,14 @@ Text_GetAlignOffsetX(
 	u64 x_align_offset = 0;
 
 	if (    align_x   != TEXT_ALIGN_X_LEFT
-		AND max_width != 0
+		AND max_width  > 0
 	) {
 		u64 width_in_pixel = Codepoint_GetStringAdvance(
-							font,
-							0.0f,
-							advance_space,
-							&s_data
-						 );
+								font,
+								0.0f,
+								advance_space,
+								&s_data
+							 );
 
 		if (max_width > width_in_pixel) {
 			if (     align_x == TEXT_ALIGN_X_MIDDLE) {
@@ -897,11 +897,13 @@ Text_ReserveMemory(
 	Vertex_Buffer<float> *t_attribute;
 
 	FOR_ARRAY(*a_vertex_chars_io, it) {
+		/// reserve "vertex_position"
 		Vertex *t_vertex = &ARRAY_IT(*a_vertex_chars_io, it);
 		t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
 		Array_Reserve(&t_attribute->a_buffer, t_attribute->group_count);
 		t_attribute->group_count = 2;
 
+		/// reserve "text_color"
 		t_attribute = &ARRAY_IT(t_vertex->a_attributes, 1);
 		Array_Reserve(&t_attribute->a_buffer, t_attribute->group_count);
 		t_attribute->group_count = 3;
@@ -948,7 +950,6 @@ Vertex_AddText(
 			+ 	Font_GetLineHeight(font)
 			+ 	codepoint.font->descent
 		;
-
 
 		/// for unavailable characters like ' '
 		if (!Texture_IsEmpty(&codepoint.texture) AND codepoint.codepoint > 32) {

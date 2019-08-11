@@ -29,6 +29,7 @@ crafting.cpp
 *.bat
 *.cfg
 *.ico
+*.csv
 
 # Object directory
 obj/
