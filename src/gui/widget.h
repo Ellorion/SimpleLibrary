@@ -807,6 +807,8 @@ Widget_UpdateListView(
 ) {
 	Assert(widget_io);
 
+	constexpr u16 cellspacing = 0;
+
 	if (widget_io->type != WIDGET_LISTVIEW)
 		return;
 
@@ -819,38 +821,58 @@ Widget_UpdateListView(
 	Text_Clear(text);
 
 	Rect rect = Text_GetRect(text);
-	s32 line_height = Font_GetLineHeight(text->font);
+	float rect_x_base = rect.x;
+	s32   line_height = Font_GetLineHeight(text->font);
+	rect.h = line_height;
 
 	Widget_InvalidateBackground(widget_io);
 
 	{ /// only needed, if headers are drawn, which they always are for now
-		Text_AddLines(text, &text->a_vertex_chars, &widget_io->a_tableheaders, true);
-		rect.y += line_height;
-	}
+		FOR_ARRAY(widget_io->a_tableheaders, it_item) {
+			Text_Line *header_column = &ARRAY_IT(widget_io->a_tableheaders, it_item);
 
-	float rect_x_base = rect.x;
+			rect.w = header_column->width_in_pixel;
+
+			Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.7, 0.7, 0.7, 1});
+
+			Vertex_AddText(&text->a_vertex_chars, text->shader_set, text->font,
+							rect, {0, 0, 0.8, 1}, text->data.align_x, header_column->s_data);
+
+			rect.x += rect.w + cellspacing;
+		}
+
+		rect.x  = rect_x_base;
+		rect.y += line_height + cellspacing;
+	}
 
 	if (!widget_io->a_tabledata)
 		return;
 
-	FOR_ARRAY(*widget_io->a_tabledata, it_rows) {
-		Array<String> *as_items = &ARRAY_IT(*widget_io->a_tabledata, it_rows);
+	FOR_ARRAY(*widget_io->a_tabledata, it_row) {
+		Array<String> *as_items = &ARRAY_IT(*widget_io->a_tabledata, it_row);
 
 		AssertMessage(as_items->count == widget_io->a_tableheaders.count,
 					  "Amount of header does not match table column count.");
 
 		FOR_ARRAY(*as_items, it_item) {
-			String *s_item = &ARRAY_IT(*as_items, it_item);
+			String    *s_item        = &ARRAY_IT(*as_items, it_item);
+			Text_Line *header_column = &ARRAY_IT(widget_io->a_tableheaders, it_item);
+
+			rect.w = header_column->width_in_pixel;
+
+			if (it_row % 2)
+				Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.75, 0.75, 0.75, 1});
+			else
+				Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.8, 0.8, 0.8, 1});
 
 			Vertex_AddText(&text->a_vertex_chars, text->shader_set, text->font,
 							rect, text->data.color, text->data.align_x, *s_item);
 
-			Text_Line *header_column = &ARRAY_IT(widget_io->a_tableheaders, it_item);
-			rect.x += header_column->width_in_pixel;
+			rect.x += rect.w + cellspacing;
 		}
 
 		rect.x  = rect_x_base;
-		rect.y += line_height;
+		rect.y += line_height + cellspacing;
 	}
 }
 
