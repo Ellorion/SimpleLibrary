@@ -92,7 +92,7 @@ instant String
 S(
 	String s_data
 ) {
- 	String s_data_ref       = s_data;
+ 	String s_data_ref = s_data;
  	{
 		s_data_ref.is_reference = true;
 		s_data_ref.changed      = true;

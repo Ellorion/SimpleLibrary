@@ -410,7 +410,7 @@ enum CURSOR_MOVE_TYPE {
 };
 
 struct Text_Line {
-	u64 width_in_pixel;
+	s32 width_in_pixel;
 	String s_data;
 };
 
@@ -478,6 +478,20 @@ struct Text {
 	Array<Text_Line> a_text_lines;
 	Array<Vertex>    a_vertex_chars;
 };
+
+instant void
+Array_Destroy(
+	Array<Text_Line> *a_text_lines
+) {
+	Assert(a_text_lines);
+
+	FOR_ARRAY(*a_text_lines, it) {
+		Text_Line *t_textline = &ARRAY_IT(*a_text_lines, it);
+		String_Destroy(&t_textline->s_data);
+	}
+
+	Array_DestroyContainer(a_text_lines);
+}
 
 instant Text
 Text_Create(
@@ -1182,7 +1196,7 @@ Text_Cursor_FindIndex(
 	Codepoint codepoint_space;
 	Codepoint_GetData(text->font, ' ', &codepoint_space);
 
-	u64 width_max = rect.w;
+	s32 width_max = rect.w;
 
 	if (!width_max) {
 		FOR_ARRAY(text->a_text_lines, it_line) {
@@ -2120,8 +2134,8 @@ Text_Render(
 instant void
 Text_GetSize(
 	Text *text,
-	s32 *width_out,
-	s32 *height_out
+	s32 *width_out_opt,
+	s32 *height_out_opt
 ) {
 	Assert(text);
 
@@ -2130,12 +2144,38 @@ Text_GetSize(
 	static Array<String>    as_words;
 	static Array<Text_Line> a_text_lines;
 
-	if (height_out) {
+	if (height_out_opt) {
 		u64 number_of_lines = Array_SplitWordsBuffer(&text->s_data, &as_words);
-		*height_out = Text_BuildLines(text, &as_words, number_of_lines, &a_text_lines);
+		*height_out_opt = Text_BuildLines(text, &as_words, number_of_lines, &a_text_lines);
 	}
 
-	IF_SET(width_out)  = text->data.rect.w;
+	IF_SET(width_out_opt)  = text->data.rect.w;
+}
+
+instant void
+Text_GetSize(
+	Font *font,
+	String s_data,
+	s32 *width_out_opt,
+	s32 *height_out_opt,
+	s32 advance_space = -1
+) {
+	Assert(font);
+	Assert(!String_IsEmpty(&s_data));
+
+	IF_SET(height_out_opt) = Font_GetLineHeight(font);
+
+	if (width_out_opt) {
+		if (advance_space < 0)
+			advance_space = Codepoint_GetAdvance(font, ' ');
+
+		*width_out_opt = Codepoint_GetStringAdvance(
+							font,
+							0,
+							advance_space,
+							&s_data
+						 );
+	}
 }
 
 instant void

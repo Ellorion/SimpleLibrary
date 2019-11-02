@@ -4,6 +4,7 @@ struct Widget;
 
 typedef void (*Widget_OwnerDraw)
 	(Widget *widget_io);
+
 typedef void (*Widget_UpdateCustomInputsSub)
 	(Widget *widget_parent_io, u64 sub_index);
 
@@ -1162,6 +1163,8 @@ Widget_Destroy(
 	Vertex_Destroy(&widget_out->vertex_rect);
 	Vertex_Destroy(&widget_out->vertex_rect_sublayer);
 	Array_Destroy(&widget_out->a_vertex_fans);
+
+	Array_Destroy(&widget_out->a_tableheaders);
 }
 
 instant void
@@ -1172,11 +1175,7 @@ Widget_Destroy(
 
     FOR_ARRAY(*ap_widgets_out, it_widget) {
 		Widget *t_widget = ARRAY_IT(*ap_widgets_out, it_widget);
-
-		Text_Destroy(&t_widget->text);
-		Vertex_Destroy(&t_widget->vertex_rect);
-		Vertex_Destroy(&t_widget->vertex_rect_sublayer);
-		Array_Destroy(&t_widget->a_vertex_fans);
+		Widget_Destroy(t_widget);
     }
 }
 
@@ -2447,9 +2446,28 @@ Widget_AddHeader(
 ) {
 	Assert(widget_io);
 
+	/// copy, so it can be changed at runtime
 	Text_Line header;
 	header.s_data          = String_Copy(s_header);
 	header.width_in_pixel  = width_in_pixel;
+
+	Array_Add(&widget_io->a_tableheaders, header);
+}
+
+instant void
+Widget_AddHeader(
+	Widget *widget_io,
+	String s_header
+) {
+	Assert(widget_io);
+
+	Text_Line header;
+	header.s_data = String_Copy(s_header);
+
+	Text t_text = widget_io->text;
+	t_text.s_data = S(header.s_data);
+
+	Text_GetSize(widget_io->text.font, s_header, &header.width_in_pixel, 0);
 
 	Array_Add(&widget_io->a_tableheaders, header);
 }

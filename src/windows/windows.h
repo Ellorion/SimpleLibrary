@@ -103,6 +103,7 @@ struct Window {
 	s32                default_width  = 0;
 	s32                default_height = 0;
 
+	// f.e. to reset window / widget / aso. event flags during every frame
 	Array<MemorySegment> a_segments_reset;
 
 	struct Window_Events {
