@@ -63,6 +63,8 @@
 ///		-Wno-unused-but-set-variable
 ///		-Wno-comment
 ///		-Wno-unused-variable
+///		-Wno-uninitialized
+///		-Wno-maybe-uninitialized
 ///
 /// Convention:
 /// 	a_ -> Array
@@ -405,7 +407,10 @@ enum KEYBOARD_HOTKEY_ID {
 };
 
 #include "core/memory.h"
+#include "core/array.h"
 #include "core/string.h"
+#include "core/array_string.h"
+#include "core/memory_segment.h"
 
 instant s32
 ToInt(
@@ -424,9 +429,6 @@ ToInt(
 #include "core/time.h"
 #include "core/parser.h"
 #include "core/sort.h"
-#include "core/array.h"
-#include "core/array_string.h"
-#include "core/memory_segment.h"
 #include "core/rect.h"
 #include "core/cpu.h"
 #include "core/tree.h"

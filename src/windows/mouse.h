@@ -18,6 +18,25 @@ struct Mouse {
 };
 
 instant void
+MemorySegment_AddMouse(
+	Array<MemorySegment> *a_segments,
+	Mouse *mouse
+) {
+	Assert(a_segments);
+	Assert(mouse);
+
+	MemorySegment_Add(a_segments, mouse->point_relative);
+	MemorySegment_Add(a_segments, mouse->down);
+	MemorySegment_Add(a_segments, mouse->up);
+
+	MemorySegment_Add(a_segments, mouse->is_up);
+	MemorySegment_Add(a_segments, mouse->is_down);
+	MemorySegment_Add(a_segments, mouse->is_moving);
+
+	MemorySegment_Add(a_segments, mouse->wheel);
+}
+
+instant void
 Mouse_Show(
 ) {
 	ShowCursor(true);
@@ -51,27 +70,6 @@ Mouse_AutoHide(
 }
 
 instant void
-Mouse_Reset(
-	Mouse *mouse_out
-) {
-	if (!mouse_out)
-		return;
-
-	mouse_out->wheel = 0;
-
-	FOR(MOUSE_BUTTON_COUNT, it) {
-		mouse_out->down[it] = false;
-		mouse_out->up[it]   = false;
-	}
-
-	mouse_out->is_up        = false;
-	mouse_out->is_down      = false;
-	mouse_out->is_moving    = false;
-
-	mouse_out->point_relative = {};
-}
-
-instant void
 Mouse_GetPosition(
 	float *x_out,
 	float *y_out,
@@ -96,9 +94,8 @@ Mouse_GetPosition(
 		point.y = (point.y - (rect_active.top  + rect_viewport.y)) * scale_y;
 	}
 
-
-	if (x_out) *x_out = point.x;
-	if (y_out) *y_out = point.y;
+	IF_SET(x_out) = point.x;
+	IF_SET(y_out) = point.y;
 }
 
 instant void
@@ -109,26 +106,13 @@ Mouse_GetPosition(
 	Assert(window);
 	Assert(mouse_out);
 
-	RECT rect_active;
-	GetWindowRect(window->hWnd, &rect_active);
-	Window_UnAdjustRect(window->hWnd, &rect_active);
+	float mouse_point_x_old = mouse_out->point.x;
+	float mouse_point_y_old = mouse_out->point.y;
 
-	Mouse t_mouse = *mouse_out;
+	Mouse_GetPosition(&mouse_out->point.x, &mouse_out->point.y, window);
 
-	Mouse_GetPosition(&mouse_out->point.x, &mouse_out->point.y, 0);
-
-	RectF rect_viewport;
-
-	glGetFloatv(GL_VIEWPORT, (GLfloat *)&rect_viewport);
-
-	float scale_x = window->width  / rect_viewport.w;
-	float scale_y = window->height / rect_viewport.h;
-
-	mouse_out->point.x = (mouse_out->point.x - (rect_active.left + rect_viewport.x)) * scale_x;
-	mouse_out->point.y = (mouse_out->point.y - (rect_active.top  + rect_viewport.y)) * scale_y;
-
-	mouse_out->point_relative.x = mouse_out->point.x - t_mouse.point.x;
-	mouse_out->point_relative.y = mouse_out->point.y - t_mouse.point.y;
+	mouse_out->point_relative.x += mouse_out->point.x - mouse_point_x_old;
+	mouse_out->point_relative.y += mouse_out->point.y - mouse_point_y_old;
 }
 
 instant bool
@@ -142,8 +126,6 @@ Mouse_Update(
 
 	if (!msg)
 		return false;
-
-	Mouse_Reset(mouse_io);
 
 	if (window AND msg->message == WM_MOUSEMOVE) {
 		mouse_io->is_moving = true;
@@ -189,7 +171,7 @@ Mouse_Update(
 		} break;
 
 		case WM_MOUSEWHEEL: {
-			mouse_io->wheel = MOUSE_WHEEL_GET_DELTA(msg->wParam) * 16;
+			mouse_io->wheel += MOUSE_WHEEL_GET_DELTA(msg->wParam) * 16;
 		} break;
 
 		default: { return false; } break;

@@ -364,52 +364,6 @@ Array_CreateBuffer(
 	return a_buffer;
 }
 
-template <typename T>
-instant void
-Array_Sort(
-	Array<T> *array_io,
-	s32 (*OnCompare)(T one, T two)
-) {
-	Assert(array_io);
-
-	if(!array_io->count)
-		return;
-
-	Sort_Data<T> sort_data;
-	sort_data.begin_io  = &array_io->memory[0];
-	sort_data.end_io    = &array_io->memory[array_io->count - 1];
-	sort_data.OnCompare = OnCompare;
-
-	Sort_Quick(sort_data);
-}
-
-/// non-custom version
-template <typename T>
-instant void
-Array_Sort(
-	Array<T> *array_io,
-	SORT_ORDER_TYPE type
-) {
-	Assert(array_io);
-
-	if(!array_io->count)
-		return;
-
-	Sort_Data<T> sort_data;
-	sort_data.begin_io  = &array_io->memory[0];
-	sort_data.end_io    = &array_io->memory[array_io->count - 1];
-
-	if (type == SORT_ORDER_ASCENDING)
-		sort_data.OnCompare = Sort_OnCompareAscending;
-	else
-	if (type == SORT_ORDER_DESCENDING)
-		sort_data.OnCompare = Sort_OnCompareDescending;
-	else
-		Assert(false);
-
-	Sort_Quick(sort_data);
-}
-
 /// does NOT work when lamba is declared as auto,
 /// since template typename has to match the
 /// event function return type

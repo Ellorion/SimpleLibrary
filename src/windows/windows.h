@@ -216,6 +216,17 @@ Window_Destroy(
 }
 
 instant void
+MemorySegment_AddWindow(
+	Array<MemorySegment> *a_segments,
+	Window *window
+) {
+	Assert(a_segments);
+	Assert(window);
+
+	MemorySegment_Add(a_segments, window->events);
+}
+
+instant void
 Window_ToCenterPosition(
 	Window *window
 ) {
@@ -561,7 +572,6 @@ Window_ReadMessage(
 
 	MemorySegment_Reset(&window_io->a_segments_reset);
 
-	Mouse_Reset(window_io->mouse);
 	Keyboard_Reset(window_io->keyboard, false);
 
 	/// vsync does not seem to work, when this does not execute,

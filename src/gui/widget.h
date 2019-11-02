@@ -48,6 +48,14 @@ struct Widget_Slide {
 	s64 step  = 0;
 };
 
+struct Widget_Column {
+	String s_name;
+	s32 width;
+	s32 height;
+	s32 spacing = 10;
+	bool is_dragging = false;
+};
+
 struct Widget;
 
 struct Widget_Data {
@@ -97,7 +105,8 @@ struct Widget {
 	Widget_Data data_prev;
 	Widget_Slide slide;
 
-	bool visible = true;
+	bool visible     = true;
+	bool is_dragging = false;
 
 	/// On Demand
 	static Widget *widget_focus_current;
@@ -136,14 +145,28 @@ struct Widget {
 	Rect rect_content; /// x,y = offsets
 
 	/// Listview Data
-	Array<Text_Line>      a_tableheaders;
-	Array<Array<String>> *a_tabledata = 0;
+	Array<Widget_Column>  a_table_columns;
+	Array<Array<String>> *a_table_data = 0;
 
 	/// Content
 	Array<Widget> a_subwidgets;
 };
 
 Widget *Widget::widget_focus_current = 0;
+
+instant void
+Array_Destroy(
+	Array<Widget_Column> *a_columns
+) {
+	Assert(a_columns);
+
+	FOR_ARRAY(*a_columns, it) {
+		Widget_Column *t_column = &ARRAY_IT(*a_columns, it);
+		String_Destroy(&t_column->s_name);
+	}
+
+	Array_DestroyContainer(a_columns);
+}
 
 instant void
 Layout_Block_SetVisible (
@@ -163,6 +186,15 @@ Layout_Block_SetVisible (
 		Widget *widget = ARRAY_IT(layout_block->ap_widgets, it);
 		widget->visible = set_visible;
 	}
+}
+
+instant Rect *
+Widget_GetRectRef(
+	Widget *widget
+) {
+	Assert(widget);
+
+	return &widget->layout_data.settings.rect;
 }
 
 instant Widget *
@@ -410,7 +442,7 @@ Widget_Redraw(
 		return;
 	}
 
-	Rect rect_box =  widget_io->layout_data.settings.rect;
+	Rect rect_box = *Widget_GetRectRef(widget_io);
 
 	/// rect sublayer init
 	/// -----------------------------------------------------------------------
@@ -436,7 +468,7 @@ Widget_Redraw(
 		} break;
 
 		case WIDGET_TEXTBOX: {
-			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
+			widget_io->text.data.rect = *Widget_GetRectRef(widget_io);
 
 			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 
@@ -444,7 +476,7 @@ Widget_Redraw(
 		} break;
 
 		case WIDGET_COMBOBOX: {
-			Rect *rect_layout = &widget_io->layout_data.settings.rect;
+			Rect *rect_layout = Widget_GetRectRef(widget_io);
 
 			rect_layout->h = 0;
 
@@ -490,7 +522,7 @@ Widget_Redraw(
 		} break;
 
 		case WIDGET_LABEL: {
-			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
+			widget_io->text.data.rect = *Widget_GetRectRef(widget_io);
 			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 		} break;
 
@@ -501,7 +533,7 @@ Widget_Redraw(
 		} break;
 
 		case WIDGET_BUTTON: {
-			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
+			widget_io->text.data.rect = *Widget_GetRectRef(widget_io);
 
 			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 
@@ -519,7 +551,7 @@ Widget_Redraw(
 		} break;
 
 		case WIDGET_CHECKBOX: {
-			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
+			widget_io->text.data.rect = *Widget_GetRectRef(widget_io);
 
 			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 
@@ -645,7 +677,7 @@ Widget_Redraw(
 		} break;
 
 		case WIDGET_PROGRESSBAR: {
-			widget_io->text.data.rect = widget_io->layout_data.settings.rect;
+			widget_io->text.data.rect = *Widget_GetRectRef(widget_io);
 
 			Vertex_AddRect32(t_vertex_static, rect_box, widget_io->data.color_background);
 
@@ -753,7 +785,7 @@ Widget_UpdateListBox(
 
 	Widget_InvalidateBackground(widget_io);
 
-	text->data.rect = widget_io->layout_data.settings.rect;
+	text->data.rect = *Widget_GetRectRef(widget_io);
 	Rect *rect_text = &text->data.rect;
 
 	s32 pad_left = 2;
@@ -798,7 +830,7 @@ Widget_UpdateListBox(
 	}
 
 	/// revert for scissor
-	*rect_text = widget_io->layout_data.settings.rect;
+	*rect_text = *Widget_GetRectRef(widget_io);
 }
 
 /// display only at this point, without any other features
@@ -816,8 +848,9 @@ Widget_UpdateListView(
 	if (!Widget_HasChanged(widget_io, true))
 		return;
 
-	Text *text      = &widget_io->text;
-	text->data.rect = widget_io->layout_data.settings.rect;
+	Text *text = &widget_io->text;
+
+	text->data.rect = *Widget_GetRectRef(widget_io);
 
 	Text_Clear(text);
 
@@ -826,40 +859,41 @@ Widget_UpdateListView(
 	s32   line_height = Font_GetLineHeight(text->font);
 	rect.h = line_height;
 
+	/// prepare to redraw everything
 	Widget_InvalidateBackground(widget_io);
 
 	{ /// only needed, if headers are drawn, which they always are for now
-		FOR_ARRAY(widget_io->a_tableheaders, it_item) {
-			Text_Line *header_column = &ARRAY_IT(widget_io->a_tableheaders, it_item);
+		FOR_ARRAY(widget_io->a_table_columns, it_item) {
+			Widget_Column *header_column = &ARRAY_IT(widget_io->a_table_columns, it_item);
 
-			rect.w = header_column->width_in_pixel;
+			rect.w = header_column->width;
 
 			Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.7, 0.7, 0.7, 1});
 
 			Vertex_AddText(&text->a_vertex_chars, text->shader_set, text->font,
-							rect, {0, 0, 0.8, 1}, text->data.align_x, header_column->s_data);
+							rect, {0, 0, 0.8, 1}, text->data.align_x, header_column->s_name);
 
-			rect.x += rect.w + cellspacing;
+			rect.x += rect.w + cellspacing + header_column->spacing;
 		}
 
 		rect.x  = rect_x_base;
 		rect.y += line_height + cellspacing;
 	}
 
-	if (!widget_io->a_tabledata)
+	if (!widget_io->a_table_data)
 		return;
 
-	FOR_ARRAY(*widget_io->a_tabledata, it_row) {
-		Array<String> *as_items = &ARRAY_IT(*widget_io->a_tabledata, it_row);
+	FOR_ARRAY(*widget_io->a_table_data, it_row) {
+		Array<String> *as_items = &ARRAY_IT(*widget_io->a_table_data, it_row);
 
-		AssertMessage(as_items->count == widget_io->a_tableheaders.count,
+		AssertMessage(as_items->count == widget_io->a_table_columns.count,
 					  "Amount of header does not match table column count.");
 
 		FOR_ARRAY(*as_items, it_item) {
-			String    *s_item        = &ARRAY_IT(*as_items, it_item);
-			Text_Line *header_column = &ARRAY_IT(widget_io->a_tableheaders, it_item);
+			String        *s_item        = &ARRAY_IT(*as_items, it_item);
+			Widget_Column *header_column = &ARRAY_IT(widget_io->a_table_columns, it_item);
 
-			rect.w = header_column->width_in_pixel;
+			rect.w = header_column->width;
 
 			if (it_row % 2)
 				Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.75, 0.75, 0.75, 1});
@@ -869,7 +903,7 @@ Widget_UpdateListView(
 			Vertex_AddText(&text->a_vertex_chars, text->shader_set, text->font,
 							rect, text->data.color, text->data.align_x, *s_item);
 
-			rect.x += rect.w + cellspacing;
+			rect.x += rect.w + cellspacing + header_column->spacing;
 		}
 
 		rect.x  = rect_x_base;
@@ -1069,7 +1103,8 @@ Widget_Render(
 			s32 width, height;
 			Texture_GetSizeAndBind(&widget_io->vertex_rect.texture, &width, &height);
 
-			Rect rect_tex_aspect = widget_io->layout_data.settings.rect;
+			Rect rect_tex_aspect = *Widget_GetRectRef(widget_io);
+
 			Rect_GetAspect(&rect_tex_aspect, width, height);
 
 			static Vertex vertex_texture = Vertex_Create(VERTEX_RECT);
@@ -1164,7 +1199,7 @@ Widget_Destroy(
 	Vertex_Destroy(&widget_out->vertex_rect_sublayer);
 	Array_Destroy(&widget_out->a_vertex_fans);
 
-	Array_Destroy(&widget_out->a_tableheaders);
+	Array_Destroy(&widget_out->a_table_columns);
 }
 
 instant void
@@ -1435,7 +1470,7 @@ Widget_UpdateInput(
     Keyboard *keyboard = widget_io->window->keyboard;
     Mouse    *mouse    = widget_io->window->mouse;
 
-    Rect *rect_widget = &widget_io->layout_data.settings.rect;
+    Rect *rect_widget = Widget_GetRectRef(widget_io);
 
     if (widget_io->a_subwidgets.count) {
 		FOR_ARRAY(widget_io->a_subwidgets, it_sub) {
@@ -1470,6 +1505,10 @@ Widget_UpdateInput(
 	/// mouse input handling
 	/// -----------------------------------------------------------------------
     if (mouse) {
+		/// only activate, so others flags can be processed when it disables
+		if (!widget_io->is_dragging)
+			widget_io->is_dragging = (mouse->pressing[0] AND mouse->is_moving);
+
 		bool is_hovering = Mouse_IsHovering(widget_io, mouse);
 
 		/// text selection
@@ -1525,7 +1564,17 @@ Widget_UpdateInput(
 				Widget_ToggleCheckbox(widget_io);
 			}
 
-			/// focus change
+			if (widget_io->is_dragging) {
+				if (widget_io->type == WIDGET_LISTVIEW) {
+					FOR_ARRAY(widget_io->a_table_columns, it) {
+						Widget_Column *column = &ARRAY_IT(widget_io->a_table_columns, it);
+						column->is_dragging = false;
+					}
+				}
+
+				widget_io->is_dragging = false;
+			}
+
 			widget_io->data.has_focus = got_focus;
 		}
 
@@ -1549,6 +1598,36 @@ Widget_UpdateInput(
 				widget_io->text.data.content_height,
 				widget_io->text.data.rect.h
 			);
+		}
+
+		if (widget_io->is_dragging OR mouse->down[0]) {
+			if (widget_io->type == WIDGET_LISTVIEW) {
+				Rect column_rect = *Widget_GetRectRef(widget_io);
+
+				if (Rect_IsIntersecting(&mouse->point, &column_rect)) {
+					s32 row_items = widget_io->a_table_data->count;
+					/// for header row
+					row_items += 1;
+
+					column_rect.h  = Font_GetLineHeight(widget_io->text.font);
+					column_rect.h *= row_items;
+
+					FOR_ARRAY(widget_io->a_table_columns, it) {
+						Widget_Column *column = &ARRAY_IT(widget_io->a_table_columns, it);
+
+						column_rect.x += column->width;
+						column_rect.w  = column->spacing;
+
+						if (mouse->down[0] AND Rect_IsIntersecting(&mouse->point, &column_rect))
+							column->is_dragging = true;
+
+						if (column->is_dragging)
+							column->width += mouse->point_relative.x;
+
+						column_rect.x += column_rect.w;
+					}
+				}
+			}
 		}
     }
 
@@ -2079,7 +2158,8 @@ Widget_RedrawNumberPickerButton(
 
 	/// @Investigate
 	Vertex *t_vertex = &widget_io->vertex_rect_sublayer;
-	Rect    rect_box =  widget_io->layout_data.settings.rect;
+
+	Rect rect_box = *Widget_GetRectRef(widget_io);
 
 	if (!t_vertex->array_id) Vertex_Create(t_vertex, VERTEX_RECT);
 	else                     Vertex_ClearAttributes(t_vertex);
@@ -2092,7 +2172,7 @@ Widget_RedrawNumberPickerButton(
 	Rect_Resize(&rect_box, -2);
 	Vertex_AddRect32(t_vertex, rect_box, {1, 1, 1, 1});
 
-	widget_io->text.data.rect = widget_io->layout_data.settings.rect;
+	widget_io->text.data.rect = *Widget_GetRectRef(widget_io);
 	widget_io->text.data.rect.x += 1;
 	widget_io->text.data.rect.h -= 3;
 }
@@ -2439,37 +2519,26 @@ Widget_CreateListView(
 }
 
 instant void
-Widget_AddHeader(
+Widget_AddColumn(
 	Widget *widget_io,
 	String s_header,
-	u64 width_in_pixel
+	s32 width_in_pixel = -1
 ) {
 	Assert(widget_io);
 
 	/// copy, so it can be changed at runtime
-	Text_Line header;
-	header.s_data          = String_Copy(s_header);
-	header.width_in_pixel  = width_in_pixel;
+	Widget_Column column;
+	column.s_name = String_Copy(s_header);
 
-	Array_Add(&widget_io->a_tableheaders, header);
-}
+	s32 column_width;
+	Text_GetSize(widget_io->text.font, s_header, &column_width, &column.height);
 
-instant void
-Widget_AddHeader(
-	Widget *widget_io,
-	String s_header
-) {
-	Assert(widget_io);
+	if (width_in_pixel < 0)
+		column.width = column_width;
+	else
+		column.width = width_in_pixel;
 
-	Text_Line header;
-	header.s_data = String_Copy(s_header);
-
-	Text t_text = widget_io->text;
-	t_text.s_data = S(header.s_data);
-
-	Text_GetSize(widget_io->text.font, s_header, &header.width_in_pixel, 0);
-
-	Array_Add(&widget_io->a_tableheaders, header);
+	Array_Add(&widget_io->a_table_columns, column);
 }
 
 instant void
@@ -2542,9 +2611,9 @@ Widget_LinkTableData(
 
 	if (a_tabledata->count) {
 		Array<String> *as_row = &ARRAY_IT(*a_tabledata, 0);
-		AssertMessage(as_row->count == widget_io->a_tableheaders.count,
+		AssertMessage(as_row->count == widget_io->a_table_columns.count,
 					  "Amount of header does not match table column count.");
 	}
 
-	widget_io->a_tabledata = a_tabledata;
+	widget_io->a_table_data = a_tabledata;
 }
