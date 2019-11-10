@@ -1505,11 +1505,55 @@ Widget_UpdateInput(
 	/// mouse input handling
 	/// -----------------------------------------------------------------------
     if (mouse) {
+		bool is_hovering = Mouse_IsHovering(widget_io, mouse);
+
+		/// drag & drop
+		/// -------------------------------------------------------------------
+		int mouse_button_index_dragging = 0;
+
 		/// only activate, so others flags can be processed when it disables
 		if (!widget_io->is_dragging)
-			widget_io->is_dragging = (mouse->pressing[0] AND mouse->is_moving);
+			widget_io->is_dragging = (    mouse->pressing[mouse_button_index_dragging]
+									  AND mouse->is_moving);
 
-		bool is_hovering = Mouse_IsHovering(widget_io, mouse);
+		if (widget_io->is_dragging OR mouse->down[mouse_button_index_dragging]) {
+			/// resize listview columns
+			if (widget_io->type == WIDGET_LISTVIEW) {
+				Rect column_rect = *Widget_GetRectRef(widget_io);
+
+				if (Rect_IsIntersecting(&mouse->point, &column_rect)) {
+					s32 row_items = widget_io->a_table_data->count;
+					/// add header row
+					row_items += 1;
+
+					/// grab after every row
+					column_rect.h  = Font_GetLineHeight(widget_io->text.font);
+					column_rect.h *= row_items;
+
+					/// check and set possible dragging column
+					FOR_ARRAY(widget_io->a_table_columns, it) {
+						Widget_Column *column = &ARRAY_IT(widget_io->a_table_columns, it);
+
+						column_rect.x += column->width;
+						column_rect.w  = column->spacing;
+
+						/// fire only once and use flag to check, since the mouse cursor
+						/// can get out of bounds with fast movement, which would cancel
+						/// the unfinished resizing
+						if (    mouse->down[mouse_button_index_dragging]
+							AND Rect_IsIntersecting(&mouse->point, &column_rect)
+						) {
+							column->is_dragging = true;
+						}
+
+						if (column->is_dragging)
+							column->width += mouse->point_relative.x;
+
+						column_rect.x += column_rect.w;
+					}
+				}
+			}
+		}
 
 		/// text selection
 		if (has_text_cursor AND is_hovering) {
@@ -1564,6 +1608,16 @@ Widget_UpdateInput(
 				Widget_ToggleCheckbox(widget_io);
 			}
 
+			widget_io->data.has_focus = got_focus;
+		}
+
+		/// right mouse button
+		if (mouse->up[2]) {
+			widget_io->events.on_trigger_secondary = is_hovering;
+		}
+
+		/// disable mouse-drag-mode
+		if (mouse->up[mouse_button_index_dragging]) {
 			if (widget_io->is_dragging) {
 				if (widget_io->type == WIDGET_LISTVIEW) {
 					FOR_ARRAY(widget_io->a_table_columns, it) {
@@ -1574,13 +1628,6 @@ Widget_UpdateInput(
 
 				widget_io->is_dragging = false;
 			}
-
-			widget_io->data.has_focus = got_focus;
-		}
-
-		/// right mouse button
-		if (mouse->up[2]) {
-			widget_io->events.on_trigger_secondary = is_hovering;
 		}
 
 		/// widget_io + list scrolling
@@ -1598,36 +1645,6 @@ Widget_UpdateInput(
 				widget_io->text.data.content_height,
 				widget_io->text.data.rect.h
 			);
-		}
-
-		if (widget_io->is_dragging OR mouse->down[0]) {
-			if (widget_io->type == WIDGET_LISTVIEW) {
-				Rect column_rect = *Widget_GetRectRef(widget_io);
-
-				if (Rect_IsIntersecting(&mouse->point, &column_rect)) {
-					s32 row_items = widget_io->a_table_data->count;
-					/// for header row
-					row_items += 1;
-
-					column_rect.h  = Font_GetLineHeight(widget_io->text.font);
-					column_rect.h *= row_items;
-
-					FOR_ARRAY(widget_io->a_table_columns, it) {
-						Widget_Column *column = &ARRAY_IT(widget_io->a_table_columns, it);
-
-						column_rect.x += column->width;
-						column_rect.w  = column->spacing;
-
-						if (mouse->down[0] AND Rect_IsIntersecting(&mouse->point, &column_rect))
-							column->is_dragging = true;
-
-						if (column->is_dragging)
-							column->width += mouse->point_relative.x;
-
-						column_rect.x += column_rect.w;
-					}
-				}
-			}
 		}
     }
 
