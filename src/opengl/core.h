@@ -158,52 +158,52 @@ OpenGL_GetTextureSizeMax() {
 	return max;
 }
 
-//instant void
-//OpenGL_Scissor(
-//	Window *window,
-//	float x,
-//	float y,
-//	s32 w,
-//	s32 h
-//) {
-//	Assert(window);
-//
-//	/// convert to right-hand coordinate system
-//	float t_x = x + window->x_viewport;
-//	float t_y = (window->height - y - h) + window->y_viewport;
-//	s32   t_w = w;
-//	s32   t_h = h;
-//
-//	glEnable(GL_SCISSOR_TEST);
-//	glScissor(t_x, t_y, t_w, t_h);
-//}
-//
-//instant void
-//OpenGL_Scissor(
-//	Window *window,
-//	Rect rect
-//) {
-//	Assert(window);
-//
-//	float x = rect.x;
-//	float y = rect.y;
-//	s32   w = rect.w;
-//	s32   h = rect.h;
-//
-//	/// convert to right-hand coordinate system
-//	float t_x = x + window->x_viewport;
-//	float t_y = (window->height - y - h) + window->y_viewport;
-//	s32   t_w = w;
-//	s32   t_h = h;
-//
-//	glEnable(GL_SCISSOR_TEST);
-//	glScissor(t_x, t_y, t_w, t_h);
-//}
-//
-//instant void
-//OpenGL_Scissor_Disable() {
-//	glDisable(GL_SCISSOR_TEST);
-//}
+instant void
+OpenGL_Scissor(
+	Window *window,
+	float x,
+	float y,
+	s32 w,
+	s32 h
+) {
+	Assert(window);
+
+	/// convert to right-hand coordinate system
+	float t_x = x + window->x_viewport;
+	float t_y = (window->height - y - h) + window->y_viewport;
+	s32   t_w = w;
+	s32   t_h = h;
+
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(t_x, t_y, t_w, t_h);
+}
+
+instant void
+OpenGL_Scissor(
+	Window *window,
+	Rect rect
+) {
+	Assert(window);
+
+	float x = rect.x;
+	float y = rect.y;
+	s32   w = rect.w;
+	s32   h = rect.h;
+
+	/// convert to right-hand coordinate system
+	float t_x = x + window->x_viewport;
+	float t_y = (window->height - y - h) + window->y_viewport;
+	s32   t_w = w;
+	s32   t_h = h;
+
+	glEnable(GL_SCISSOR_TEST);
+	glScissor(t_x, t_y, t_w, t_h);
+}
+
+instant void
+OpenGL_Scissor_Disable() {
+	glDisable(GL_SCISSOR_TEST);
+}
 
 instant void
 OpenGL_SetBlending(

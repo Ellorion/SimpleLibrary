@@ -871,7 +871,7 @@ Widget_UpdateListView(
 			Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.7, 0.7, 0.7, 1});
 
 			Vertex_AddText(&text->a_vertex_chars, text->shader_set, text->font,
-							rect, {0, 0, 0.8, 1}, text->data.align_x, header_column->s_name);
+							rect, rect, {0, 0, 0.8, 1}, text->data.align_x, header_column->s_name);
 
 			rect.x += rect.w + cellspacing + header_column->spacing;
 		}
@@ -901,7 +901,7 @@ Widget_UpdateListView(
 				Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.8, 0.8, 0.8, 1});
 
 			Vertex_AddText(&text->a_vertex_chars, text->shader_set, text->font,
-							rect, text->data.color, text->data.align_x, *s_item);
+							rect, rect, text->data.color, text->data.align_x, *s_item);
 
 			rect.x += rect.w + cellspacing + header_column->spacing;
 		}
@@ -1128,7 +1128,7 @@ Widget_Render(
 
 		Text *text = &widget_io->text;
 
-//		OpenGL_Scissor(shader_set->window, widget_io->layout_data.settings.rect);
+		OpenGL_Scissor(shader_set->window, widget_io->layout_data.settings.rect);
 
 		/// static rects
 		///@Note: using a shader will reset uniform offsets to 0
@@ -1146,7 +1146,7 @@ Widget_Render(
 
 		Text_Render(&widget_io->text);
 
-//		OpenGL_Scissor_Disable();
+		OpenGL_Scissor_Disable();
 	}
 
 	Widget *wg_overlay = 0;

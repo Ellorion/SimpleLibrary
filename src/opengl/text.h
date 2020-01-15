@@ -954,6 +954,7 @@ Vertex_AddText(
 	ShaderSet         *shader_set,
 	Font              *font,
 	Rect               rect,
+	Rect			   rect_crop,
 	Color32            color,
 	TEXT_ALIGN_X_TYPE  align_x,
 	String             s_data
@@ -1023,10 +1024,10 @@ Vertex_AddText(
 				Assert(S("render_area") == t_attribute->name);
 
 				Array_ReserveAdd(&t_attribute->a_buffer, 4);
-				Array_Add(&t_attribute->a_buffer, (float)rect.x);
-				Array_Add(&t_attribute->a_buffer, (float)rect.y);
-				Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
-				Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.h);
+				Array_Add(&t_attribute->a_buffer, (float)rect_crop.x);
+				Array_Add(&t_attribute->a_buffer, (float)rect_crop.y);
+				Array_Add(&t_attribute->a_buffer, (float)rect_crop.w);
+				Array_Add(&t_attribute->a_buffer, (float)rect_crop.h);
 			}
 		}
 
@@ -1079,6 +1080,7 @@ Text_AddLines(
 	Assert(a_text_lines);
 
 	Rect rect = Text_GetRect(text);
+	Rect rect_crop = rect;
 
 	bool has_cursor = text->data.is_editable;
 
@@ -1089,7 +1091,7 @@ Text_AddLines(
 		Text_Line *text_line = &ARRAY_IT(*a_text_lines, it_line);
 
 		Vertex_AddText( a_vertex_chars_io, text->shader_set,
-						text->font, rect, text->data.color,
+						text->font, rect, rect_crop, text->data.color,
 						text->data.align_x, text_line->s_data);
 
 		if (as_columns)
@@ -2110,10 +2112,10 @@ Text_Render(
 ) {
 	Assert(text_io);
 
-//	bool is_fixed_size = (text_io->data.rect.w OR text_io->data.rect.h);
-//
-//	if (is_fixed_size)
-//		OpenGL_Scissor(text_io->shader_set->window, text_io->data.rect);
+	bool is_fixed_size = (text_io->data.rect.w OR text_io->data.rect.h);
+
+	if (is_fixed_size)
+		OpenGL_Scissor(text_io->shader_set->window, text_io->data.rect);
 
 	/// DEBUG render background rect
 	ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
@@ -2164,8 +2166,8 @@ Text_Render(
 		Vertex_Render(text_io->shader_set, &text_io->a_vertex_chars);
 	}
 
-//	if (is_fixed_size)
-//		OpenGL_Scissor_Disable();
+	if (is_fixed_size)
+		OpenGL_Scissor_Disable();
 }
 
 instant void
