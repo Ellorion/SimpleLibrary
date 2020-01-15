@@ -1128,7 +1128,7 @@ Widget_Render(
 
 		Text *text = &widget_io->text;
 
-		OpenGL_Scissor(shader_set->window, widget_io->layout_data.settings.rect);
+//		OpenGL_Scissor(shader_set->window, widget_io->layout_data.settings.rect);
 
 		/// static rects
 		///@Note: using a shader will reset uniform offsets to 0
@@ -1146,7 +1146,7 @@ Widget_Render(
 
 		Text_Render(&widget_io->text);
 
-		OpenGL_Scissor_Disable();
+//		OpenGL_Scissor_Disable();
 	}
 
 	Widget *wg_overlay = 0;

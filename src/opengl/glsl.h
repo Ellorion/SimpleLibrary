@@ -160,6 +160,7 @@ R"(
 
 	in vec2 vertex_position;
 	in vec3 text_color;
+	in vec4 render_area;
 
 	float left   = 0.0f;
 	float right  = viewport.z;
@@ -187,6 +188,7 @@ R"(
 		mat4 proj_matrix;
 		mat4 scale_matrix;
 		vec3 text_color;
+		vec4 render_area;
 	} o_Vertex;
 
 	void main() {
@@ -198,6 +200,7 @@ R"(
 		o_Vertex.proj_matrix  = proj_matrix;
 		o_Vertex.scale_matrix = scale_matrix;
 		o_Vertex.text_color   = text_color;
+		o_Vertex.render_area  = render_area;
 	}
 )",
 
@@ -214,45 +217,49 @@ R"(
 		mat4 proj_matrix;
 		mat4 scale_matrix;
 		vec3 text_color;
+		vec4 render_area;
 	} i_Vertex[];
 
 	out vec2 tex_coords;
 	out vec3 text_color;
+	out vec4 render_area;
 
 	void main() {
 		vec4 point        = gl_in[0].gl_Position;
 		mat4 proj_matrix  = i_Vertex[0].proj_matrix;
 		mat4 scale_matrix = i_Vertex[0].scale_matrix;
 
-		mat4 matrix_mod = proj_matrix;
-
-		vec4 v_pos_1 = matrix_mod * (point + vec4(0     , 0     , 0, 0) * scale_matrix);
-		vec4 v_pos_2 = matrix_mod * (point + vec4(size.x, 0     , 0, 0) * scale_matrix);
-		vec4 v_pos_3 = matrix_mod * (point + vec4(0     , size.y, 0, 0) * scale_matrix);
-		vec4 v_pos_4 = matrix_mod * (point + vec4(size.x, size.y, 0, 0) * scale_matrix);
+		vec4 v_pos_1 = proj_matrix * (point + vec4(0     , 0     , 0, 0) * scale_matrix);
+		vec4 v_pos_2 = proj_matrix * (point + vec4(size.x, 0     , 0, 0) * scale_matrix);
+		vec4 v_pos_3 = proj_matrix * (point + vec4(0     , size.y, 0, 0) * scale_matrix);
+		vec4 v_pos_4 = proj_matrix * (point + vec4(size.x, size.y, 0, 0) * scale_matrix);
 
 		/// v1 (top-left)
 		gl_Position = v_pos_1;
 		tex_coords = vec2(0, 0);
 		text_color = i_Vertex[0].text_color;
+		render_area = i_Vertex[0].render_area;
 		EmitVertex();
 
 		/// v2 (bottom-left)
 		gl_Position = v_pos_2;
 		tex_coords = vec2(1, 0);
 		text_color = i_Vertex[0].text_color;
+		render_area = i_Vertex[0].render_area;
 		EmitVertex();
 
 		/// v3 (top-right)
 		gl_Position = v_pos_3;
 		tex_coords = vec2(0, 1);
 		text_color = i_Vertex[0].text_color;
+		render_area = i_Vertex[0].render_area;
 		EmitVertex();
 
 		/// v4 (bottom-rights)
 		gl_Position = v_pos_4;
 		tex_coords = vec2(1, 1);
 		text_color = i_Vertex[0].text_color;
+		render_area = i_Vertex[0].render_area;
 		EmitVertex();
 
 		EndPrimitive();
@@ -268,12 +275,18 @@ R"(
 
 	in vec2 tex_coords;
 	in vec3 text_color;
+	in vec4 render_area;
 
 	out vec4 out_frag_color;
 
 	void main() {
-		vec4 color_greyscale = texture2D(fragment_texture, tex_coords);
-		out_frag_color = vec4(text_color.xyz, color_greyscale.a);
+		if (gl_FragCoord.x < render_area.x)  discard;
+		if (gl_FragCoord.y < render_area.y)  discard;
+		if (gl_FragCoord.x > render_area.z)  discard;
+		if (gl_FragCoord.y > render_area.w)  discard;
+
+		vec4 color_texture = texture2D(fragment_texture, tex_coords);
+		out_frag_color = vec4(text_color.xyz, color_texture.a);
 	}
 )"};
 

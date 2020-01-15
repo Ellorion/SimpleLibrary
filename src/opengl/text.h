@@ -65,6 +65,17 @@ Font_ResetEvents(
 	font->events = {};
 }
 
+instant void
+MemorySegment_AddFont(
+	Array<MemorySegment> *a_segments,
+	Font *font
+) {
+	Assert(a_segments);
+	Assert(font);
+
+	MemorySegment_Add(a_segments, font->events);
+}
+
 instant bool
 Font_HasError(
 	Font *font
@@ -888,6 +899,7 @@ Text_ReserveMemory(
 				if (!Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex)) {
 					Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
 					Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
+					Vertex_FindOrAddAttribute(t_vertex, 4, "render_area", &t_attribute);
 				}
 				{
 					t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
@@ -901,6 +913,13 @@ Text_ReserveMemory(
 					Assert(S("text_color") == t_attribute->name);
 
 					t_attribute->group_count += 3;
+				}
+
+				{
+					t_attribute = &ARRAY_IT(t_vertex->a_attributes, 2);
+					Assert(S("render_area") == t_attribute->name);
+
+					t_attribute->group_count += 4;
 				}
 			}
 
@@ -921,6 +940,11 @@ Text_ReserveMemory(
 		t_attribute = &ARRAY_IT(t_vertex->a_attributes, 1);
 		Array_Reserve(&t_attribute->a_buffer, t_attribute->group_count);
 		t_attribute->group_count = 3;
+
+		/// reserve "render_area"
+		t_attribute = &ARRAY_IT(t_vertex->a_attributes, 2);
+		Array_Reserve(&t_attribute->a_buffer, t_attribute->group_count);
+		t_attribute->group_count = 4;
 	}
 }
 
@@ -973,6 +997,7 @@ Vertex_AddText(
 			if (!Vertex_FindOrAdd(a_vertex_chars_io, &codepoint.texture, &t_vertex)) {
 				Vertex_FindOrAddAttribute(t_vertex, 2, "vertex_position", &t_attribute);
 				Vertex_FindOrAddAttribute(t_vertex, 3, "text_color", &t_attribute);
+				Vertex_FindOrAddAttribute(t_vertex, 4, "render_area", &t_attribute);
 			}
 			{
 				t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
@@ -991,6 +1016,17 @@ Vertex_AddText(
 				Array_Add(&t_attribute->a_buffer, color.r);
 				Array_Add(&t_attribute->a_buffer, color.g);
 				Array_Add(&t_attribute->a_buffer, color.b);
+			}
+
+			{
+				t_attribute = &ARRAY_IT(t_vertex->a_attributes, 2);
+				Assert(S("render_area") == t_attribute->name);
+
+				Array_ReserveAdd(&t_attribute->a_buffer, 4);
+				Array_Add(&t_attribute->a_buffer, (float)rect.x);
+				Array_Add(&t_attribute->a_buffer, (float)rect.y);
+				Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
+				Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.h);
 			}
 		}
 
@@ -2074,10 +2110,10 @@ Text_Render(
 ) {
 	Assert(text_io);
 
-	bool is_fixed_size = (text_io->data.rect.w OR text_io->data.rect.h);
-
-	if (is_fixed_size)
-		OpenGL_Scissor(text_io->shader_set->window, text_io->data.rect);
+//	bool is_fixed_size = (text_io->data.rect.w OR text_io->data.rect.h);
+//
+//	if (is_fixed_size)
+//		OpenGL_Scissor(text_io->shader_set->window, text_io->data.rect);
 
 	/// DEBUG render background rect
 	ShaderSet_Use(text_io->shader_set, SHADER_PROG_RECT);
@@ -2104,6 +2140,7 @@ Text_Render(
 		AND text_io->cursor.vertex_cursor.a_attributes.count
 	) {
 		if (Time_HasElapsed(&text_io->cursor.timer_blinking, text_io->cursor.blink_inverval_ms)) {
+			/// @Info: if this does not update, font.events might not be reset with memorysegment
 			text_io->cursor.is_blink_on = !text_io->cursor.is_blink_on;
 		}
 
@@ -2127,8 +2164,8 @@ Text_Render(
 		Vertex_Render(text_io->shader_set, &text_io->a_vertex_chars);
 	}
 
-	if (is_fixed_size)
-		OpenGL_Scissor_Disable();
+//	if (is_fixed_size)
+//		OpenGL_Scissor_Disable();
 }
 
 instant void

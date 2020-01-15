@@ -24,42 +24,11 @@ Time_Reset(
 	timer_out->counter = 0;
 }
 
-instant u32
-Time_Get() {
-	return GetTickCount();
-}
-
-instant bool
-Time_HasElapsed(
-	Timer *timer_io,
-	u32 interval_in_ms,
-	bool run_once = false
-) {
-	Assert(timer_io);
-
-	if (!timer_io->lo_timer) {
-		Time_Reset(timer_io);
-		return false;
-	}
-
-	bool result = true;
-
-	if (Time_Get() - timer_io->lo_timer < interval_in_ms) {
-		result = false;
-	}
-	else {
-		if (!run_once) {
-			timer_io->lo_timer = Time_Get();
-		}
-	}
-
-	return result;
-}
-
 /// milliseconds
 instant double
 Time_Measure(
-	Timer *timer_io
+	Timer *timer_io,
+	bool restart_after_measuring
 ) {
 	if (!timer_io)
 		return 0.f;
@@ -82,9 +51,32 @@ Time_Measure(
 							* 1000.0)
 							/ largeFreq.QuadPart);
 
-	timer_io->hi_timer = current_time;
+	if (restart_after_measuring)
+		timer_io->hi_timer = current_time;
 
 	return diff;
+}
+
+instant bool
+Time_HasElapsed(
+	Timer *timer_io,
+	u32 interval_in_ms,
+	bool run_once = false
+) {
+	Assert(timer_io);
+
+	bool result = Time_Measure(timer_io, false) >= interval_in_ms;
+
+	if (result) {
+		Time_Reset(timer_io);
+	}
+
+	return result;
+}
+
+instant u32
+Time_Get() {
+	return GetTickCount();
 }
 
 /// has to be used every frame or the calculation will be wrong
@@ -128,6 +120,6 @@ Time_Move(
 
 	if (!timespan_in_ms)  return 0.0f;
 
-	double step_size = Time_Measure(timer_io) / timespan_in_ms;
+	double step_size = Time_Measure(timer_io, true) / timespan_in_ms;
 	return distance * step_size;
 }
