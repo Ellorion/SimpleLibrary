@@ -11,8 +11,8 @@ enum STRING_LENGTH_TYPE {
 };
 
 struct String {
-	bool  is_reference     = false;
-	bool  changed          = false;
+	bool  is_reference = false;
+	bool  has_changed  = false;
 
 #if DEBUG_MODE
 	bool  DEBUG_reference_exists = false;
@@ -65,7 +65,7 @@ S(
 		s_data.length = String_GetLength(c_data);
 
 		s_data.is_reference = true;
-		s_data.changed      = true;
+		s_data.has_changed      = true;
  	}
 
 	return s_data;
@@ -82,7 +82,7 @@ S(
 		s_data.length = length;
 
 		s_data.is_reference = true;
-		s_data.changed      = true;
+		s_data.has_changed      = true;
  	}
 
 	return s_data;
@@ -95,7 +95,7 @@ S(
  	String s_data_ref = s_data;
  	{
 		s_data_ref.is_reference = true;
-		s_data_ref.changed      = true;
+		s_data_ref.has_changed      = true;
 
 #if DEBUG_MODE
 		s_data.DEBUG_reference_exists = true;
@@ -116,7 +116,7 @@ S(
 		s_data_ref.length = length;
 
 		s_data_ref.is_reference = true;
-		s_data_ref.changed      = true;
+		s_data_ref.has_changed      = true;
 
 #if DEBUG_MODE
 		s_data.DEBUG_reference_exists = true;
@@ -238,7 +238,7 @@ String_Destroy(
 
 	*s_data_io = {};
 
-	s_data_io->changed = true;
+	s_data_io->has_changed = true;
 }
 
 instant String
@@ -257,7 +257,7 @@ String_Copy(
 	Memory_Copy(s_result.value, c_source, length);
 	s_result.length = length;
 
-	s_result.changed          = true;
+	s_result.has_changed          = true;
 	s_result.is_reference     = false;
 
 #if DEBUG_MODE
@@ -312,7 +312,7 @@ String_Append(
 	String_Resize(s_dest_io, s_dest_io->length + length_append);
 	Memory_Copy(s_dest_io->value + index_start, s_source.value, length_append);
 
-	s_dest_io->changed = true;
+	s_dest_io->has_changed = true;
 
 	return true;
 }
@@ -379,7 +379,7 @@ String_Clear(
 	Assert(s_data_out);
 
 	s_data_out->length = 0;
-	s_data_out->changed = true;
+	s_data_out->has_changed = true;
 }
 
 /// does NOT add memory for '\0'
@@ -425,7 +425,7 @@ String_CreateBuffer(
 
 	String_Resize(s_buffer_out, buffer_size);
 	s_buffer_out->length  = buffer_size;
-	s_buffer_out->changed = true;
+	s_buffer_out->has_changed = true;
 	s_buffer_out->is_reference = is_reference;
 }
 
@@ -437,7 +437,7 @@ String_CreateBuffer(
 
 	String_Resize(&s_buffer_out, buffer_size);
 	s_buffer_out.length  = buffer_size;
-	s_buffer_out.changed = true;
+	s_buffer_out.has_changed = true;
 
 	return s_buffer_out;
 }
@@ -737,7 +737,7 @@ String_Cut(
 
 	if (s_data_io AND length < s_data_io->length) {
 		s_data_io->length  = length;
-		s_data_io->changed = true;
+		s_data_io->has_changed = true;
 	}
 }
 
@@ -779,7 +779,7 @@ String_ToLower(
 		++index;
 	}
 
-	s_data_io->changed = true;
+	s_data_io->has_changed = true;
 }
 
 instant void
@@ -801,7 +801,7 @@ String_ToUpper(
 		++index;
 	}
 
-	s_data_io->changed = true;
+	s_data_io->has_changed = true;
 }
 
 /// no utf support
@@ -821,7 +821,7 @@ String_Reverse(
 		s_data_io->value[length - it - 1] = temp;
 	}
 
-	s_data_io->changed = true;
+	s_data_io->has_changed = true;
 }
 
 instant void
@@ -872,7 +872,7 @@ String_TrimLeft(
 		if (trim_length) {
 			s_data_io->length -= trim_length;
 			Memory_Copy(s_data_io->value, s_data_io->value + trim_length, s_data_io->length);
-			s_data_io->changed = true;
+			s_data_io->has_changed = true;
 		}
 	}
 }
@@ -900,7 +900,7 @@ String_TrimRight(
 	}
 
 	s_data_io->length  = length;
-	s_data_io->changed = true;
+	s_data_io->has_changed = true;
 }
 
 instant void
@@ -938,7 +938,7 @@ String_Remove(
 	Memory_Copy(s_data_io->value + index_start, s_data_io->value + index_end, length);
 	s_data_io->length -= rm_count;
 
-	s_data_io->changed = true;
+	s_data_io->has_changed = true;
 
 	return rm_count;
 }
@@ -961,7 +961,7 @@ String_Replace(
 		index_start += index_found + s_replace.length;
 	}
 
-	s_data_io->changed = true;
+	s_data_io->has_changed = true;
 }
 
 instant void
@@ -1103,13 +1103,13 @@ String_Insert(
 		String s_data;
 		s_data.value   = (char *)&c_data;
 		s_data.length  = length;
-		s_data.changed = true;
+		s_data.has_changed = true;
 		s_data.is_reference = true;
 
 		String_Insert(s_data_io, s_data, index_start);
 	}
 
-	s_data_io->changed = true;
+	s_data_io->has_changed = true;
 
 	return length;
 }
@@ -1179,6 +1179,25 @@ String_Flush(
 	String *s_data_io
 ) {
 	Memory_Set(s_data_io->value, 0, s_data_io->length);
+}
+
+instant bool
+String_HasChanged(
+	String *s_data,
+	bool reset_status
+) {
+	Assert(s_data);
+
+	/// it is not enouth to change the string container,
+	/// the content of the string could have been modified,
+	/// but f.e. could have kept the same length and storage
+	/// location
+	bool result = s_data->has_changed;
+
+	if (reset_status)
+		s_data->has_changed = false;
+
+	return result;
 }
 
 /// operator

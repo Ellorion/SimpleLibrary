@@ -15,9 +15,10 @@ Window_HandleEvents(
 
 	Vertex_AddText(&a_vertex_chars, &shader_set, &font,
 				 {0, 0, 200, font.size},
+				 {0, 0, 200, font.size},
 				 {1, 1, 1, 1},
-				 S("Hello, World!"),
-				 TEXT_ALIGN_X_MIDDLE);
+				 TEXT_ALIGN_X_MIDDLE,
+				 S("Hello, World!"));
 
 	while(Window_IsRunning(window)) {
 		/// Events

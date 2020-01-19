@@ -91,7 +91,7 @@ Array_SplitRefBuffer(
 
 			s_element->value   = s_data_it.value;
 			s_element->length += index_found;
-			s_element->changed = true;
+			s_element->has_changed = true;
 			s_element->is_reference = true;
 
 			if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count > 1) {

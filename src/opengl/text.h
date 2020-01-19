@@ -27,8 +27,11 @@ struct Font {
 	bool filter_linear = false;
 	Array<Codepoint> a_codepoint;
 
-	struct Font_Events {
-		bool on_size_changed = false;
+	union Font_Events {
+		struct {
+			bool on_size_changed = false;
+		};
+		u32 flags;
 	} events;
 
 };
@@ -453,9 +456,10 @@ struct Text_Cursor {
 };
 
 struct Text_Data {
-	Rect rect 			= {}; /// draw area
+	Rect rect 			= {}; /// draw area (single text data)
 	Rect rect_padding 	= {};
 	Rect rect_margin    = {};
+	Rect rect_crop      = {}; /// draw area ((multiple) text data)
 	Color32 color 		= {0.0f, 0.0f, 0.0f, 1.0f};
 
 	TEXT_ALIGN_X_TYPE align_x = TEXT_ALIGN_X_LEFT;
@@ -546,13 +550,13 @@ Text_HasChanged(
 ) {
 	Assert(text_io);
 
-	bool has_changed = text_io->s_data.changed;
+	bool has_changed = text_io->s_data.has_changed;
 
 	has_changed |= !Memory_Compare(&text_io->data, &text_io->data_prev, sizeof(text_io->data));
 
 	if (has_changed AND update_changes) {
 		text_io->data_prev = text_io->data;
-		text_io->s_data.changed = false;
+		text_io->s_data.has_changed = false;
 	}
 
 	if (text_io->font)
@@ -572,7 +576,7 @@ Text_HasChanged(
 	FOR_ARRAY(*as_data, it) {
 		String *ts_data = &ARRAY_IT(*as_data, it);
 
-		if (ts_data->changed) {
+		if (ts_data->has_changed) {
 			anything_changed = true;
 			break;
 		}
@@ -1069,6 +1073,8 @@ Text_GetRect(
 	return rect;
 }
 
+/// @Needed? -> Convert to "instant void Text_AddLines(Text *text_io)" (see below)
+///
 /// modal style
 instant void
 Text_AddLines(
@@ -1080,7 +1086,6 @@ Text_AddLines(
 	Assert(a_text_lines);
 
 	Rect rect = Text_GetRect(text);
-	Rect rect_crop = rect;
 
 	bool has_cursor = text->data.is_editable;
 
@@ -1091,7 +1096,7 @@ Text_AddLines(
 		Text_Line *text_line = &ARRAY_IT(*a_text_lines, it_line);
 
 		Vertex_AddText( a_vertex_chars_io, text->shader_set,
-						text->font, rect, rect_crop, text->data.color,
+						text->font, rect, text->data.rect_crop, text->data.color,
 						text->data.align_x, text_line->s_data);
 
 		if (as_columns)
@@ -1170,7 +1175,7 @@ Text_Update(
 
 	u64 number_of_line_breaks = 0;
 
-	if (text_io->s_data.changed)
+	if (text_io->s_data.has_changed)
 		number_of_line_breaks = Array_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
 
 	s32 text_height = Text_BuildLines(text_io, &text_io->as_words, number_of_line_breaks, &text_io->a_text_lines);
@@ -1209,7 +1214,7 @@ Text_Update(
 	MEASURE_END("");
 
 	text_io->data_prev = text_io->data;
-	text_io->s_data.changed = false;
+	text_io->s_data.has_changed = false;
 
 	return true;
 }
@@ -1657,8 +1662,13 @@ Text_Cursor_Update(
 			continue;
 		}
 
-		u64 x_align_offset = Text_GetAlignOffsetX(	text_io->font, text_io->data.align_x, text_line->s_data,
-													codepoint_space.advance, width_max);
+		u64 x_align_offset = Text_GetAlignOffsetX(
+								text_io->font,
+								text_io->data.align_x,
+								text_line->s_data,
+								codepoint_space.advance,
+								width_max);
+
 		rect_position_it.x += x_align_offset;
 
 		bool is_newline_char_once = false;
@@ -1822,7 +1832,7 @@ Text_GetSelection(
 
 	s_data_out->value   = text->s_data.value + cursor->data.index_select_start;
 	s_data_out->length  = length;
-	s_data_out->changed = true;
+	s_data_out->has_changed = true;
 
 	return true;
 }
@@ -2052,7 +2062,7 @@ Text_UpdateInput(
 					Text_RemoveSelection(text_io);
 					Text_Cursor_Update(text_io);
 
-					Assert(text_io->s_data.changed);
+					Assert(text_io->s_data.has_changed);
 				}
 			} break;
 
@@ -2080,7 +2090,7 @@ Text_UpdateInput(
 					/// to trigger on_text_changed event,
 					/// since this would be set to false
 					/// with text_update
-					text_io->s_data.changed = true;
+					text_io->s_data.has_changed = true;
 				}
 			}
 		}
@@ -2103,7 +2113,7 @@ Text_UpdateInput(
 	}
 
 	/// string could have been appended, removed or cleared
-	IF_SET(text_changed_out) = text_io->s_data.changed;
+	IF_SET(text_changed_out) = text_io->s_data.has_changed;
 }
 
 instant void

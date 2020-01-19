@@ -93,6 +93,10 @@ struct Widget_Data {
 	String s_row_filter;
 	Array<String> as_filter_data;
 
+	/// ListView Data
+	Array<Widget_Column>  a_table_columns;
+	Array<Array<String>> *a_table_data = 0;
+
 	Array<Widget *> *ap_radiogroup = 0;
 };
 
@@ -143,10 +147,6 @@ struct Widget {
 	/// Layout / Size
 	Layout_Data layout_data;
 	Rect rect_content; /// x,y = offsets
-
-	/// Listview Data
-	Array<Widget_Column>  a_table_columns;
-	Array<Array<String>> *a_table_data = 0;
 
 	/// Content
 	Array<Widget> a_subwidgets;
@@ -310,6 +310,7 @@ Mouse_IsHovering(
     return Rect_IsIntersecting(&t_point, &widget->layout_data.settings.rect);
 }
 
+/// @Todo: check and update recursively
 instant bool
 Widget_HasChanged(
 	Widget *widget_io,
@@ -329,21 +330,14 @@ Widget_HasChanged(
 	}
 
 	if (widget_io->text.font)
-		has_changed |= widget_io->text.font->events.on_size_changed;
+		has_changed |= (widget_io->text.font->events.flags != 0);
 
 	if (!has_changed) {
 		/// check list entries
 		FOR_ARRAY(widget_io->data.as_row_data, it) {
 			String *t_data = &ARRAY_IT(widget_io->data.as_row_data, it);
 
-			if (t_data->changed) {
-				has_changed = true;
-
-				if (!update_changes)
-					break;
-
-				t_data->changed = false;
-			}
+			has_changed |= String_HasChanged(t_data, update_changes);
 		}
 	}
 
@@ -863,15 +857,17 @@ Widget_UpdateListView(
 	Widget_InvalidateBackground(widget_io);
 
 	{ /// only needed, if headers are drawn, which they always are for now
-		FOR_ARRAY(widget_io->a_table_columns, it_item) {
-			Widget_Column *header_column = &ARRAY_IT(widget_io->a_table_columns, it_item);
+		FOR_ARRAY(widget_io->data.a_table_columns, it_item) {
+			Widget_Column *header_column = &ARRAY_IT(widget_io->data.a_table_columns, it_item);
 
 			rect.w = header_column->width;
 
 			Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.7, 0.7, 0.7, 1});
 
+			Rect rect_crop = rect;
+
 			Vertex_AddText(&text->a_vertex_chars, text->shader_set, text->font,
-							rect, rect, {0, 0, 0.8, 1}, text->data.align_x, header_column->s_name);
+							rect, rect_crop, {0, 0, 0.8, 1}, text->data.align_x, header_column->s_name);
 
 			rect.x += rect.w + cellspacing + header_column->spacing;
 		}
@@ -880,18 +876,18 @@ Widget_UpdateListView(
 		rect.y += line_height + cellspacing;
 	}
 
-	if (!widget_io->a_table_data)
+	if (!widget_io->data.a_table_data)
 		return;
 
-	FOR_ARRAY(*widget_io->a_table_data, it_row) {
-		Array<String> *as_items = &ARRAY_IT(*widget_io->a_table_data, it_row);
+	FOR_ARRAY(*widget_io->data.a_table_data, it_row) {
+		Array<String> *as_items = &ARRAY_IT(*widget_io->data.a_table_data, it_row);
 
-		AssertMessage(as_items->count == widget_io->a_table_columns.count,
+		AssertMessage(as_items->count == widget_io->data.a_table_columns.count,
 					  "Amount of header does not match table column count.");
 
 		FOR_ARRAY(*as_items, it_item) {
 			String        *s_item        = &ARRAY_IT(*as_items, it_item);
-			Widget_Column *header_column = &ARRAY_IT(widget_io->a_table_columns, it_item);
+			Widget_Column *header_column = &ARRAY_IT(widget_io->data.a_table_columns, it_item);
 
 			rect.w = header_column->width;
 
@@ -900,8 +896,10 @@ Widget_UpdateListView(
 			else
 				Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.8, 0.8, 0.8, 1});
 
+			Rect rect_crop = rect;
+
 			Vertex_AddText(&text->a_vertex_chars, text->shader_set, text->font,
-							rect, rect, text->data.color, text->data.align_x, *s_item);
+							rect, rect_crop, text->data.color, text->data.align_x, *s_item);
 
 			rect.x += rect.w + cellspacing + header_column->spacing;
 		}
@@ -1029,7 +1027,7 @@ Widget_Update(
 		}
 	}
 
-	if (widget_io->data.s_row_filter.changed) {
+	if (widget_io->data.s_row_filter.has_changed) {
 		widget_io->data.as_filter_data.by_reference = true;
 
 		Widget_UseScrollDefault(widget_io);
@@ -1048,7 +1046,7 @@ Widget_Update(
 			}
 		);
 
-		widget_io->data.s_row_filter.changed = false;
+		widget_io->data.s_row_filter.has_changed = false;
 	}
 
 	LOG_STATUS("completed\n");
@@ -1198,8 +1196,7 @@ Widget_Destroy(
 	Vertex_Destroy(&widget_out->vertex_rect);
 	Vertex_Destroy(&widget_out->vertex_rect_sublayer);
 	Array_Destroy(&widget_out->a_vertex_fans);
-
-	Array_Destroy(&widget_out->a_table_columns);
+	Array_Destroy(&widget_out->data.a_table_columns);
 }
 
 instant void
@@ -1522,7 +1519,7 @@ Widget_UpdateInput(
 				Rect column_rect = *Widget_GetRectRef(widget_io);
 
 				if (Rect_IsIntersecting(&mouse->point, &column_rect)) {
-					s32 row_items = widget_io->a_table_data->count;
+					s32 row_items = widget_io->data.a_table_data->count;
 					/// add header row
 					row_items += 1;
 
@@ -1531,8 +1528,8 @@ Widget_UpdateInput(
 					column_rect.h *= row_items;
 
 					/// check and set possible dragging column
-					FOR_ARRAY(widget_io->a_table_columns, it) {
-						Widget_Column *column = &ARRAY_IT(widget_io->a_table_columns, it);
+					FOR_ARRAY(widget_io->data.a_table_columns, it) {
+						Widget_Column *column = &ARRAY_IT(widget_io->data.a_table_columns, it);
 
 						column_rect.x += column->width;
 						column_rect.w  = column->spacing;
@@ -1620,8 +1617,8 @@ Widget_UpdateInput(
 		if (mouse->up[mouse_button_index_dragging]) {
 			if (widget_io->is_dragging) {
 				if (widget_io->type == WIDGET_LISTVIEW) {
-					FOR_ARRAY(widget_io->a_table_columns, it) {
-						Widget_Column *column = &ARRAY_IT(widget_io->a_table_columns, it);
+					FOR_ARRAY(widget_io->data.a_table_columns, it) {
+						Widget_Column *column = &ARRAY_IT(widget_io->data.a_table_columns, it);
 						column->is_dragging = false;
 					}
 				}
@@ -2527,10 +2524,13 @@ Widget_CreateListView(
 	t_widget.window       = window;
 
 	t_widget.layout_data.settings.rect = rect_box;
-	t_widget.layout_data.settings.auto_width = true;
+	t_widget.layout_data.settings.auto_height = true;
+	t_widget.layout_data.settings.auto_width  = true;
 
 	t_widget.text.font = font;
 	t_widget.text.data.rect = rect_box;
+
+	t_widget.trigger_autosize = true;
 
 	return t_widget;
 }
@@ -2555,7 +2555,7 @@ Widget_AddColumn(
 	else
 		column.width = width_in_pixel;
 
-	Array_Add(&widget_io->a_table_columns, column);
+	Array_Add(&widget_io->data.a_table_columns, column);
 }
 
 instant void
@@ -2628,9 +2628,9 @@ Widget_LinkTableData(
 
 	if (a_tabledata->count) {
 		Array<String> *as_row = &ARRAY_IT(*a_tabledata, 0);
-		AssertMessage(as_row->count == widget_io->a_table_columns.count,
+		AssertMessage(as_row->count == widget_io->data.a_table_columns.count,
 					  "Amount of header does not match table column count.");
 	}
 
-	widget_io->a_table_data = a_tabledata;
+	widget_io->data.a_table_data = a_tabledata;
 }

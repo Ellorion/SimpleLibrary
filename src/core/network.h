@@ -220,7 +220,7 @@ Network_DestroyInfo(
 	String_Destroy(&info->s_name_device);
 
 	info->s_ip = {};
-	info->s_ip.changed = true;
+	info->s_ip.has_changed = true;
 }
 
 instant void
@@ -315,7 +315,7 @@ Network_GetIPByName(
 	/// also includes 0-terminator
 	s_ip.value   = c_ip;
 	s_ip.length  = String_GetLength(c_ip);
-	s_ip.changed = true;
+	s_ip.has_changed = true;
 
 	return s_ip;
 }

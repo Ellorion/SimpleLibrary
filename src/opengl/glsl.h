@@ -280,10 +280,12 @@ R"(
 	out vec4 out_frag_color;
 
 	void main() {
-		if (gl_FragCoord.x < render_area.x)  discard;
-		if (gl_FragCoord.y < render_area.y)  discard;
-		if (gl_FragCoord.x > render_area.x + render_area.z)  discard;
-		if (gl_FragCoord.y > render_area.y + render_area.w)  discard;
+		if (render_area.z != 0 && render_area.w != 0) {
+			if (gl_FragCoord.x < render_area.x)  discard;
+			if (gl_FragCoord.y < render_area.y)  discard;
+			if (gl_FragCoord.x > render_area.x + render_area.z)  discard;
+			if (gl_FragCoord.y > render_area.y + render_area.w)  discard;
+		}
 
 		vec4 color_texture = texture2D(fragment_texture, tex_coords);
 		out_frag_color = vec4(text_color.xyz, color_texture.a);

@@ -186,7 +186,7 @@ Parser_GetStringRef(
 
 	s_data_out->value   = parser_io->s_data.value;
 	s_data_out->length  = index_found;
-	s_data_out->changed = true;
+	s_data_out->has_changed = true;
 	s_data_out->is_reference = true;
 
 	if (type == PARSER_MODE_SEEK)

@@ -169,7 +169,7 @@ File_Read(
 	String_Resize(s_data_out, file_size);
 	fread(s_data_out->value, sizeof(char), sizeof(char) * s_data_out->length, file->fp);
 
-	s_data_out->changed = true;
+	s_data_out->has_changed = true;
 
 	return true;
 }
