@@ -965,6 +965,36 @@ String_Replace(
 }
 
 instant void
+String_RemoveLineBreaks(
+	String *s_data_io
+) {
+	Assert(s_data_io);
+	Assert(!s_data_io->is_reference);
+
+	{ // "\r"
+		String s_find = S("\r");
+
+		s64 index_found = 0;
+
+		while(String_Find(s_data_io, s_find, &index_found, index_found)) {
+			String_Remove(s_data_io, index_found, index_found + s_find.length);
+		}
+	}
+
+	{ // "\n"
+		String s_find = S("\n");
+
+		s64 index_found = 0;
+
+		while(String_Find(s_data_io, s_find, &index_found, index_found)) {
+			String_Remove(s_data_io, index_found, index_found + s_find.length);
+		}
+	}
+
+	s_data_io->has_changed = true;
+}
+
+instant void
 String_Cut(
 	String *s_data_io,
 	String s_start,

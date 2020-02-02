@@ -1169,8 +1169,7 @@ Text_Update(
 
 	/// redraw text
 	if (text_io->data.use_no_linebreak) {
-		String_Replace(&text_io->s_data, S("\n"), S(""));
-		String_Replace(&text_io->s_data, S("\r"), S(""));
+		String_RemoveLineBreaks(&text_io->s_data);
 	}
 
 	u64 number_of_line_breaks = 0;
