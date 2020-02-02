@@ -30,7 +30,7 @@
 
 /// Operating System: Windows
 ///
-/// Compiler: g++ (8.2.0) (mingw)
+/// Compiler: g++ (i686-posix-dwarf-rev0, Built by MinGW-W64 project) 8.1.0
 ///
 /// Linker flags:
 ///	   [-lcomdlg32]
