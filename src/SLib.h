@@ -446,6 +446,7 @@ ToInt(
 #include "utility/csv.h"
 #include "utility/helper.h"
 #include "utility/profiler.h"
+#include "utility/convert.h"
 
 #include "windows/windows.h"
 #include "opengl/core.h"
