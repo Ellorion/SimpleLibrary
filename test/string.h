@@ -15,7 +15,7 @@ Test_Strings(
 	AssertMessage(s_data.length == 0, "[Test] Multiple empty string destruction failed");
 
 	String_Append(&s_data, S("Hello"));
-	To_CString(buffer, 100, &s_data);
+	Convert_ToCString(buffer, 100, &s_data);
 	AssertMessage(String_IsEqual(buffer,  "Hello", 5)        , "[Test] C_String data does not match");
 	AssertMessage(String_IsEqual(s_data, S("Hello World"), 5), "[Test] String data does not match (truncated)");
 	AssertMessage(String_IsEqual(s_data, S("Hello"))         , "[Test] String data does not match (autosize)");
@@ -30,7 +30,7 @@ Test_Strings(
 	AssertMessage(String_IsEqual(s_data, S("Hello World")), "[Test] String data does not match (append c_string)");
 	AssertMessage(s_data.length == 11, "[Test] Appending on existing data failed");
 
-	To_CString(buffer, 6, &s_data);
+	Convert_ToCString(buffer, 6, &s_data);
 	AssertMessage(String_GetLength(buffer) == 5, "[Test] Buffer overflow when converting string to c_string");
 
 	String_Destroy(&s_data);
@@ -49,7 +49,7 @@ Test_Strings(
 
 	/// store string in buffer (f.e. for filling dynamic string arrays)
 	String s_buffer;
-	To_StringBuffer(&s_buffer, "buffer");
+	Convert_ToStringBuffer(&s_buffer, "buffer");
 	AssertMessage(String_IsEqual(s_buffer, S("buffer")), "[Test] String data does not match (buffer)");
 
 	String s_buffer_copy;

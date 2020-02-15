@@ -38,7 +38,7 @@ Dialog_OpenFile(
     ofn.Flags        = 0x02000000 | OFN_FILEMUSTEXIST;
 
     if (GetOpenFileNameA(&ofn)) {
-		To_StringBuffer(s_file_out, filename);
+		Convert_ToStringBuffer(s_file_out, filename);
 		result = true;
     }
 
@@ -68,7 +68,7 @@ Dialog_OpenDirectory(
 		Memory_Free(pidl);
 
 		if (result)
-			To_StringBuffer(s_directory_out, directory);
+			Convert_ToStringBuffer(s_directory_out, directory);
 	}
 
     return result;

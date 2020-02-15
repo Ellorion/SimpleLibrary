@@ -65,7 +65,7 @@ S(
 		s_data.length = String_GetLength(c_data);
 
 		s_data.is_reference = true;
-		s_data.has_changed      = true;
+		s_data.has_changed  = true;
  	}
 
 	return s_data;
@@ -82,7 +82,7 @@ S(
 		s_data.length = length;
 
 		s_data.is_reference = true;
-		s_data.has_changed      = true;
+		s_data.has_changed  = true;
  	}
 
 	return s_data;
@@ -95,7 +95,7 @@ S(
  	String s_data_ref = s_data;
  	{
 		s_data_ref.is_reference = true;
-		s_data_ref.has_changed      = true;
+		s_data_ref.has_changed  = true;
 
 #if DEBUG_MODE
 		s_data.DEBUG_reference_exists = true;
@@ -116,7 +116,7 @@ S(
 		s_data_ref.length = length;
 
 		s_data_ref.is_reference = true;
-		s_data_ref.has_changed      = true;
+		s_data_ref.has_changed  = true;
 
 #if DEBUG_MODE
 		s_data.DEBUG_reference_exists = true;
@@ -128,7 +128,7 @@ S(
 
 instant void
 String_Print(
-	String s_data
+	const String &s_data
 ) {
 	FOR(s_data.length, it) {
 		std::cout << s_data.value[it];
@@ -137,7 +137,7 @@ String_Print(
 
 instant void
 String_PrintLine(
-	String s_data
+	const String &s_data
 ) {
 	String_Print(s_data);
 	std::cout << std::endl;
@@ -145,7 +145,7 @@ String_PrintLine(
 
 instant void
 String_Print(
-	String s_data,
+	const String &s_data,
 	u64 length
 ) {
 	length = MIN(s_data.length, length);
@@ -157,7 +157,7 @@ String_Print(
 
 instant void
 String_PrintLine(
-	String s_data,
+	const String &s_data,
 	u64 length
 ) {
 	String_Print(s_data, length);
@@ -257,8 +257,8 @@ String_Copy(
 	Memory_Copy(s_result.value, c_source, length);
 	s_result.length = length;
 
-	s_result.has_changed          = true;
-	s_result.is_reference     = false;
+	s_result.has_changed  = true;
+	s_result.is_reference = false;
 
 #if DEBUG_MODE
 	s_result.DEBUG_reference_exists = false;
@@ -342,37 +342,6 @@ String_Insert(
 }
 
 instant void
-To_StringBuffer(
-	String *s_data_out,
-	const char *c_data,
-	u64 c_length = 0
-) {
-	Assert(s_data_out);
-	Assert(c_data);
-
-	if (!c_length)
-		c_length = String_GetLength(c_data);
-
-	String s_data = S(c_data, c_length);
-
-	String_Destroy(s_data_out);
-	String_Append(s_data_out, s_data);
-}
-
-instant String
-To_String(
-	const char *c_data,
-	u64 c_length = 0
-) {
-	Assert(c_data);
-
-	String s_result;
-	To_StringBuffer(&s_result, c_data, c_length);
-
-	return s_result;
-}
-
-instant void
 String_Clear(
 	String *s_data_out
 ) {
@@ -380,39 +349,6 @@ String_Clear(
 
 	s_data_out->length = 0;
 	s_data_out->has_changed = true;
-}
-
-/// does NOT add memory for '\0'
-/// make sure you add an additional byte
-/// in the buffer so you don't truncate the string
-instant void
-To_CString(
-	char *c_buffer_out,
-	u64   c_length,
-	String *s_data
-) {
-	Assert(s_data);
-
-	if (!c_length)
-		return;
-
-	if (String_IsEmpty(s_data)) {
-		c_buffer_out[0] = '\0';
-		return;
-	}
-
-	/// stop copying memory after '\0'
-	if (c_length > s_data->length + 1) {
-		c_length = s_data->length + 1;
-	}
-
-	/// stop before '\0'
-	FOR(c_length - 1, it) {
-		c_buffer_out[it] = s_data->value[it];
-	}
-
-	/// set final '\0'
-	c_buffer_out[c_length - 1] = '\0';
 }
 
 instant void
