@@ -1,8 +1,8 @@
 #pragma once
 
 struct Mutex_Ticket {
-	s64 ticket  = 0;
-	s64 serving = 0;
+	u64 ticket  = 0;
+	u64 serving = 0;
 };
 
 instant void
@@ -11,7 +11,7 @@ Mutex_WaitForRelease(
 ) {
 	Assert(mutex);
 
-	s64 ticket = InterlockedIncrement(&mutex->ticket);
+	u64 ticket = InterlockedIncrement(&mutex->ticket);
 
 	while(ticket > mutex->serving)
 		Sleep(1);
@@ -20,7 +20,7 @@ Mutex_WaitForRelease(
 instant void
 Mutex_LockUntil(
 	Mutex_Ticket *mutex,
-	s64 serving
+	u64 serving
 ) {
 	Assert(mutex);
 

@@ -76,7 +76,7 @@ Test_Strings(
 	AssertMessage(String_IndexOf(&s_buffer, S("test"), 0, true) == 4, "[Test] String indexof failed.");
 	AssertMessage(String_StartWith(&s_buffer, S("xxx_"), true), "[Test] String startwidth failed.");
 
-	long pos_found = 0;
+	s64 pos_found = 0;
 	if (String_Find(&s_buffer, S("_xxx"), &pos_found)) {
 		AssertMessage(pos_found == 8, "[Test] Data in string not found at correct index.");
 	}

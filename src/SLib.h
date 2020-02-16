@@ -146,15 +146,17 @@ __inline__ static void debug_break(void)
 	__asm__ volatile("int $0x03");
 }
 
-#define s8	char
-#define s16	short
-#define s32	int
-#define s64	long
+#define s8	  char
+#define s16	  short
+#define s32	  int
+#define slong long  			// 32-bit
+#define s64	  long long
 
-#define u8	unsigned char
-#define u16	unsigned short
-#define u32	unsigned int
-#define u64	unsigned long
+#define u8	  unsigned char
+#define u16	  unsigned short
+#define u32	  unsigned int
+#define ulong unsigned long 	// 32-bit
+#define u64	  unsigned long long
 
 #define AND &&
 #define OR  ||

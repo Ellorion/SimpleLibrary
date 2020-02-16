@@ -1,10 +1,10 @@
 #pragma once
 
-typedef u64 WINAPI (*Thread_Function)(void *data);
+typedef ulong WINAPI (*Thread_Function)(void *data);
 
 struct Thread {
 	HANDLE handle        = 0;
-	u64 id               = 0;
+	ulong  id            = 0;
 	void *data           = 0;
 	Thread_Function func = 0;
 };

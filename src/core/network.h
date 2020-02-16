@@ -518,12 +518,12 @@ Network_GetMAC(
 	if (!String_EndWith(&s_ip_address, S("\0", 1), false))
 		return s_result;
 
-    u64 mac_address[2];
-    u64 mac_address_len = 6;
+    ulong mac_address[2];
+    ulong mac_address_len = 6;
 
     IPAddr ip_address = inet_addr(s_ip_address.value);
 
-    s32 request = SendARP(ip_address, 0, mac_address, &mac_address_len);
+    auto request = SendARP(ip_address, 0, mac_address, &mac_address_len);
 
     if (request == NO_ERROR AND mac_address_len) {
         s_result = Network_ConvertToMAC((u8 *)&mac_address, mac_address_len);
@@ -540,7 +540,7 @@ Network_GetInfo(
 	info.s_ip          = Network_GetIPByName(info.s_name_device);
 	info.s_mac         = Network_GetMAC(info.s_ip);
 
-	u64 len_buffer;
+	ulong len_buffer;
 	GetAdaptersInfo(0, &len_buffer);
 
 	IP_ADAPTER_INFO *adapter_info = (IP_ADAPTER_INFO *)Memory_Create(char, len_buffer);
