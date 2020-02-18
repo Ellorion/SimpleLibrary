@@ -144,7 +144,9 @@ Convert_SizeToString(
 		++index;
 	}
 
-	String s_result = Convert_DoubleToString(size, 2);
+	u8 num_remainders = (index > 0) ? 2 : 0;
+
+	String s_result = Convert_DoubleToString(size, num_remainders);
 	String_Append(&s_result, S(units_size[index]));
 
 	return s_result;
