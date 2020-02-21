@@ -1,25 +1,14 @@
-/// Usage:
-///	int main() {
-///		Stream stream;
-///
-///		if (!Stream_Create(&stream, S("file.log"))) {
-///			AssertMessage(false, "Error on Stream_Create");
-///		}
-///
-///		stream << S("Hello, World");
-///
-///		String s_finishline = String_Copy("!");
-///		stream << s_finishline;
-///
-///		stream << S('\r') << S('\n');
-///
-///		Stream_Close(&stream);
-///
-///		return 0;
-///	}
+#pragma once
+
+enum class StreamFileMode {
+	Clear = 0, 	/// create new file or erase  existing (read & write)
+	Append,		/// create new file or append existing (read & write)
+};
 
 struct Stream {
+	StreamFileMode mode;
 	File file;
+	String s_data;
 };
 
 instant void
@@ -29,20 +18,37 @@ Stream_Close(
 	Assert(stream);
 
 	File_Close(&stream->file);
+	String_Destroy(&stream->s_data);
 
 	*stream = {};
 }
 
 instant bool
-Stream_Create(
+Stream_OpenFile(
 	Stream *stream,
-	String s_filename
+	String s_data,
+	StreamFileMode mode
 ) {
 	Assert(stream);
 
 	Stream_Close(stream);
 
-	stream->file = File_Open(s_filename, "wb+");
+	stream->mode   = mode;
+	stream->s_data = String_Copy(s_data);
+
+	switch (stream->mode) {
+		case StreamFileMode::Clear: {
+			stream->file = File_Open(stream->s_data, "wb+");
+		} break;
+
+		case StreamFileMode::Append: {
+			stream->file = File_Open(stream->s_data, "ab+");
+		} break;
+
+		default: {
+			AssertMessage(false, "Unhandled StreamFileMode");
+		} break;
+	}
 
 	return true;
 }
