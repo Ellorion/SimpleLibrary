@@ -57,6 +57,22 @@ String_GetLength(
 /// (temporary) string conversion
 instant String
 S(
+	char c_data
+) {
+ 	String s_data;
+ 	{
+		s_data.value  = &c_data;
+		s_data.length = 1;
+
+		s_data.is_reference = true;
+		s_data.has_changed  = true;
+ 	}
+
+	return s_data;
+}
+
+instant String
+S(
 	const char *c_data
 ) {
  	String s_data;

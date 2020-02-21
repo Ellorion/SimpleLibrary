@@ -30,6 +30,7 @@ crafting.cpp
 *.cfg
 *.ico
 *.csv
+*.log
 
 # Object directory
 obj/

@@ -1,7 +1,7 @@
 #pragma once
 
 struct File {
-	FILE *fp;
+	FILE *fp = 0;
 };
 
 instant bool
@@ -142,14 +142,16 @@ File_Size(
 	return size;
 }
 
-instant void
+instant bool
 File_Write(
 	File *file,
 	String s_data
 ) {
 	Assert(file);
 
-    fwrite(s_data.value, sizeof(char), sizeof(char) * s_data.length, file->fp);
+    auto bytesWritten = fwrite(s_data.value, sizeof(char), sizeof(char) * s_data.length, file->fp);
+
+    return (bytesWritten > 0);
 }
 
 instant bool

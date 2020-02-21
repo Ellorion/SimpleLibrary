@@ -55,6 +55,8 @@
 ///     -mwindows
 ///
 /// Compiler options:
+///		-std=c++17
+///
 ///		-fno-exceptions
 ///		-fno-asynchronous-unwind-tables
 ///		-fno-rtti
@@ -435,6 +437,7 @@ ToInt(
 #include "core/cpu.h"
 #include "core/tree.h"
 #include "core/files.h"
+#include "core/stream.h"
 #include "core/image.h"
 #include "core/map.h"
 
