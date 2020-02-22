@@ -6,7 +6,7 @@ enum class StreamType {
 };
 
 struct Stream {
-	StreamType type;
+	StreamType type = StreamType::File;
 	File file;
 	String s_buffer;
 };
@@ -34,6 +34,10 @@ Stream_Close(
 		case StreamType::Buffer: {
 			String_Destroy(&stream->s_buffer);
 		} break;
+
+		default: {
+			AssertMessage(false, "Unhandled StreamType!");
+		} break;
 	}
 
 	Stream_Clear(stream);
@@ -54,7 +58,7 @@ Stream_Open(
 	return File_IsOpen(&stream->file);
 }
 
-instant String *
+instant bool
 Stream_Open(
 	Stream *stream
 ) {
@@ -64,7 +68,30 @@ Stream_Open(
 
 	stream->type = StreamType::Buffer;
 
-	return &stream->s_buffer;
+	return true;
+}
+
+instant String
+Stream_GetBuffer(
+	Stream *stream
+) {
+	Assert(stream);
+
+	switch (stream->type) {
+		case StreamType::File: {
+			AssertMessage(false, "File-Stream does not use the internal buffer.");
+		} break;
+
+		case StreamType::Buffer: {
+			return S(stream->s_buffer);
+		} break;
+
+		default: {
+			AssertMessage(false, "Unhandled StreamType!");
+		} break;
+	}
+
+	return {};
 }
 
 Stream &operator<<(Stream &out, const String &s_data) {
@@ -81,6 +108,10 @@ Stream &operator<<(Stream &out, const String &s_data) {
 
 			case StreamType::Buffer: {
 				String_Append(&out.s_buffer, s_data, s_data.length);
+			} break;
+
+			default:  {
+				AssertMessage(false, "Unhandled StreamType!");
 			} break;
 		}
 
