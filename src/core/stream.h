@@ -1,15 +1,15 @@
 #pragma once
 
-enum class StreamFileMode {
-	Clear = 0, 	/// create new file or erase  existing (read & write)
-	Append,		/// create new file or append existing (read & write)
+struct Stream {
+	File file;
 };
 
-struct Stream {
-	StreamFileMode mode;
-	File file;
-	String s_data;
-};
+instant void
+Stream_Clear(
+	Stream *stream
+) {
+	Assert(stream);
+}
 
 instant void
 Stream_Close(
@@ -18,44 +18,31 @@ Stream_Close(
 	Assert(stream);
 
 	File_Close(&stream->file);
-	String_Destroy(&stream->s_data);
 
-	*stream = {};
+	Stream_Clear(stream);
 }
 
 instant bool
-Stream_OpenFile(
+Stream_Open(
 	Stream *stream,
-	String s_data,
-	StreamFileMode mode
+	const File &file
 ) {
 	Assert(stream);
 
-	Stream_Close(stream);
+	Stream_Clear(stream);
 
-	stream->mode   = mode;
-	stream->s_data = String_Copy(s_data);
+	stream->file = file;
 
-	switch (stream->mode) {
-		case StreamFileMode::Clear: {
-			stream->file = File_Open(stream->s_data, "wb+");
-		} break;
-
-		case StreamFileMode::Append: {
-			stream->file = File_Open(stream->s_data, "ab+");
-		} break;
-
-		default: {
-			AssertMessage(false, "Unhandled StreamFileMode");
-		} break;
-	}
-
-	return true;
+	return (stream->file.fp != 0);
 }
 
 Stream &operator<<(Stream &out, const String &s_data) {
+	if (String_IsEmpty(&s_data)) {
+		LOG_DEBUG("No data available to write in Stream Operator")
+	}
+	else
 	if (!File_Write(&out.file, s_data)) {
-		AssertMessage(false, "File could not be written to with stream operator.");
+		AssertMessage(false, "File could not be written to with File-Stream Operator.");
 	}
 
 	return out;

@@ -211,7 +211,7 @@ String_AddOffset(
 
 instant bool
 String_IsEmpty(
-	String *s_data,
+	const String *s_data,
 	bool skip_whitespace = false
 ) {
 	Assert(s_data);
