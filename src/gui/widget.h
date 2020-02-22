@@ -2140,7 +2140,7 @@ Widget_UpdateInputNumberPicker(
 			if (widget->events.on_trigger) {
 				Widget_Slide *t_slide = &widget_parent_io->slide;
 
-				t_slide->value = ToInt(tw_label->text.s_data);
+				t_slide->value = Convert_ToInt(tw_label->text.s_data);
 
 				if (sub_index == 1) {
 					if (t_slide->value - t_slide->step >= t_slide->start)
@@ -2152,7 +2152,7 @@ Widget_UpdateInputNumberPicker(
 						t_slide->value += t_slide->step;
 				}
 
-				char *c_value = ToCString(t_slide->value);
+				char *c_value = Convert_ToCString(t_slide->value);
 
 				String_Clear(&tw_label->text.s_data);
 				String_Append(&tw_label->text.s_data, S(c_value));
@@ -2223,7 +2223,7 @@ Widget_CreateNumberPicker(
 	wg_label.text.data.align_x = TEXT_ALIGN_X_RIGHT;
 	wg_label.text.data.rect_padding = {2, 2, 2, 2};
 
-	char *c_value = ToCString(slide.value);
+	char *c_value = Convert_ToCString(slide.value);
 	String_Append(&wg_label.text.s_data, S(c_value));
 	Memory_Free(c_value);
 

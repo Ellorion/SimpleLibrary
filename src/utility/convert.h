@@ -151,3 +151,62 @@ Convert_SizeToString(
 
 	return s_result;
 }
+
+instant char *
+Convert_ToCString(
+	s64 value,
+	u32 len = 0
+) {
+    u64 tmpValue   = value;
+	u8  digitCount = 0;
+	u8  is_signed  = 0;
+
+	/// make space for '-' sign
+	if (value < 0) {
+		++digitCount;
+		is_signed = 1;
+	}
+
+	/// calc number of digits
+	do {
+		value /= 10;
+		++digitCount;
+	} while (value);
+
+    /// include null-terminate char
+	char *buffer = Memory_Create(char, digitCount + 1);
+
+	/// display negative sign and stay in ascii number
+	/// range by removing the sign from the value
+	value = tmpValue;
+	if (value < 0) {
+		*buffer = '-';
+		value *= -1;
+	}
+
+	if (len AND len > digitCount)
+		digitCount = len;
+
+	/// convert digits to char array
+	do {
+		int digit = value % 10;
+		buffer[--digitCount] = digit + '0';
+		value /= 10;
+	} while (digitCount - is_signed);
+
+	if (len)
+		buffer[len] = 0;
+
+	return buffer;
+}
+
+instant s32
+Convert_ToInt(
+	String s_data
+) {
+	char *c_data = String_CreateCBufferCopy(s_data);
+	s32 result = atoi(c_data);
+	Memory_Free(c_data);
+
+	return result;
+}

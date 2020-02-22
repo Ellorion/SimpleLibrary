@@ -141,7 +141,7 @@ Network_HTTP_ParseURL(
 	if (index_find > 0) {
 		String s_port = S(uri.s_domain);
 		String_AddOffset(&s_port, index_find + s_seperator_port.length);
-		uri.port = ToInt(s_port);
+		uri.port = Convert_ToInt(s_port);
 
 		uri.s_domain.length = index_find;
 	}
@@ -836,7 +836,7 @@ Network_HTTP_GetResponseRef(
 		*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.header_size);
 
 		String s_http_code = String_GetDelimiterSectionRef(s_response_out, S(" "), 1, true);
-		network->HTTP.response_code = ToInt(s_http_code);
+		network->HTTP.response_code = Convert_ToInt(s_http_code);
 
 		switch (network->HTTP.response_code) {
 			case 200: {		/// everything is awesome
@@ -852,7 +852,7 @@ Network_HTTP_GetResponseRef(
 						/// since both strings use a reference to network->HTTP.s_buffer_chunk,
 						/// it can be overwritten without any memory leak,
 						/// and the string buffer size also stays intact
-						network->HTTP.content_length = ToInt(s_data);
+						network->HTTP.content_length = Convert_ToInt(s_data);
 						break;
 					}
 				}

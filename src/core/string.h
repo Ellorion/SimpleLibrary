@@ -514,7 +514,7 @@ String_CopyBuffer(
 
 instant String
 String_Copy(
-	String s_data
+	const String &s_data
 ) {
 	return String_Copy(s_data.value, s_data.length);
 }

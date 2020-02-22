@@ -123,7 +123,10 @@ File_Close(
 	Assert(file_io);
 
 	/// Returns 0 on success
-	return (fclose(file_io->fp) == 0);
+	bool success = (fclose(file_io->fp) == 0);
+	*file_io = {};
+
+	return success;
 }
 
 instant u64
