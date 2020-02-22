@@ -5,6 +5,15 @@ struct File {
 };
 
 instant bool
+File_IsOpen(
+	File *file
+) {
+	Assert(file);
+
+	return (file->fp != 0);
+}
+
+instant bool
 File_HasExtension(
 	String *s_filename,
 	String  s_extension

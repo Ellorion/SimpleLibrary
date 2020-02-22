@@ -29,11 +29,11 @@ Stream_Open(
 ) {
 	Assert(stream);
 
-	Stream_Clear(stream);
+	Stream_Close(stream);
 
 	stream->file = file;
 
-	return (stream->file.fp != 0);
+	return File_IsOpen(&stream->file);
 }
 
 Stream &operator<<(Stream &out, const String &s_data) {
