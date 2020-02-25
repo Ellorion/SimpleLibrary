@@ -1,5 +1,10 @@
 #pragma once
 
+#define IN_STREAM_VERSION(_object, _min, _max_incl)                                   \
+    if ((numcheck >= (_min)) && ((numcheck <= (_max_incl)) || ((_max_incl) == 0))) {  \
+        in >> _object;                                                                \
+    }
+
 enum class StreamType {
 	File = 0,
 	Buffer
