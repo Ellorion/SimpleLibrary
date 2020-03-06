@@ -120,6 +120,7 @@ struct Widget {
 	/// Triggers (per Frame)
 	bool trigger_autosize = false;
 	bool trigger_popout   = false;
+	bool trigger_update   = false;
 
 	/// Events (per Frame)
 	struct Widget_Events {
@@ -318,18 +319,18 @@ Widget_HasChanged(
 ) {
 	Assert(widget_io);
 
-	bool has_changed = false;
+	bool has_changed = widget_io->trigger_update;
 
 	/// a list would iterate over the list items and reuse "text"
 	/// for every list element incl. might change (some) of its settings,
 	/// that is why the list data change checking will happen seperately
-	if (!Widget_IsListType(widget_io)) {
+	if (!has_changed && !Widget_IsListType(widget_io)) {
 		///@Note: updating text changed status will happen
 		///       in a Text_Update
 		has_changed |= Text_HasChanged(&widget_io->text, false);
 	}
 
-	if (widget_io->text.font)
+	if (!has_changed && widget_io->text.font)
 		has_changed |= (widget_io->text.font->events.flags != 0);
 
 	if (!has_changed) {
@@ -1049,6 +1050,8 @@ Widget_Update(
 		widget_io->data.s_row_filter.has_changed = false;
 	}
 
+	widget_io->trigger_update = false;
+
 	LOG_STATUS("completed\n");
 
 	return result;
@@ -1508,7 +1511,7 @@ Widget_UpdateInput(
 		/// -------------------------------------------------------------------
 		int mouse_button_index_dragging = 0;
 
-		/// only activate, so others flags can be processed when it disables
+		/// only activate, so others flags can be processed before it disables
 		if (!widget_io->is_dragging)
 			widget_io->is_dragging = (    mouse->pressing[mouse_button_index_dragging]
 									  AND mouse->is_moving);
@@ -1520,7 +1523,7 @@ Widget_UpdateInput(
 
 				if (Rect_IsIntersecting(&mouse->point, &column_rect)) {
 					s32 row_items = widget_io->data.a_table_data->count;
-					/// add header row
+					/// add header row -> vertical column spacer from header to last entry
 					row_items += 1;
 
 					/// grab after every row
@@ -1543,8 +1546,10 @@ Widget_UpdateInput(
 							column->is_dragging = true;
 						}
 
-						if (column->is_dragging)
+						if (column->is_dragging) {
 							column->width += mouse->point_relative.x;
+							widget_io->trigger_update = true;
+						}
 
 						column_rect.x += column_rect.w;
 					}
