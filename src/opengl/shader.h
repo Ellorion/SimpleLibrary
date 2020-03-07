@@ -275,8 +275,8 @@ ShaderSet_UpdateViewport(
 	RectF viewport;
 	Window *t_window = shader_set_io->window;
 
-	viewport.x = t_window->x_viewport;
-	viewport.y = t_window->y_viewport;
+	viewport.x = t_window->viewport_x;
+	viewport.y = t_window->viewport_y;
 	viewport.w = (float)t_window->width;
 	viewport.h = (float)t_window->height;
 

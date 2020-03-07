@@ -86,8 +86,8 @@ struct Window {
 	HWND   		       hWnd           = 0;
 	HDC    		       hDC            = 0;
 	HGLRC  		       hRC            = 0;
-	float		       x_viewport     = 0;
-	float		       y_viewport     = 0;
+	float		       viewport_x     = 0;
+	float		       viewport_y     = 0;
 	s32    		       width          = 0;
 	s32    		       height         = 0;
 	bool   		       is_fullscreen  = false;
@@ -103,7 +103,12 @@ struct Window {
 	s32                default_width  = 0;
 	s32                default_height = 0;
 
-	// f.e. to reset window / widget / aso. event flags during every frame
+	// f.e. to reset
+	// - window
+	// - mouse
+	// - font
+	// - widget
+	// event flags / cata during every frame
 	Array<MemorySegment> a_segments_reset;
 
 	struct Window_Events {
@@ -133,7 +138,6 @@ instant void Keyboard_Reset(Keyboard *, bool);
 instant void Keyboard_ResetLastKey(Keyboard *);
 
 instant bool Mouse_Update(Mouse *, Window *, MSG *);
-instant void Mouse_Reset(Mouse *);
 
 LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
 	switch (uMessage) {

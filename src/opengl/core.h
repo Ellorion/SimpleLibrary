@@ -116,8 +116,8 @@ OpenGL_AdjustScaleViewport(
 			);
 		}
 
-		window_io->x_viewport = x;
-		window_io->y_viewport = y;
+		window_io->viewport_x = x;
+		window_io->viewport_y = y;
 
 		result =    window_io->width  != new_width
 		         OR window_io->height != new_height;
@@ -169,8 +169,8 @@ OpenGL_Scissor(
 	Assert(window);
 
 	/// convert to right-hand coordinate system
-	float t_x = x + window->x_viewport;
-	float t_y = (window->height - y - h) + window->y_viewport;
+	float t_x = x + window->viewport_x;
+	float t_y = (window->height - y - h) + window->viewport_y;
 	s32   t_w = w;
 	s32   t_h = h;
 
@@ -191,8 +191,8 @@ OpenGL_Scissor(
 	s32   h = rect.h;
 
 	/// convert to right-hand coordinate system
-	float t_x = x + window->x_viewport;
-	float t_y = (window->height - y - h) + window->y_viewport;
+	float t_x = x + window->viewport_x;
+	float t_y = (window->height - y - h) + window->viewport_y;
 	s32   t_w = w;
 	s32   t_h = h;
 

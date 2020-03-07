@@ -118,9 +118,11 @@ struct Widget {
 	WIDGET_SELECT_TYPE type_select = WIDGET_SELECT_ON_RETURN;
 
 	/// Triggers (per Frame)
-	bool trigger_autosize = false;
-	bool trigger_popout   = false;
-	bool trigger_update   = false;
+	struct Widget_Trigger {
+		bool autosize = false;
+		bool popout   = false;
+		bool update   = false;
+	} trigger;
 
 	/// Events (per Frame)
 	struct Widget_Events {
@@ -319,7 +321,7 @@ Widget_HasChanged(
 ) {
 	Assert(widget_io);
 
-	bool has_changed = widget_io->trigger_update;
+	bool has_changed = widget_io->trigger.update;
 
 	/// a list would iterate over the list items and reuse "text"
 	/// for every list element incl. might change (some) of its settings,
@@ -958,7 +960,7 @@ Widget_Update(
 
 	/// Triggers
 	/// =======================================================================
- 	if (widget_io->trigger_autosize) {
+ 	if (widget_io->trigger.autosize) {
 		Layout_Data_Settings *layout_data = &widget_io->layout_data.settings;
 		Text_Data *settings = &text->data;
 
@@ -1008,13 +1010,10 @@ Widget_Update(
 				}
 			}
 		}
-
-		widget_io->trigger_autosize = false;
 	}
 
-	if (widget_io->trigger_popout) {
+	if (widget_io->trigger.popout) {
 		widget_io->data.is_popout = !widget_io->data.is_popout;
-		widget_io->trigger_popout = false;
 
 		if (widget_io->data.can_popout_focus_change) {
 			if (widget_io->data.is_popout) {
@@ -1050,7 +1049,7 @@ Widget_Update(
 		widget_io->data.s_row_filter.has_changed = false;
 	}
 
-	widget_io->trigger_update = false;
+	widget_io->trigger = {};
 
 	LOG_STATUS("completed\n");
 
@@ -1548,7 +1547,7 @@ Widget_UpdateInput(
 
 						if (column->is_dragging) {
 							column->width += mouse->point_relative.x;
-							widget_io->trigger_update = true;
+							widget_io->trigger.update = true;
 						}
 
 						column_rect.x += column_rect.w;
@@ -1966,7 +1965,7 @@ Widget_CreateLabel(
 	if (!String_IsEmpty(&s_data))
 		String_Append(&t_widget.text.s_data, s_data);
 
-	t_widget.trigger_autosize = true;
+	t_widget.trigger.autosize = true;
 
 	return t_widget;
 }
@@ -2006,7 +2005,7 @@ Widget_CreateButton(
 	if (!String_IsEmpty(&s_data))
 		String_Append(&t_widget.text.s_data, s_data);
 
-	t_widget.trigger_autosize = true;
+	t_widget.trigger.autosize = true;
 
 	return t_widget;
 }
@@ -2039,7 +2038,7 @@ Widget_CreateListBox(
 
 	t_widget.text.font = font;
 
-	t_widget.trigger_autosize = true;
+	t_widget.trigger.autosize = true;
 
 	return t_widget;
 }
@@ -2076,7 +2075,7 @@ Widget_CreateCheckBox(
 
 	t_widget.text.data.rect_padding = {1, 1, 3, 1};
 
-	t_widget.trigger_autosize = true;
+	t_widget.trigger.autosize = true;
 
 	return t_widget;
 }
@@ -2104,7 +2103,7 @@ Widget_CreatePictureBox(
 
 	t_widget.data.is_focusable = false;
 
-	t_widget.trigger_autosize = true;
+	t_widget.trigger.autosize = true;
 
 	return t_widget;
 }
@@ -2275,7 +2274,7 @@ Widget_CreateTextBox(
 		t_widget.text.data.use_no_linebreak = true;
 	}
 
-	t_widget.trigger_autosize = true;
+	t_widget.trigger.autosize = true;
 
 	return t_widget;
 }
@@ -2309,7 +2308,7 @@ Widget_TriggerPopout(
 	Assert(widget);
 
 	widget->data.can_popout_focus_change = can_focus_change;
-	widget->trigger_popout = true;
+	widget->trigger.popout = true;
 }
 
 instant void
@@ -2480,7 +2479,7 @@ Widget_CreateComboBox(
 
 	twg_list->widget_focus_on_popout = twg_text;
 
-	t_widget.trigger_autosize = true;
+	t_widget.trigger.autosize = true;
 
 	return t_widget;
 }
@@ -2508,7 +2507,7 @@ Widget_CreateProgressbar(
 	t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_width = true;
 
-	t_widget.trigger_autosize = true;
+	t_widget.trigger.autosize = true;
 
 	return t_widget;
 }
@@ -2535,7 +2534,7 @@ Widget_CreateListView(
 	t_widget.text.font = font;
 	t_widget.text.data.rect = rect_box;
 
-	t_widget.trigger_autosize = true;
+	t_widget.trigger.autosize = true;
 
 	return t_widget;
 }

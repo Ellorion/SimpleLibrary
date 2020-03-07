@@ -26,14 +26,15 @@ MemorySegment_AddMouse(
 	Assert(mouse);
 
 	MemorySegment_Add(a_segments, mouse->point_relative);
-	MemorySegment_Add(a_segments, mouse->down);
 	MemorySegment_Add(a_segments, mouse->up);
+	MemorySegment_Add(a_segments, mouse->down);
+
+	MemorySegment_Add(a_segments, mouse->wheel);
 
 	MemorySegment_Add(a_segments, mouse->is_up);
 	MemorySegment_Add(a_segments, mouse->is_down);
 	MemorySegment_Add(a_segments, mouse->is_moving);
 
-	MemorySegment_Add(a_segments, mouse->wheel);
 }
 
 instant void
