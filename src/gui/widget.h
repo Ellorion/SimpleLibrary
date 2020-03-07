@@ -52,7 +52,7 @@ struct Widget_Column {
 	String s_name;
 	s32 width;
 	s32 height;
-	s32 spacing = 10;
+	s32 spacing = 5;
 	bool is_dragging = false;
 };
 
@@ -88,15 +88,19 @@ struct Widget_Data {
 	bool has_scrollable_list = false;
 	WIDGET_SCROLL_TYPE scroll_type = WIDGET_SCROLL_ITEM;
 
+	/// ListBox Data
 	Array<String> as_row_data;
 
+	/// ListBox filter
 	String s_row_filter;
 	Array<String> as_filter_data;
 
 	/// ListView Data
+	bool is_header_visible = true;
 	Array<Widget_Column>  a_table_columns;
 	Array<Array<String>> *a_table_data = 0;
 
+	/// Radiogroup link
 	Array<Widget *> *ap_radiogroup = 0;
 };
 
@@ -859,7 +863,7 @@ Widget_UpdateListView(
 	/// prepare to redraw everything
 	Widget_InvalidateBackground(widget_io);
 
-	{ /// only needed, if headers are drawn, which they always are for now
+	if (widget_io->data.is_header_visible) {
 		FOR_ARRAY(widget_io->data.a_table_columns, it_item) {
 			Widget_Column *header_column = &ARRAY_IT(widget_io->data.a_table_columns, it_item);
 
@@ -882,11 +886,22 @@ Widget_UpdateListView(
 	if (!widget_io->data.a_table_data)
 		return;
 
+	AssertMessage([&]() {
+		if (widget_io->data.is_header_visible) {
+			FOR_ARRAY(*widget_io->data.a_table_data, it_row) {
+				Array<String> *as_items = &ARRAY_IT(*widget_io->data.a_table_data, it_row);
+
+				if (as_items->count != widget_io->data.a_table_columns.count)
+					return false;
+			}
+		}
+
+		return true;
+	}(),
+	"Amount of header does not match table column count.");
+
 	FOR_ARRAY(*widget_io->data.a_table_data, it_row) {
 		Array<String> *as_items = &ARRAY_IT(*widget_io->data.a_table_data, it_row);
-
-		AssertMessage(as_items->count == widget_io->data.a_table_columns.count,
-					  "Amount of header does not match table column count.");
 
 		FOR_ARRAY(*as_items, it_item) {
 			String        *s_item        = &ARRAY_IT(*as_items, it_item);

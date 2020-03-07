@@ -3,6 +3,10 @@
 #define MOUSE_WHEEL_GET_DELTA(value) (GET_WHEEL_DELTA_WPARAM(value) / WHEEL_DELTA)
 #define MOUSE_BUTTON_COUNT 3
 
+#define IS_MOUSE_BUTTON_DOWN_LEFT   (static_cast<bool>(GetKeyState(VK_LBUTTON) & (1<<16)))
+#define IS_MOUSE_BUTTON_DOWN_MIDDLE (static_cast<bool>(GetKeyState(VK_MBUTTON) & (1<<16)))
+#define IS_MOUSE_BUTTON_DOWN_RIGHT  (static_cast<bool>(GetKeyState(VK_RBUTTON) & (1<<16)))
+
 struct Mouse {
 	Point point          = {};
 	Point point_relative = {};
@@ -124,6 +128,27 @@ Mouse_Update(
 ) {
 	if (!mouse_io)
 		return false;
+
+	{	/// restore mouse state when mouse button
+		/// was released outside of the handling area (window)
+		if (!IS_MOUSE_BUTTON_DOWN_LEFT AND mouse_io->pressing[0]) {
+			mouse_io->pressing[0] = false;
+			mouse_io->up[0] = true;
+			mouse_io->is_up = true;
+		}
+
+		if (!IS_MOUSE_BUTTON_DOWN_MIDDLE AND mouse_io->pressing[1]) {
+			mouse_io->pressing[1] = false;
+			mouse_io->up[1] = true;
+			mouse_io->is_up = true;
+		}
+
+		if (!IS_MOUSE_BUTTON_DOWN_RIGHT AND mouse_io->pressing[2]) {
+			mouse_io->pressing[2] = false;
+			mouse_io->up[2] = true;
+			mouse_io->is_up = true;
+		}
+	}
 
 	if (!msg)
 		return false;
