@@ -667,51 +667,51 @@ Network_HTTP_SetCredentials(
 	return true;
 }
 
-/// @Depricated
-instant bool
-Network_HTTP_Request(
-	Network *network,
-	String   s_ip,
-	String   s_path
-) {
-	Assert(network);
-
-	if (!Network_IsSocketValid(network)) {
-		*network = Network_Connect(SOCKET_TCP, s_ip, 80);
-
-		if (Network_HasError(network))
-			return false;
-	}
-
-	if (   network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
-		OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_DATA
-	) {
-		return false;
-	}
-
-	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
-	String_Clear(&network->s_error);
-
-	String s_request;
-	String_Append(&s_request, S("GET /"));
-	String_Append(&s_request, s_path);
-	String_Append(&s_request, S(" HTTP/1.1"));
-	String_Append(&s_request, S("\r\nHost: "));
-	String_Append(&s_request, s_ip);
-
-	if (Network_HTTP_HasCredentials(network)) {
-		String_Append(&s_request, S("\r\nAuthorization: Basic "));
-		String_Append(&s_request, network->HTTP.s_credentials);
-	}
-
-	String_Append(&s_request, S("\r\n\r\n"));
-
-	bool success = Network_Send(network, s_request);
-
-	String_Destroy(&s_request);
-
-	return success;
-}
+///// @Depricated
+//instant bool
+//Network_HTTP_Request(
+//	Network *network,
+//	String   s_ip,
+//	String   s_path
+//) {
+//	Assert(network);
+//
+//	if (!Network_IsSocketValid(network)) {
+//		*network = Network_Connect(SOCKET_TCP, s_ip, 80);
+//
+//		if (Network_HasError(network))
+//			return false;
+//	}
+//
+//	if (   network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
+//		OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_DATA
+//	) {
+//		return false;
+//	}
+//
+//	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
+//	String_Clear(&network->s_error);
+//
+//	String s_request;
+//	String_Append(&s_request, S("GET /"));
+//	String_Append(&s_request, s_path);
+//	String_Append(&s_request, S(" HTTP/1.1"));
+//	String_Append(&s_request, S("\r\nHost: "));
+//	String_Append(&s_request, s_ip);
+//
+//	if (Network_HTTP_HasCredentials(network)) {
+//		String_Append(&s_request, S("\r\nAuthorization: Basic "));
+//		String_Append(&s_request, network->HTTP.s_credentials);
+//	}
+//
+//	String_Append(&s_request, S("\r\n\r\n"));
+//
+//	bool success = Network_Send(network, s_request);
+//
+//	String_Destroy(&s_request);
+//
+//	return success;
+//}
 
 instant bool
 Network_HTTP_Request(
@@ -997,8 +997,6 @@ Network_HTTP_DownloadData(
 
 	Network network;
 	String s_header;
-	String s_response;
-	bool success;
 
 	String s_result;
 	bool is_url_reloacating;
@@ -1012,7 +1010,7 @@ Network_HTTP_DownloadData(
 		Network_HTTP_Request(&network, s_url);
 		OnErrorReturn();
 
-		success = Network_HTTP_GetResponseRef(&network, &s_header);
+		Network_HTTP_GetResponseRef(&network, &s_header);
 
 		is_url_reloacating = (   network.HTTP.response_code == 301
 							  OR network.HTTP.response_code == 302);
@@ -1032,8 +1030,12 @@ Network_HTTP_DownloadData(
 
 	OnErrorReturn();
 
-	while (Network_HTTP_GetResponseRef(&network, &s_response)) {
-		String_Append(&s_result, s_response);
+	{ /// get requested data
+		String s_response;
+
+		while (Network_HTTP_GetResponseRef(&network, &s_response)) {
+			String_Append(&s_result, s_response);
+		}
 	}
 
 	OnErrorReturn();

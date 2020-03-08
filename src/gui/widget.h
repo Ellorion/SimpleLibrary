@@ -66,26 +66,23 @@ struct Widget_Data {
 	Color32 color_outline_checked  = {0.5f, 0.5f, 1.0f, 1.0f};
 	Color32 color_progress         = {0.5f, 0.5f, 1.0f, 1.0f};
 
-	u64  active_row_id = 0;
+	u64  selected_row_id = 0;
 
-	u32  border_size   = 0;
-	u32  spacing       = 1;
+	u32  border_size = 0;
+	u32  spacing     = 1;
 
-	bool is_focusable  = true;
-	bool is_scrollable = false;
-	bool is_checkable  = false;
+	bool is_visible  = true;
+	bool is_dragging = false;
 	bool is_filter_case_sensitive = true;
-
-	bool can_popout_focus_change = false;
+	bool can_popout_focus_change  = false;
 
 	/// overlay
-	bool is_floating   = false; /// is overlay
-	bool is_popout     = false; /// visible overlay
+	bool is_floating = false; /// is overlay
+	bool is_popout   = false; /// visible overlay
 
 	bool has_focus  = false;
 	bool is_checked = false;
 
-	bool has_scrollable_list = false;
 	WIDGET_SCROLL_TYPE scroll_type = WIDGET_SCROLL_ITEM;
 
 	/// ListBox Data
@@ -113,8 +110,11 @@ struct Widget {
 	Widget_Data data_prev;
 	Widget_Slide slide;
 
-	bool visible     = true;
-	bool is_dragging = false;
+	/// type specific
+	bool is_focusable  = true;
+	bool is_scrollable = false;
+	bool is_checkable  = false;
+	bool has_scrollable_list = false;
 
 	/// On Demand
 	static Widget *widget_focus_current;
@@ -191,7 +191,7 @@ Layout_Block_SetVisible (
 
 	FOR_ARRAY(layout_block->ap_widgets, it) {
 		Widget *widget = ARRAY_IT(layout_block->ap_widgets, it);
-		widget->visible = set_visible;
+		widget->data.is_visible = set_visible;
 	}
 }
 
@@ -418,7 +418,7 @@ Widget_SetFocus(
 ) {
  	Assert(widget_io);
 
-	if (!widget_io->data.is_focusable)
+	if (!widget_io->is_focusable)
 		return;
 
     if (widget_io->widget_focus_current) {
@@ -719,7 +719,7 @@ Widget_GetListArrayFiltered(
 
 	if (widget->data.s_row_filter.length) {
 		as_target = &widget->data.as_filter_data;
-		Clamp(&widget->data.active_row_id, 0, widget->data.as_filter_data.count - 1);
+		Clamp(&widget->data.selected_row_id, 0, widget->data.as_filter_data.count - 1);
 	}
 
 	*as_row_data_out = as_target;
@@ -806,7 +806,7 @@ Widget_UpdateListBox(
 
 		Color32 t_color_rect = widget_io->data.color_outline;
 
-		if (widget_io->data.active_row_id == it_row) {
+		if (widget_io->data.selected_row_id == it_row) {
 			if (widget_io->data.has_focus)
 				t_color_rect = widget_io->data.color_outline_selected;
 			else
@@ -909,10 +909,15 @@ Widget_UpdateListView(
 
 			rect.w = header_column->width;
 
-			if (it_row % 2)
-				Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.75, 0.75, 0.75, 1});
-			else
-				Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.8, 0.8, 0.8, 1});
+			if (it_row == widget_io->data.selected_row_id) {
+				Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.50, 0.50, 0.75, 1});
+			}
+			else {
+				if (it_row % 2)
+					Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.75, 0.75, 0.75, 1});
+				else
+					Vertex_AddRect32(&widget_io->vertex_rect, rect, {0.8, 0.8, 0.8, 1});
+			}
 
 			Rect rect_crop = rect;
 
@@ -1081,7 +1086,7 @@ Widget_Render(
 	Assert(shader_set);
 	Assert(widget_io);
 
-	if (!widget_io->visible)
+	if (!widget_io->data.is_visible)
 		return 0;
 
 	widget_io->text.shader_set = shader_set;
@@ -1234,7 +1239,7 @@ Widget_IsFocusable(
 ) {
 	Assert(widget);
 
-	bool is_focusable = widget->data.is_focusable;
+	bool is_focusable = widget->is_focusable;
 
 	if (is_focusable)  return is_focusable;
 
@@ -1304,7 +1309,7 @@ Widget_UpdateFocus(
 		/// loop) so a possible target can be chosen
 		if (    focus_set_next
 			AND is_visible
-			AND t_widget->data.is_focusable
+			AND t_widget->is_focusable
 		) {
 			t_widget->data.has_focus = true;
 			focus_set_next = false;
@@ -1347,7 +1352,7 @@ Widget_UpdateFocus(
 			bool is_visible = (   !t_widget->data.is_floating
 							   OR  t_widget->data.is_popout);
 
-			if (t_widget->data.is_focusable AND is_visible) {
+			if (t_widget->is_focusable AND is_visible) {
 				t_widget->data.has_focus = true;
 				t_widget->widget_focus_current = t_widget;
 
@@ -1358,7 +1363,7 @@ Widget_UpdateFocus(
 }
 
 instant void
-Widget_CalcActiveRowRect(
+Widget_CalcSelectedRowRect(
 	Widget *widget,
 	Rect *rect_row_out
 ) {
@@ -1383,7 +1388,7 @@ Widget_CalcActiveRowRect(
 		rect_item.w = width;
 		rect_item.h = height;
 
-		if (widget->data.active_row_id == it_row) {
+		if (widget->data.selected_row_id == it_row) {
 			*rect_row_out = rect_item;
 			break;
 		}
@@ -1457,7 +1462,7 @@ Widget_ToggleCheckbox(
 	Widget *widget_io
 ) {
 	Assert(widget_io);
-	Assert(widget_io->data.is_checkable);
+	Assert(widget_io->is_checkable);
 
 	if (!widget_io->data.ap_radiogroup) {
 		widget_io->data.is_checked = !widget_io->data.is_checked;
@@ -1466,7 +1471,7 @@ Widget_ToggleCheckbox(
 
 	FOR_ARRAY(*widget_io->data.ap_radiogroup, it) {
 		Widget *t_widget = ARRAY_IT(*widget_io->data.ap_radiogroup, it);
-		Assert(t_widget->data.is_checkable);
+		Assert(t_widget->is_checkable);
 
 		t_widget->data.is_checked = false;
 	}
@@ -1502,19 +1507,19 @@ Widget_UpdateInput(
     if (widget_io->events.on_updated_input)
 		return;
 
-	if (!widget_io->data.is_focusable)
+	if (!widget_io->is_focusable)
 		return;
 
 	if (widget_io->data.is_floating AND !widget_io->data.is_popout)
 		return;
 
 	bool got_focus = widget_io->data.has_focus;
-	u64  prev_active_row = widget_io->data.active_row_id;
+	u64  prev_active_row = widget_io->data.selected_row_id;
 
 	bool has_text_cursor = widget_io->text.data.is_editable;
 
-	bool is_scrollable_list = widget_io->data.has_scrollable_list;
-	bool is_scrollable      = widget_io->data.is_scrollable;
+	bool is_scrollable_list = widget_io->has_scrollable_list;
+	bool is_scrollable      = widget_io->is_scrollable;
 
 	/// mouse input handling
 	/// -----------------------------------------------------------------------
@@ -1526,11 +1531,11 @@ Widget_UpdateInput(
 		int mouse_button_index_dragging = 0;
 
 		/// only activate, so others flags can be processed before it disables
-		if (!widget_io->is_dragging)
-			widget_io->is_dragging = (    mouse->pressing[mouse_button_index_dragging]
-									  AND mouse->is_moving);
+		if (!widget_io->data.is_dragging)
+			widget_io->data.is_dragging = (    mouse->pressing[mouse_button_index_dragging]
+									       AND mouse->is_moving);
 
-		if (widget_io->is_dragging OR mouse->down[mouse_button_index_dragging]) {
+		if (widget_io->data.is_dragging OR mouse->down[mouse_button_index_dragging]) {
 			/// resize listview columns
 			if (widget_io->type == WIDGET_LISTVIEW) {
 				Rect column_rect = *Widget_GetRectRef(widget_io);
@@ -1609,8 +1614,8 @@ Widget_UpdateInput(
 				u64 new_active_row_id;
 
 				if (Widget_CalcActiveRowID(widget_io, mouse, &new_active_row_id)) {
-					if (new_active_row_id != widget_io->data.active_row_id) {
-						widget_io->data.active_row_id = new_active_row_id;
+					if (new_active_row_id != widget_io->data.selected_row_id) {
+						widget_io->data.selected_row_id = new_active_row_id;
 						widget_io->events.on_list_change_index = true;
 					}
 					else {
@@ -1620,7 +1625,7 @@ Widget_UpdateInput(
 			}
 
 			/// checkbox toggle + radiogroup option
-			if (got_focus AND widget_io->data.is_checkable) {
+			if (got_focus AND widget_io->is_checkable) {
 				Widget_ToggleCheckbox(widget_io);
 			}
 
@@ -1634,7 +1639,7 @@ Widget_UpdateInput(
 
 		/// disable mouse-drag-mode
 		if (mouse->up[mouse_button_index_dragging]) {
-			if (widget_io->is_dragging) {
+			if (widget_io->data.is_dragging) {
 				if (widget_io->type == WIDGET_LISTVIEW) {
 					FOR_ARRAY(widget_io->data.a_table_columns, it) {
 						Widget_Column *column = &ARRAY_IT(widget_io->data.a_table_columns, it);
@@ -1642,7 +1647,7 @@ Widget_UpdateInput(
 					}
 				}
 
-				widget_io->is_dragging = false;
+				widget_io->data.is_dragging = false;
 			}
 		}
 
@@ -1679,7 +1684,7 @@ Widget_UpdateInput(
         	widget_io->events.on_trigger_secondary = true;
         }
 
-		if (    widget_io->data.is_checkable
+		if (    widget_io->is_checkable
 			AND (is_key_return OR is_key_space)
 		) {
 			Widget_ToggleCheckbox(widget_io);
@@ -1688,30 +1693,46 @@ Widget_UpdateInput(
 		if (is_scrollable_list) {
 			/// list-item navigation and triggering
 			/// ---------------------------------------------------------------
-			if (widget_io->data.active_row_id) {
+			if (widget_io->data.selected_row_id) {
 				if (keyboard->down[VK_UP]) {
-					--widget_io->data.active_row_id;
+					--widget_io->data.selected_row_id;
 					widget_io->events.on_list_change_index = true;
 				}
 
 				if (keyboard->down[VK_HOME]) {
-					if (widget_io->data.active_row_id != 0) {
-						widget_io->data.active_row_id = 0;
+					if (widget_io->data.selected_row_id != 0) {
+						widget_io->data.selected_row_id = 0;
 						widget_io->events.on_list_change_index = true;
 					}
 				}
 			}
 
-			if (    widget_io->data.as_row_data.count
-				AND widget_io->data.active_row_id < widget_io->data.as_row_data.count - 1
-			) {
+			bool can_listbox_rowid_advance =
+				(    widget_io->data.as_row_data.count
+				 AND widget_io->data.selected_row_id < widget_io->data.as_row_data.count - 1);
+
+			bool can_listview_rowid_advance =
+				(    widget_io->data.a_table_data
+				 AND widget_io->data.a_table_data->count
+				 AND widget_io->data.selected_row_id < widget_io->data.a_table_data->count - 1);
+
+			if (can_listbox_rowid_advance OR can_listview_rowid_advance) {
 				if (keyboard->down[VK_DOWN]) {
-					++widget_io->data.active_row_id;
+					++widget_io->data.selected_row_id;
 					widget_io->events.on_list_change_index = true;
 				}
 
 				if (keyboard->down[VK_END]) {
-					widget_io->data.active_row_id = widget_io->data.as_row_data.count - 1;
+					if (widget_io->type == WIDGET_LISTBOX) {
+						widget_io->data.selected_row_id = widget_io->data.as_row_data.count - 1;
+					}
+					else if (widget_io->type == WIDGET_LISTVIEW) {
+						widget_io->data.selected_row_id = widget_io->data.a_table_data->count - 1;
+					}
+					else {
+						Assert("Unhandled list type!");
+					}
+
 					widget_io->events.on_list_change_index = true;
 				}
 			}
@@ -1737,39 +1758,41 @@ Widget_UpdateInput(
 
     /// list scrolling (if to be selected list-item is not (fully) visible)
     /// -----------------------------------------------------------------------
-    if (prev_active_row != widget_io->data.active_row_id AND is_scrollable_list) {
-		Rect rect_active_row;
-        Widget_CalcActiveRowRect(widget_io, &rect_active_row);
+    if (widget_io->type == WIDGET_LISTBOX) {
+		if (prev_active_row != widget_io->data.selected_row_id AND is_scrollable_list) {
+			Rect rect_active_row;
+			Widget_CalcSelectedRowRect(widget_io, &rect_active_row);
 
-		if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
-			if (widget_io->data.scroll_type == WIDGET_SCROLL_ITEM) {
-				if (widget_io->data.active_row_id < prev_active_row) {
-					widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
-				}
-				else {
-					widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
-					widget_io->text.offset_y += (rect_widget->h - rect_active_row.h);
-				}
-			}
-			else
-			if (widget_io->data.scroll_type == WIDGET_SCROLL_BLOCK) {
-				if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
-					if (widget_io->data.active_row_id < prev_active_row) {
+			if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
+				if (widget_io->data.scroll_type == WIDGET_SCROLL_ITEM) {
+					if (widget_io->data.selected_row_id < prev_active_row) {
 						widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
-						widget_io->text.offset_y += (rect_widget->h - rect_active_row.h);
 					}
 					else {
 						widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
+						widget_io->text.offset_y += (rect_widget->h - rect_active_row.h);
 					}
 				}
+				else
+				if (widget_io->data.scroll_type == WIDGET_SCROLL_BLOCK) {
+					if (!Rect_IsVisibleFully(&rect_active_row, rect_widget)) {
+						if (widget_io->data.selected_row_id < prev_active_row) {
+							widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
+							widget_io->text.offset_y += (rect_widget->h - rect_active_row.h);
+						}
+						else {
+							widget_io->text.offset_y -= (rect_active_row.y - rect_widget->y);
+						}
+					}
+				}
+				else {
+					AssertMessage(	false,
+									"[Widget] Unhandled widget scroll type.");
+				}
 			}
-			else {
-				AssertMessage(	false,
-								"[Widget] Unhandled widget scroll type.");
-			}
-		}
 
-		Rect_ClampY(&widget_io->rect_content, *rect_widget);
+			Rect_ClampY(&widget_io->rect_content, *rect_widget);
+		}
     }
 
     widget_io->events.on_updated_input = true;
@@ -1782,7 +1805,7 @@ Widget_GetSelectedRowBuffer(
 ) {
 	Assert(widget);
 	Assert(s_row_data_out);
-	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
+	Assert(!widget->data.selected_row_id OR widget->data.selected_row_id < widget->data.as_row_data.count);
 
 	if (!widget->data.as_row_data.count) {
 		String_Clear(s_row_data_out);
@@ -1792,7 +1815,7 @@ Widget_GetSelectedRowBuffer(
 	Array<String> *as_target;
 	Widget_GetListArrayFiltered(widget, &as_target);
 
-	String *ts_row_data = &ARRAY_IT(*as_target, widget->data.active_row_id);
+	String *ts_row_data = &ARRAY_IT(*as_target, widget->data.selected_row_id);
 
 	String_Clear(s_row_data_out);
 	String_Append(s_row_data_out, *ts_row_data);
@@ -1803,7 +1826,7 @@ Widget_GetSelectedRowRef(
 	Widget *widget
 ) {
 	Assert(widget);
-	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
+	Assert(!widget->data.selected_row_id OR widget->data.selected_row_id < widget->data.as_row_data.count);
 
 	String s_result = {};
 
@@ -1811,11 +1834,11 @@ Widget_GetSelectedRowRef(
 		return s_result;
 
 	if (widget->data.as_filter_data.count) {
-		s_result = S(ARRAY_IT(widget->data.as_filter_data, widget->data.active_row_id));
+		s_result = S(ARRAY_IT(widget->data.as_filter_data, widget->data.selected_row_id));
 	}
 	else {
 		if (String_IsEmpty(&widget->data.s_row_filter, false))
-			s_result = S(ARRAY_IT(widget->data.as_row_data, widget->data.active_row_id));
+			s_result = S(ARRAY_IT(widget->data.as_row_data, widget->data.selected_row_id));
 	}
 
 	return s_result;
@@ -1826,9 +1849,9 @@ Widget_GetSelectedRowID(
 	Widget *widget
 ) {
 	Assert(widget);
-	Assert(!widget->data.active_row_id OR widget->data.active_row_id < widget->data.as_row_data.count);
+	Assert(!widget->data.selected_row_id OR widget->data.selected_row_id < widget->data.as_row_data.count);
 
-	return widget->data.active_row_id;
+	return widget->data.selected_row_id;
 }
 
 instant bool
@@ -1912,7 +1935,7 @@ Widget_LoadDirectoryList(
 
 	Array_ClearContainer(a_entries_out);
 
-	widget_io->data.active_row_id = 0;
+	widget_io->data.selected_row_id = 0;
 
 	/// remove "\" from directory path (f.e. C:\) for consistency
 	if (String_EndWith(&ts_directory_buffer, S("\\"), true)) {
@@ -1966,7 +1989,7 @@ Widget_CreateLabel(
 	t_widget.rect_content = rect_box;
 	t_widget.window       = window;
 
-	t_widget.data.is_focusable = false;
+	t_widget.is_focusable = false;
 
 	t_widget.text.data.align_x    = text_align_x;
 	t_widget.text.data.rect       = rect_box;
@@ -2046,8 +2069,8 @@ Widget_CreateListBox(
 	t_widget.layout_data.settings.auto_height = true;
 	t_widget.layout_data.settings.auto_width  = true;
 
-	t_widget.data.is_focusable = true;
-	t_widget.data.has_scrollable_list = true;
+	t_widget.is_focusable = true;
+	t_widget.has_scrollable_list = true;
 
 	t_widget.text.data.rect = rect_box;
 
@@ -2079,10 +2102,11 @@ Widget_CreateCheckBox(
 	t_widget.layout_data.settings.auto_height = true;
 	t_widget.layout_data.settings.auto_width  = true;
 
-	t_widget.data.is_checkable = true;
-	t_widget.data.is_focusable = true;
-	t_widget.data.border_size  = 2;
-	t_widget.data.is_checked   = checked;
+	t_widget.is_checkable = true;
+	t_widget.is_focusable = true;
+
+	t_widget.data.border_size = 2;
+	t_widget.data.is_checked  = checked;
 
 	t_widget.text.font = font;
 
@@ -2116,7 +2140,7 @@ Widget_CreatePictureBox(
 	if (texture)
 		t_widget.vertex_rect.texture = *texture;
 
-	t_widget.data.is_focusable = false;
+	t_widget.is_focusable = false;
 
 	t_widget.trigger.autosize = true;
 
@@ -2134,7 +2158,7 @@ Widget_CreateSpreader(
     t_widget.type = WIDGET_SPREADER;
     t_widget.window = window;
 
-    t_widget.data.is_focusable = false;
+    t_widget.is_focusable = false;
 
     return t_widget;
 }
@@ -2227,7 +2251,7 @@ Widget_CreateNumberPicker(
     t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_width  = true;
 
-	t_widget.data.is_focusable = false;
+	t_widget.is_focusable = false;
 
 	Widget wg_label       = Widget_CreateLabel( window, font, {0, 0, 50, 24}, {});
 	Widget wg_button_up   = Widget_CreateButton(window, font, {0, 0, 24, 24}, S("<"));
@@ -2271,7 +2295,7 @@ Widget_CreateTextBox(
 	t_widget.rect_content = rect_box;
 	t_widget.window       = window;
 
-	t_widget.data.is_scrollable = true;
+	t_widget.is_scrollable = true;
 
 	t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_height = true;
@@ -2460,7 +2484,7 @@ Widget_CreateComboBox(
 	t_widget.rect_content = rect_box;
 	t_widget.window       = window;
 
-	t_widget.data.is_focusable = false;
+	t_widget.is_focusable = false;
 
 	t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_width = true;
@@ -2513,7 +2537,7 @@ Widget_CreateProgressbar(
 	t_widget.window       = window;
 	t_widget.slide        = slide;
 
-	t_widget.data.is_focusable = false;
+	t_widget.is_focusable = false;
 
 	t_widget.text.font         = font;
 	t_widget.text.data.align_x = TEXT_ALIGN_X_MIDDLE;
@@ -2541,6 +2565,9 @@ Widget_CreateListView(
 	t_widget.type         = WIDGET_LISTVIEW;
 	t_widget.rect_content = rect_box;
 	t_widget.window       = window;
+
+	t_widget.is_scrollable       = true;
+	t_widget.has_scrollable_list = true;
 
 	t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_height = true;
