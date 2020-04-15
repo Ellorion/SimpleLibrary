@@ -294,27 +294,15 @@ _AssertMessage(
 		*(ptr_b)  = temp;     \
     } while(0)
 
-/// @Depricated: alot slower than the macro version,
-///              even when using FORCEINLINE...
-//template <typename T>
-//instant void
-//Swap(
-//	T *first_io,
-//	T *second_io
-//) {
-//	Assert(first_io);
-//	Assert(second_io);
-//
-//	T temp = *first_io;
-//	*first_io = *second_io;
-//	*second_io = temp;
-//}
-
 struct Color32 {
 	float r = 0.0f;
 	float g = 0.0f;
 	float b = 0.0f;
 	float a = 1.0f;
+};
+
+namespace Color {
+	Color32 White = {1.0f, 1.0f, 1.0f, 1.0f};
 };
 
 template<typename K, typename L>

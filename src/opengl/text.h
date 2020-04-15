@@ -508,11 +508,27 @@ Array_Destroy(
 	Array_DestroyContainer(a_text_lines);
 }
 
+instant void
+Text_SetData(
+	Text *text,
+	String s_data
+) {
+	Assert(text);
+
+	if (text->s_data.is_reference) {
+		text->s_data = {};
+	} else {
+		String_Clear(&text->s_data);
+	}
+
+	String_Append(&text->s_data, s_data);
+}
+
 instant Text
 Text_Create(
 	ShaderSet *shader_set,
 	Font *font,
-	String *s_data_opt,
+	String s_data,
 	Rect rect,
 	TEXT_ALIGN_X_TYPE align_x
 ) {
@@ -528,8 +544,8 @@ Text_Create(
 	text.data.align_x	= align_x;
 	text.data.color		= {1, 1, 1, 1};
 
-	if (s_data_opt)
-		String_Append(&text.s_data, *s_data_opt);
+	if (!String_IsEmpty(&s_data))
+		Text_SetData(&text, s_data);
 
 	return text;
 }
@@ -2264,4 +2280,14 @@ Text_UseWordWrap(
 	Assert(text);
 
 	text->data.use_word_wrap = enable;
+}
+
+instant void
+Text_AutoSizeAfterUpdate(
+	Text *text
+) {
+	Assert(text);
+
+	text->data.rect.w = text->data.content_width;
+	text->data.rect.h = text->data.content_height;
 }

@@ -7,16 +7,21 @@ Convert_IntToString(
 ) {
 	String s_result;
 
-	while(value) {
-		int remainder = value % base;
-		{
-			char ch = (remainder > 9)
-						? (remainder - 10) + 'a'
-						:  remainder       + '0';
+	if (value == 0) {
+		String_Insert(&s_result, '0', 0);
+	}
+	else {
+		while(value) {
+			int remainder = value % base;
+			{
+				char ch = (remainder > 9)
+							? (remainder - 10) + 'a'
+							:  remainder       + '0';
 
-			String_Insert(&s_result, ch, 0);
+				String_Insert(&s_result, ch, 0);
+			}
+			value /= base;
 		}
-		value /= base;
 	}
 
 	return s_result;
