@@ -55,7 +55,7 @@
 ///     -mwindows
 ///
 /// Compiler options:
-///		-std=c++17
+///		-std=c++20
 ///
 ///		-fno-exceptions
 ///		-fno-asynchronous-unwind-tables
@@ -177,6 +177,11 @@ __inline__ static void debug_break(void)
 /// ===========================================================================
 #define FOR(_max, _it)				\
 	for(u64 _it = 0;				\
+	_it < (_max); 					\
+	++_it)
+
+#define FOR_AUTO(_max, _it)			\
+	for(auto _it = 0;				\
 	_it < (_max); 					\
 	++_it)
 
@@ -430,6 +435,7 @@ enum KEYBOARD_HOTKEY_ID {
 #include "utility/csv.h"
 #include "utility/helper.h"
 #include "utility/profiler.h"
+#include "utility/prime.h"
 
 #include "windows/windows.h"
 #include "opengl/core.h"
