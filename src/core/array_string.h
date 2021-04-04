@@ -8,6 +8,33 @@
 
 #define String_SplitLinesRef	Array_SplitLinesRef
 
+instant String *
+Array_Add(
+    Array<String> *array_io,
+    String &element
+) {
+    Assert(array_io);
+
+    constexpr u64 length = 1;
+
+    if (array_io->count + length > array_io->max) {
+        array_io->max += length;
+        array_io->memory = (String *)_Memory_Resize( array_io->memory,
+                                                array_io->max * sizeof(String));
+    }
+
+    array_io->count += length;
+    u64 target = array_io->count - 1; /// convert to index
+
+    array_io->memory[target] = element;
+
+    /// ownership transference:
+    /// prevent f.e. memory corruption with String_Destroy
+    element.is_reference = true;
+
+    return &array_io->memory[target];
+}
+
 instant void
 Array_Destroy(
 	Array<String> *array_out

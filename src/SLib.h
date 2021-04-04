@@ -403,10 +403,10 @@ enum KEYBOARD_HOTKEY_ID {
 	KEYBOARD_HOTKEY_ID_COUNT,
 };
 
-#include "core/array_const.h"
 #include "core/memory.h"
 #include "core/array.h"
 #include "core/string.h"
+#include "core/array_const.h"
 #include "core/array_string.h"
 #include "core/memory_segment.h"
 

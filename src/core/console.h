@@ -28,7 +28,7 @@ T ConRead() {
 /// @todo: temporary global storage for strings?
 String ConRead() {
     char buffer[1024];
-    std::cin >> buffer;
+    std::cin.getline(buffer, 1024);
 
     return String_Copy(buffer);
 }

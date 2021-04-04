@@ -52,3 +52,17 @@ Array_ClearContainer(
 
 	array_out->count = 0;
 }
+
+template <typename T = String, int Count>
+instant void
+Array_PrintList(
+	Array_Const<T, Count> *a_data
+) {
+	Assert(a_data);
+
+	FOR_ARRAY(*a_data, it) {
+		String t_data = ARRAY_IT(*a_data, it);
+
+		String_PrintLine(t_data);
+	}
+}
