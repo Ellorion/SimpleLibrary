@@ -447,3 +447,5 @@ enum KEYBOARD_HOTKEY_ID {
 
 #include "gui/layout.h"
 #include "gui/widget.h"
+
+#include "core/console.h"

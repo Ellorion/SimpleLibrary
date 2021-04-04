@@ -12,8 +12,9 @@ enum STRING_LENGTH_TYPE {
 };
 
 struct String {
-	bool  is_reference = false;
-	bool  has_changed  = false;
+	bool is_reference = false;
+	bool has_changed  = false;
+	bool is_case_sensitive = true;
 
 #if DEBUG_MODE
 	bool  DEBUG_reference_exists = false;
@@ -26,6 +27,7 @@ struct String {
 #include "utf8.h"
 
 /// does support UTF-8
+constexpr
 instant u64
 String_GetLength(
 	const char *c_data,
@@ -56,6 +58,7 @@ String_GetLength(
 }
 
 /// (temporary) string conversion
+constexpr
 instant String
 S(
 	char c_data
@@ -72,68 +75,41 @@ S(
 	return s_data;
 }
 
-instant String
-S(
-	const char *c_data
-) {
- 	String s_data;
- 	{
-		s_data.value  = (char *)c_data;
-		s_data.length = String_GetLength(c_data);
-
-		s_data.is_reference = true;
-		s_data.has_changed  = true;
- 	}
-
-	return s_data;
-}
-
+constexpr
 instant String
 S(
 	const char *c_data,
-	u64 length
+	u64 length = 0,
+	bool isCaseSensitive = true
 ) {
  	String s_data;
  	{
 		s_data.value  = (char *)c_data;
-		s_data.length = length;
+		s_data.length = (length ? length : String_GetLength(c_data));
 
 		s_data.is_reference = true;
 		s_data.has_changed  = true;
+		s_data.is_case_sensitive = isCaseSensitive;
  	}
 
 	return s_data;
 }
 
-instant String
-S(
-	String s_data
-) {
- 	String s_data_ref = s_data;
- 	{
-		s_data_ref.is_reference = true;
-		s_data_ref.has_changed  = true;
-
-#if DEBUG_MODE
-		s_data.DEBUG_reference_exists = true;
-#endif // DEBUG_MODE
- 	}
-
-	return s_data_ref;
-}
-
+constexpr
 instant String
 S(
 	String s_data,
-	u64 length
+	u64 length = 0,
+	bool isCaseSensitive = true
 ) {
  	String s_data_ref;
 	{
 		s_data_ref.value  = s_data.value;
-		s_data_ref.length = length;
+		s_data_ref.length = (length ? length : s_data.length);
 
 		s_data_ref.is_reference = true;
 		s_data_ref.has_changed  = true;
+		s_data.is_case_sensitive = isCaseSensitive;
 
 #if DEBUG_MODE
 		s_data.DEBUG_reference_exists = true;
@@ -1187,24 +1163,26 @@ String_HasChanged(
 /// string - string
 bool
 operator == (
-	String &s_data1,
-	String &s_data2
+	const String &s_data1,
+	const String &s_data2
 ) {
-	return String_IsEqual(s_data1, s_data2);
+    bool is_case_sensitive = (s_data1.is_case_sensitive && s_data2.is_case_sensitive);
+
+	return String_IsEqual(s_data1, s_data2, 0, is_case_sensitive);
 }
 
 bool
 operator != (
-	String &s_data1,
-	String &s_data2
+	const String &s_data1,
+	const String &s_data2
 ) {
 	return !(s_data1 == s_data2);
 }
 
 bool
 operator < (
-	String &s_data1,
-	String &s_data2
+	const String &s_data1,
+	const String &s_data2
 ) {
 	u64 length = MIN(s_data1.length, s_data2.length);
 
@@ -1220,8 +1198,8 @@ operator < (
 
 bool
 operator > (
-	String &s_data1,
-	String &s_data2
+	const String &s_data1,
+	const String &s_data2
 ) {
 	u64 length = MIN(s_data1.length, s_data2.length);
 
@@ -1238,8 +1216,8 @@ operator > (
 /// @Testing
 bool
 operator <= (
-	String &s_data1,
-	String &s_data2
+	const String &s_data1,
+	const String &s_data2
 ) {
 	return !(s_data1 > s_data2);
 }
@@ -1247,8 +1225,8 @@ operator <= (
 /// @Testing
 bool
 operator >= (
-	String &s_data1,
-	String &s_data2
+	const String &s_data1,
+	const String &s_data2
 ) {
 	return !(s_data1 < s_data2);
 }
@@ -1256,7 +1234,7 @@ operator >= (
 /// string - const char *
 bool
 operator == (
-	String		 s_data1,
+	const String s_data1,
 	const char	*c_data2
 ) {
  	String ts_data2 = S(c_data2);
@@ -1266,14 +1244,14 @@ operator == (
 bool
 operator == (
 	const char 	*c_data1,
-	String 		 s_data2
+	const String s_data2
 ) {
 	return (s_data2 == c_data1);
 }
 
 bool
 operator != (
-	String		 s_data1,
+	const String s_data1,
 	const char	*c_data2
 ) {
 	return !(s_data1 == c_data2);
@@ -1282,7 +1260,7 @@ operator != (
 bool
 operator != (
 	const char 	*c_data1,
-	String 		 s_data2
+	const String s_data2
 ) {
 	return !(s_data2 == c_data1);
 }
