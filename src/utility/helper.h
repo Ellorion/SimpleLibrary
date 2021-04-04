@@ -69,7 +69,7 @@ Array_SortTest(
 	T t_prev = ARRAY_IT(*a_data, 0);
 
 	if (type == SORT_ORDER_ASCENDING) {
-		FOR_ARRAY_START(*a_data, 1, it) {
+		FOR_ARRAY_START(*a_data, it, 1) {
 			T value = ARRAY_IT(*a_data, it);
 			Assert(value >= t_prev);
 			t_prev = value;
@@ -77,7 +77,7 @@ Array_SortTest(
 	}
 	else
 	if (type == SORT_ORDER_DESCENDING) {
-		FOR_ARRAY_START(*a_data, 1, it) {
+		FOR_ARRAY_START(*a_data, it, 1) {
 			T value = ARRAY_IT(*a_data, it);
 			Assert(value <= t_prev);
 			t_prev = value;
