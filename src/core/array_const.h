@@ -4,6 +4,8 @@ template <typename T, int Count>
 struct Array_Const {
 	T     memory[Count];
 	u64   count  = 0;
+
+	u64   last_search_index_found = 0;
 };
 
 template <typename T, int Count>
@@ -65,4 +67,79 @@ Array_PrintList(
 
 		String_PrintLine(t_data);
 	}
+}
+
+/// search availability or index
+template <typename T, int Count>
+instant bool
+Array_Find(
+    Array_Const<T, Count> &array,
+    T find,
+    u64 *index = 0
+) {
+    /// in case of content removal
+    Clamp(&array.last_search_index_found, 0, array.count);
+
+    FOR_START(array.last_search_index_found, array.count, it) {
+        if (ARRAY_IT(array, it) == find) {
+            if (index)
+                *index = it;
+
+            return true;
+        }
+    }
+
+    FOR_START(0, array.last_search_index_found, it) {
+        if (ARRAY_IT(array, it) == find) {
+            if (index)
+                *index = it;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+template <typename T, int Count, typename Func>
+instant bool
+Array_Find(
+    Array_Const<T, Count> &array,
+    T find,
+    u64 *index_opt,
+    Func OnSearch
+) {
+    /// in case of content removal
+    Clamp(&array.last_search_index_found, 0, array.count);
+
+    FOR_START(array.last_search_index_found, array.count, it) {
+        if (OnSearch(ARRAY_IT(array, it), find)) {
+            if (index_opt)
+                *index_opt = it;
+
+            array.last_search_index_found = it;
+
+            return true;
+        }
+    }
+
+    FOR_START(0, array.last_search_index_found, it) {
+        if (OnSearch(ARRAY_IT(array, it), find)) {
+            if (index_opt)
+                *index_opt = it;
+
+            array.last_search_index_found = it;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+template <typename T, int Count>
+constexpr
+instant bool
+MatchesAny(T &checkAgainst, Array_Const<T, Count> &a_oneOf) {
+    return Array_Find(a_oneOf, checkAgainst);
 }

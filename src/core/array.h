@@ -203,17 +203,15 @@ Array_Reserve(
 template <typename T>
 instant bool
 Array_Find(
-    Array<T> *array,
+    Array<T> &array,
     T find,
     u64 *index = 0
 ) {
-    Assert(array);
-
     /// in case of content removal
-    Clamp(&array->last_search_index_found, 0, array->count);
+    Clamp(&array.last_search_index_found, 0, array.count);
 
-    FOR_START(array->last_search_index_found, array->count, it) {
-        if (ARRAY_IT(*array, it) == find) {
+    FOR_START(array.last_search_index_found, array.count, it) {
+        if (ARRAY_IT(array, it) == find) {
             if (index)
                 *index = it;
 
@@ -221,8 +219,8 @@ Array_Find(
         }
     }
 
-    FOR_START(0, array->last_search_index_found, it) {
-        if (ARRAY_IT(*array, it) == find) {
+    FOR_START(0, array.last_search_index_found, it) {
+        if (ARRAY_IT(array, it) == find) {
             if (index)
                 *index = it;
 
@@ -236,33 +234,31 @@ Array_Find(
 template <typename T, typename Func>
 instant bool
 Array_Find(
-    Array<T> *array,
+    Array<T> &array,
     T find,
     u64 *index_opt,
     Func OnSearch
 ) {
-    Assert(array);
-
     /// in case of content removal
-    Clamp(&array->last_search_index_found, 0, array->count);
+    Clamp(&array.last_search_index_found, 0, array.count);
 
-    FOR_START(array->last_search_index_found, array->count, it) {
-        if (OnSearch(ARRAY_IT(*array, it), find)) {
+    FOR_START(array.last_search_index_found, array.count, it) {
+        if (OnSearch(ARRAY_IT(array, it), find)) {
             if (index_opt)
                 *index_opt = it;
 
-            array->last_search_index_found = it;
+            array.last_search_index_found = it;
 
             return true;
         }
     }
 
-    FOR_START(0, array->last_search_index_found, it) {
-        if (OnSearch(ARRAY_IT(*array, it), find)) {
+    FOR_START(0, array.last_search_index_found, it) {
+        if (OnSearch(ARRAY_IT(array, it), find)) {
             if (index_opt)
                 *index_opt = it;
 
-            array->last_search_index_found = it;
+            array.last_search_index_found = it;
 
             return true;
         }
@@ -282,7 +278,7 @@ Array_FindOrAdd(
     Assert(array_io);
 
     u64 t_index_find;
-    bool found_element = Array_Find(array_io, find, &t_index_find);
+    bool found_element = Array_Find(*array_io, find, &t_index_find);
 
     if (!found_element) {
         Array_Add(array_io, find);
@@ -299,21 +295,20 @@ Array_FindOrAdd(
 template <typename T, typename Func>
 instant bool
 Array_FindOrAdd(
-    Array<T> *array_io,
+    Array<T> &array_io,
     T find,
     T **entry_out,
     Func OnSearch
 ) {
-    Assert(array_io);
     Assert(entry_out);
 
     u64 t_index_find;
     bool found_element = Array_Find(array_io, find, &t_index_find, OnSearch);
 
     if (found_element) {
-        *entry_out = &ARRAY_IT(*array_io, t_index_find);
+        *entry_out = &ARRAY_IT(array_io, t_index_find);
     } else {
-        Array_AddEmpty(array_io, entry_out);
+        Array_AddEmpty(&array_io, entry_out);
 
         /// store what you want to find, if it does not exists,
         /// so it does not have to be assigned manually all the time
@@ -477,4 +472,11 @@ Array_Filter(
             Array_Add(a_dest_out, t_data);
         }
     }
+}
+
+template <typename T>
+constexpr
+instant bool
+MatchesAny(T &checkAgainst, Array<T> &a_oneOf) {
+    return Array_Find(a_oneOf, checkAgainst);
 }

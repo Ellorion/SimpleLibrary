@@ -47,7 +47,7 @@ Profiler_AnalyseDependencies(
 			dep_find.s_file = String_Copy(s_path);
 			String_Append(&dep_find.s_file, s_token);
 
-			bool entry_existed = Array_FindOrAdd(a_dependencies_io, dep_find, &dep_entry,
+			bool entry_existed = Array_FindOrAdd(*a_dependencies_io, dep_find, &dep_entry,
 				[](auto element, auto find) {
 					return (element.s_file == find.s_file);
 				}

@@ -336,6 +336,7 @@ operator + (
 	return pt;
 }
 
+constexpr
 instant Color32
 Color_MakeGrey(
 	float value,
@@ -344,6 +345,7 @@ Color_MakeGrey(
 	return {value, value, value, alpha};
 }
 
+constexpr
 instant void
 Clamp(
 	s64 *value_io,
@@ -356,6 +358,7 @@ Clamp(
 	if (*value_io > max)  *value_io = max;
 }
 
+constexpr
 instant void
 Clamp(
 	u64 *value_io,
@@ -368,6 +371,7 @@ Clamp(
 	if (*value_io > max)  *value_io = max;
 }
 
+constexpr
 instant bool
 IsNumeric(
 	char character
@@ -375,6 +379,7 @@ IsNumeric(
 	return (character >= '0' AND character <= '9');
 }
 
+constexpr
 instant void
 ToHex(
 	const char value,
@@ -402,6 +407,13 @@ enum KEYBOARD_HOTKEY_ID {
 	KEYBOARD_HOTKEY_09,
 	KEYBOARD_HOTKEY_ID_COUNT,
 };
+
+template <typename S, typename... T>
+constexpr
+instant bool
+MatchesAny(S &&checkAgainst, T &&...oneOf) {
+    return ((checkAgainst == oneOf) || ...);
+}
 
 #include "core/memory.h"
 #include "core/array.h"
