@@ -340,8 +340,13 @@ String_Clear(
 ) {
 	Assert(s_data_out);
 
-	s_data_out->length = 0;
-	s_data_out->has_changed = true;
+	if (s_data_out->is_reference) {
+        *s_data_out = {};
+	}
+	else {
+        s_data_out->length = 0;
+        s_data_out->has_changed = true;
+	}
 }
 
 instant void

@@ -20,10 +20,8 @@ Image_LoadBMP32(
 	}
 
 	File file = File_Open(s_filename, "rb");
-
-	String s_data = File_Read(&file);
-
-	File_Close(&file);
+	String s_data = File_Read(file);
+	File_Close(file);
 
     String s_data_it = S(s_data);
 

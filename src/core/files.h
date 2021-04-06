@@ -6,11 +6,9 @@ struct File {
 
 instant bool
 File_IsOpen(
-	File *file
+	File &file
 ) {
-	Assert(file);
-
-	return (file->fp != 0);
+	return (file.fp != 0);
 }
 
 instant bool
@@ -127,76 +125,115 @@ File_Open(
 
 instant bool
 File_Close(
-	File *file_io
+	File &file
 ) {
-	Assert(file_io);
-
 	/// Returns 0 on success
-	bool success = (fclose(file_io->fp) == 0);
-	*file_io = {};
+	bool success = (fclose(file.fp) == 0);
+	file = {};
 
 	return success;
 }
 
 instant u64
 File_Size(
-	File *file
+	const File &file
 ) {
-	Assert(file);
-
-	if (!file->fp)
+	if (!file.fp)
 		return 0;
 
-	fseek (file->fp, 0, SEEK_END);
-	u64 size = ftell(file->fp);
-	rewind(file->fp);
+    u64 cur_pos = ftell(file.fp);
+	fseek (file.fp, 0, SEEK_END);
+	u64 size = ftell(file.fp);
+    fseek (file.fp, cur_pos, SEEK_SET);
 
 	return size;
 }
 
 instant bool
 File_Write(
-	File *file,
+	File &file,
 	String s_data
 ) {
-	Assert(file);
-
-    auto bytesWritten = fwrite(s_data.value, sizeof(char), sizeof(char) * s_data.length, file->fp);
+    auto bytesWritten = fwrite(s_data.value, sizeof(char), sizeof(char) * s_data.length, file.fp);
 
     return (bytesWritten > 0);
 }
 
 instant bool
 File_Read(
-	File *file,
-	String *s_data_out
+    File *file,
+	String *s_data_out,
+	u64 length = 0
 ) {
-	Assert(file);
-
 	String_Clear(s_data_out);
 
-	u64 file_size = File_Size(file);
+	u64 file_size = (length ? length : File_Size(*file));
 
 	if (!file_size)
 		return false;
 
 	String_Resize(s_data_out, file_size);
 	fread(s_data_out->value, sizeof(char), sizeof(char) * s_data_out->length, file->fp);
-
 	s_data_out->has_changed = true;
 
 	return true;
 }
 
+instant bool
+File_IsEOF(
+    File &file
+) {
+    AssertMessage(file.fp, "File does not exists or was not opened");
+
+    return (feof(file.fp) != 0);
+}
+
+instant bool
+File_ReadUntil(
+    File &file,
+	String *s_data_out,
+	String s_find,
+	bool skip_find = true
+) {
+	String_Clear(s_data_out);
+
+    auto find_length = s_find.length;
+
+    bool found_index = false;
+    s64 index_found = 0;
+    s64 seek_start = ftell(file.fp);
+
+    while (!File_IsEOF(file)) {
+        found_index = String_Find(s_data_out, s_find, &index_found);
+
+        if (found_index) {
+            s_data_out->length = index_found;
+
+            auto seek_offset = index_found;
+            if (skip_find) {
+                seek_offset += s_find.length;
+            }
+
+            fseek(file.fp, seek_start + seek_offset, SEEK_SET);
+
+            break;
+        }
+
+        String s_buffer;
+        File_Read(&file, &s_buffer, find_length);
+        String_Append(s_data_out, s_buffer);
+    }
+
+	return found_index;
+}
 
 instant String
 File_Read(
-	File *file
+    File &file,
+	u64 length = 0
 ) {
-	Assert(file);
-
 	String s_data;
-	File_Read(file, &s_data);
+	File_Read(&file, &s_data, length);
 
 	return s_data;
 }
@@ -221,7 +258,7 @@ File_ReadAll(
 
 	bool success = File_Read(&file, s_data_out);
 
-	File_Close(&file);
+	File_Close(file);
 
 	MEASURE_END("(" << s_filename.value << ") ");
 

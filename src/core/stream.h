@@ -33,7 +33,7 @@ Stream_Close(
 
 	switch (stream->type) {
 		case StreamType::File: {
-			File_Close(&stream->file);
+			File_Close(stream->file);
 		} break;
 
 		case StreamType::Buffer: {
@@ -51,7 +51,7 @@ Stream_Close(
 instant bool
 Stream_Open(
 	Stream *stream,
-	const File &file
+	File &file
 ) {
 	Assert(stream);
 
@@ -60,7 +60,7 @@ Stream_Open(
 	stream->type = StreamType::File;
 	stream->file = file;
 
-	return File_IsOpen(&stream->file);
+	return File_IsOpen(stream->file);
 }
 
 instant bool
@@ -106,7 +106,7 @@ Stream &operator<<(Stream &out, const String &s_data) {
 	else {
 		switch(out.type) {
 			case StreamType::File: {
-				if (!File_Write(&out.file, s_data)) {
+				if (!File_Write(out.file, s_data)) {
 					AssertMessage(false, "File could not be written to with File-Stream Operator.");
 				}
 			} break;
