@@ -4,6 +4,7 @@ struct File {
 	FILE *fp = 0;
 };
 
+constexpr
 instant bool
 File_IsOpen(
 	File &file

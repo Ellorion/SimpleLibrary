@@ -16,6 +16,7 @@ struct Stream {
     String s_buffer;
 };
 
+constexpr
 instant void
 Stream_Clear(
 	Stream *stream
@@ -25,6 +26,7 @@ Stream_Clear(
 	String_Clear(&stream->s_buffer);
 }
 
+constexpr
 instant void
 Stream_Close(
 	Stream *stream
@@ -48,34 +50,29 @@ Stream_Close(
 	Stream_Clear(stream);
 }
 
-instant bool
+/// Usage: auto [stream, success] = Stream_Open(file);
+constexpr
+instant Tuple<Stream, bool>
 Stream_Open(
-	Stream *stream,
 	File &file
 ) {
-	Assert(stream);
+    Stream stream;
 
-	Stream_Close(stream);
+	stream.type = StreamType::File;
+	stream.file = file;
 
-	stream->type = StreamType::File;
-	stream->file = file;
-
-	return File_IsOpen(stream->file);
+	return Tuple(stream, File_IsOpen(stream.file));
 }
 
-instant bool
+constexpr
+instant Tuple<Stream, bool>
 Stream_Open(
-	Stream *stream
 ) {
-	Assert(stream);
-
-	Stream_Close(stream);
-
-	stream->type = StreamType::Buffer;
-
-	return true;
+	Stream stream;
+	return Tuple(stream, true);
 }
 
+constexpr
 instant String
 Stream_GetBuffer(
 	Stream *stream
