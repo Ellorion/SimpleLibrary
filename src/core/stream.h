@@ -6,14 +6,14 @@
     }
 
 enum class StreamType {
-	File = 0,
-	Buffer
+	Buffer,
+	File,
 };
 
 struct Stream {
-	StreamType type = StreamType::File;
+	StreamType type = StreamType::Buffer;
 	File file;
-	String s_buffer;
+    String s_buffer;
 };
 
 instant void
