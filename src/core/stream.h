@@ -99,7 +99,9 @@ Stream_GetBuffer(
 	return {};
 }
 
-Stream &operator<<(Stream &out, const String &s_data) {
+constexpr
+Stream &
+operator<<(Stream &out, const String &s_data) {
 	if (String_IsEmpty(&s_data)) {
 		LOG_DEBUG("No data available to write in Stream Operator")
 	}
@@ -123,4 +125,30 @@ Stream &operator<<(Stream &out, const String &s_data) {
 	}
 
 	return out;
+}
+
+template <class T>
+constexpr
+Stream &
+operator<<(Stream &out, const Array<T> a_data) {
+    FOR_ARRAY_AUTO(a_data, it) {
+        out << *it << S("\n");
+    }
+
+    out << S("\n");
+
+    return out;
+}
+
+template <class T, int Count>
+constexpr
+Stream &
+operator<<(Stream &out, const Array_Const<T, Count> a_data) {
+    FOR_ARRAY_AUTO(a_data, it) {
+        out << *it << S("\n");
+    }
+
+    out << S("\n");
+
+    return out;
 }

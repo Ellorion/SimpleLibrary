@@ -186,6 +186,7 @@ String_AddOffset(
 	}
 }
 
+constexpr
 instant bool
 String_IsEmpty(
 	const String *s_data,
@@ -334,6 +335,7 @@ String_Insert(
 	return s_source.length;
 }
 
+constexpr
 instant void
 String_Clear(
 	String *s_data_out

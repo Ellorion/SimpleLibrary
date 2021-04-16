@@ -149,6 +149,7 @@ File_Size(
 	return size;
 }
 
+constexpr
 instant bool
 File_Write(
 	File &file,
@@ -159,6 +160,7 @@ File_Write(
     return (bytesWritten > 0);
 }
 
+constexpr
 instant bool
 File_Read(
     File *file,

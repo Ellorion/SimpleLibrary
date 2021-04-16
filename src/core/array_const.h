@@ -3,7 +3,7 @@
 template <typename T, int Count>
 struct Array_Const {
 	T     memory[Count];
-	u64   count  = 0;
+	u64   count = 0;
 
 	u64   last_search_index_found = 0;
 };
