@@ -15,12 +15,12 @@
 
 #define FOR_ARRAY_AUTO(_array, _it) 		            \
 	for(auto _it = &(_array).memory[0];                 \
-		_it <= &(_array).memory[(_array).count - 1];    \
+		(_array).count AND _it <= &(_array).memory[(_array).count - 1];    \
 		++_it)
 
 #define FOR_ARRAY_AUTO_START(_array, _it, _start) 		\
 	for(auto _it = &(_array).memory[_start];            \
-		_it <= &(_array).memory[(_array).count - 1];    \
+		(_array).count AND _it <= &(_array).memory[(_array).count - 1];    \
 		++_it)
 
 #define FOR_ARRAY_REV(_array, _it)	    \
