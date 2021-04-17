@@ -221,12 +221,12 @@ Array_Split(
 
 instant Array<String>
 Array_SplitLinesRef(
-	String *s_data,
+	const String &s_data,
 	bool include_empty_lines
 ) {
 	Array<String> as_result;
 
-	String s_data_it = S(*s_data);
+	String s_data_it = S(s_data);
 
 	while(!String_IsEmpty(s_data_it)) {
 		s64 index        = String_IndexOf(s_data_it, S("\r"), 0, true);
