@@ -7,11 +7,12 @@ struct File {
 constexpr
 instant bool
 File_IsOpen(
-	File &file
+	const File &file
 ) {
 	return (file.fp != 0);
 }
 
+constexpr
 instant bool
 File_HasExtension(
 	String *s_filename,
@@ -77,6 +78,7 @@ File_Exists(
 	return result;
 }
 
+constexpr
 instant bool
 File_CreateDirectory(
 	String s_directory,
@@ -135,6 +137,7 @@ File_Close(
 	return success;
 }
 
+constexpr
 instant u64
 File_Size(
 	const File &file
@@ -230,6 +233,7 @@ File_ReadUntil(
 	return found_index;
 }
 
+constexpr
 instant String
 File_Read(
     File &file,
@@ -296,10 +300,11 @@ enum DIR_LIST_TYPE {
 	DIR_LIST_ALL
 };
 
+constexpr
 instant s32
 Directory_Entry_Compare (
-	Directory_Entry entry_1,
-	Directory_Entry entry_2
+	const Directory_Entry &entry_1,
+	const Directory_Entry &entry_2
 ) {
 	if(entry_1.type == entry_2.type) {
 		/// do not move, should always be the first entry
@@ -320,9 +325,10 @@ Directory_Entry_Compare (
 	return (entry_1.type - entry_2.type);
 }
 
+constexpr
 instant bool
 File_IsDirectory(
-	String s_path
+	const String &s_path
 ) {
 	if (String_IsEmpty(s_path, true))
 		return false;
@@ -340,6 +346,7 @@ File_IsDirectory(
 }
 
 /// does not list or includes subdirectories
+constexpr
 instant void
 File_ReadDirectory(
 	Array<Directory_Entry> *a_entries_io,
@@ -444,9 +451,9 @@ File_ReadDirectory(
 ///       or it could leave a mess
 instant void
 File_Rename(
-	String s_path,
-	String s_filename_old,
-	String s_filename_new
+	const String &s_path,
+	const String &s_filename_old,
+	const String &s_filename_new
 ) {
 	String s_file_old;
 	String_Append(s_file_old, s_path);
@@ -466,19 +473,20 @@ File_Rename(
 	String_Destroy(s_file_new);
 }
 
+constexpr
 instant String
 File_GetExtension(
-	String *s_data
+	const String &s_data
 ) {
 	String s_result;
 
-	s64 pos_ext = String_IndexOfRev(*s_data, S("."), true);
+	s64 pos_ext = String_IndexOfRev(s_data, S("."), true);
 
 	if (!pos_ext) {
 		return s_result;
 	}
 
-	s_result = String_Copy(s_data->value + pos_ext, s_data->length - pos_ext);
+	s_result = String_Copy(s_data.value + pos_ext, s_data.length - pos_ext);
 
 	return s_result;
 }
@@ -522,42 +530,41 @@ File_GetDrives(
 }
 
 /// @todo: auto-remove ".."
+constexpr
 instant void
 File_ChangePath(
-	String *s_dest_io,
-	String  s_append
+	String &s_dest_io,
+	const String &s_append
 ) {
-	Assert(s_dest_io);
-
 	if (!(   String_EndWith(s_append, S("..")    , true)
 		  OR String_EndWith(s_append, S("\\..")  , true)
 		  OR String_EndWith(s_append, S("\\..\\"), true)
 	)) {
-		if (    !String_EndWith(*s_dest_io, S("\\"), true)
-			AND s_dest_io->length
+		if (    !String_EndWith(s_dest_io, S("\\"), true)
+			AND s_dest_io.length
 		) {
-			String_Append(*s_dest_io, S("\\"));
+			String_Append(s_dest_io, S("\\"));
 		}
 
-		String_Append(*s_dest_io, s_append);
+		String_Append(s_dest_io, s_append);
 		return;
 	}
 
-	while(   String_EndWith(*s_dest_io, S("\\"), true)
-		  OR String_EndWith(*s_dest_io, S("/") , true)
+	while(   String_EndWith(s_dest_io, S("\\"), true)
+		  OR String_EndWith(s_dest_io, S("/") , true)
 	) {
-        String_Cut(*s_dest_io, s_dest_io->length - 1);
+        String_Cut(s_dest_io, s_dest_io.length - 1);
 	}
 
 	s64 pos_found;
-	bool found = String_FindRev(*s_dest_io, S("\\"), &pos_found);
+	bool found = String_FindRev(s_dest_io, S("\\"), &pos_found);
 
 	if (found) {
-		String_Cut(*s_dest_io, pos_found);
+		String_Cut(s_dest_io, pos_found);
 		return;
 	}
 	else {
-		String_Clear(*s_dest_io);
+		String_Clear(s_dest_io);
 		return;
 	}
 }

@@ -25,7 +25,7 @@ template <typename T>
 struct Sort_Data {
 	T *begin_io = 0;
 	T *end_io   = 0;
-	s32 (*OnCompare)(T one, T two) = 0;
+	s32 (*OnCompare)(const T &one, const T &two) = 0;
 };
 
 template <typename T>
@@ -137,7 +137,7 @@ template <typename T>
 instant void
 Array_Sort(
 	Array<T> *array_io,
-	s32 (*OnCompare)(T one, T two)
+	s32 (*OnCompare)(const T &one, const T &two)
 ) {
 	Assert(array_io);
 
