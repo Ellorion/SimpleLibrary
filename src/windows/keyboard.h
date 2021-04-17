@@ -214,7 +214,7 @@ Keyboard_AppendKey(
 	Assert(keyboard);
 	Assert(s_data_io);
 
-	String_Insert(s_data_io, keyboard->key_sym, s_data_io->length);
+	String_Insert(*s_data_io, keyboard->key_sym, s_data_io->length);
 }
 
 instant bool

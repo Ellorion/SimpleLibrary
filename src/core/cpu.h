@@ -100,7 +100,7 @@ CPU_GetFeatures() {
 		}
 	}
 
-	String_Destroy(&s_vendor);
+	String_Destroy(s_vendor);
 
 	return (cpu_features);
 }

@@ -7,7 +7,7 @@ CSV_Load(
 	Array<Array<String>> a_csv;
 	Array<String>        as_rowitem;
 
-	if (!String_IsEmpty(&s_data)) {
+	if (!String_IsEmpty(s_data)) {
 		Array<String> as_rows = Array_SplitLinesRef(&s_data, false);
 
 		FOR_ARRAY(as_rows, it_row) {

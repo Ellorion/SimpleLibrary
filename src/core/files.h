@@ -21,7 +21,7 @@ File_HasExtension(
 
 	bool result = false;
 
-	if (String_IsEmpty(&s_extension, true))
+	if (String_IsEmpty(s_extension, true))
 		return true;
 
 	Array<String> as_extentions = Array_Split(&s_extension, S("|"), DELIMITER_IGNORE, true);
@@ -29,7 +29,7 @@ File_HasExtension(
     FOR_ARRAY(as_extentions, it) {
     	String ts_data = ARRAY_IT(as_extentions, it);
 
-		if (String_EndWith(s_filename, ts_data, true)) {
+		if (String_EndWith(*s_filename, ts_data, true)) {
 			result = true;
 			break;
 		}
@@ -66,13 +66,13 @@ File_Exists(
 	WIN32_FIND_DATA file_data;
 
 	String ts_filename;
-	String_Append(&ts_filename, s_path);
-	String_Append(&ts_filename, S("/"));
-	String_Append(&ts_filename, s_filename);
+	String_Append(ts_filename, s_path);
+	String_Append(ts_filename, S("/"));
+	String_Append(ts_filename, s_filename);
 
 	bool result = File_Exists(ts_filename);
 
-	String_Destroy(&ts_filename);
+	String_Destroy(ts_filename);
 
 	return result;
 }
@@ -82,16 +82,16 @@ File_CreateDirectory(
 	String s_directory,
 	bool make_path_relative = true
 ) {
-	if (String_IsEmpty(&s_directory, true))
+	if (String_IsEmpty(s_directory, true))
 		return false;
 
 	String s_path_relative;
 
 	if (make_path_relative)
-		String_Append(&s_path_relative, S("./"));
+		String_Append(s_path_relative, S("./"));
 
-	String_Append(&s_path_relative, s_directory);
-	String_Append(&s_path_relative, S("\0", 1));
+	String_Append(s_path_relative, s_directory);
+	String_Append(s_path_relative, S("\0", 1));
 
 	bool success = (CreateDirectory(s_path_relative.value, 0) != 0);
 
@@ -101,7 +101,7 @@ File_CreateDirectory(
 			success = true;
 	}
 
-	String_Destroy(&s_path_relative);
+	String_Destroy(s_path_relative);
 
 	return success;
 }
@@ -168,14 +168,14 @@ File_Read(
 	String *s_data_out,
 	u64 length = 0
 ) {
-	String_Clear(s_data_out);
+	String_Clear(*s_data_out);
 
 	u64 file_size = (length ? length : File_Size(*file));
 
 	if (!file_size)
 		return false;
 
-	String_Resize(s_data_out, file_size);
+	String_Resize(*s_data_out, file_size);
 	fread(s_data_out->value, sizeof(char), sizeof(char) * s_data_out->length, file->fp);
 	s_data_out->has_changed = true;
 
@@ -198,7 +198,7 @@ File_ReadUntil(
 	String s_find,
 	bool skip_find = true
 ) {
-	String_Clear(s_data_out);
+	String_Clear(*s_data_out);
 
     auto find_length = s_find.length;
 
@@ -207,7 +207,7 @@ File_ReadUntil(
     s64 seek_start = ftell(file.fp);
 
     while (!File_IsEOF(file)) {
-        found_index = String_Find(s_data_out, s_find, &index_found);
+        found_index = String_Find(*s_data_out, s_find, &index_found);
 
         if (found_index) {
             s_data_out->length = index_found;
@@ -224,7 +224,7 @@ File_ReadUntil(
 
         String s_buffer;
         File_Read(&file, &s_buffer, find_length);
-        String_Append(s_data_out, s_buffer);
+        String_Append(*s_data_out, s_buffer);
     }
 
 	return found_index;
@@ -306,8 +306,8 @@ Directory_Entry_Compare (
 		if (entry_1.s_name == "..") return -1;
 		if (entry_2.s_name == "..") return -1;
 
-		long index_1 = String_IndexOfRev(&entry_1.s_name, S("."), true);
-		long index_2 = String_IndexOfRev(&entry_2.s_name, S("."), true);
+		long index_1 = String_IndexOfRev(entry_1.s_name, S("."), true);
+		long index_2 = String_IndexOfRev(entry_2.s_name, S("."), true);
 
 		u64 length = 0;
 
@@ -324,7 +324,7 @@ instant bool
 File_IsDirectory(
 	String s_path
 ) {
-	if (String_IsEmpty(&s_path, true))
+	if (String_IsEmpty(s_path, true))
 		return false;
 
 	char *c_path = String_CreateCBufferCopy(s_path);
@@ -351,16 +351,16 @@ File_ReadDirectory(
 ) {
 	Assert(a_entries_io);
 
-	if (String_IsEmpty(&s_path, true))
+	if (String_IsEmpty(s_path, true))
 		return;
 
 	HANDLE id_directory;
 	WIN32_FIND_DATA file_data;
 
 	String s_search_path;
-	String_Append(&s_search_path, s_path);
-	String_Append(&s_search_path, S("/*"));
-	String_Append(&s_search_path, S("\0", 1));
+	String_Append(s_search_path, s_path);
+	String_Append(s_search_path, S("/*"));
+	String_Append(s_search_path, S("\0", 1));
 
 	String s_extension_filter = S(extension_filter);
 
@@ -390,24 +390,25 @@ File_ReadDirectory(
 
 			/// exclude if filter does not match
 			if (name_filter)
-				found_name = String_Find(&s_filename, S(name_filter));
+				found_name = String_Find(s_filename, S(name_filter));
 
 			if (has_extension AND found_name) {
 				String ts_filename;
 
 				if (prefix_path) {
-					String_Append(&ts_filename, s_path);
-					if (    !String_EndWith(&ts_filename, S("/") , true)
-						AND !String_EndWith(&ts_filename, S("\\"), true)
+					String_Append(ts_filename, s_path);
+
+					if (    !String_EndWith(ts_filename, S("/") , true)
+						AND !String_EndWith(ts_filename, S("\\"), true)
 					) {
-						String_Append(&ts_filename, S("\\"));
+						String_Append(ts_filename, S("\\"));
 					}
 				}
 
-				String_Append(&ts_filename, S(file_data.cFileName));
+				String_Append(ts_filename, S(file_data.cFileName));
 
 				Directory_Entry dir_entry;
-				String_Append(&dir_entry.s_name, ts_filename);
+				String_Append(dir_entry.s_name, ts_filename);
 
 				if (is_directory)
 					dir_entry.type = DIR_ENTRY_DIR;
@@ -428,7 +429,7 @@ File_ReadDirectory(
 			/// when navigating to connected non-inserted drives
 			/// like CD/DVD drives
 			Directory_Entry dir_entry;
-			String_Append(&dir_entry.s_name, S(".."));
+			String_Append(dir_entry.s_name, S(".."));
 
 			dir_entry.type = DIR_ENTRY_DIR;
 
@@ -436,7 +437,7 @@ File_ReadDirectory(
 		}
 	}
 
-	String_Destroy(&s_search_path);
+	String_Destroy(s_search_path);
 }
 
 ///@HINT: test this with backup data, before using
@@ -448,21 +449,21 @@ File_Rename(
 	String s_filename_new
 ) {
 	String s_file_old;
-	String_Append(&s_file_old, s_path);
-	String_Append(&s_file_old, S("/"));
-	String_Append(&s_file_old, s_filename_old);
-	String_Append(&s_file_old, S("\0", 1));
+	String_Append(s_file_old, s_path);
+	String_Append(s_file_old, S("/"));
+	String_Append(s_file_old, s_filename_old);
+	String_Append(s_file_old, S("\0", 1));
 
 	String s_file_new;
-	String_Append(&s_file_new, s_path);
-	String_Append(&s_file_new, S("/"), 1);
-	String_Append(&s_file_new, s_filename_new);
-	String_Append(&s_file_new, S("\0", 1));
+	String_Append(s_file_new, s_path);
+	String_Append(s_file_new, S("/"), 1);
+	String_Append(s_file_new, s_filename_new);
+	String_Append(s_file_new, S("\0", 1));
 
 	MoveFile(s_file_old.value, s_file_new.value);
 
-	String_Destroy(&s_file_old);
-	String_Destroy(&s_file_new);
+	String_Destroy(s_file_old);
+	String_Destroy(s_file_new);
 }
 
 instant String
@@ -471,7 +472,7 @@ File_GetExtension(
 ) {
 	String s_result;
 
-	s64 pos_ext = String_IndexOfRev(s_data, S("."), true);
+	s64 pos_ext = String_IndexOfRev(*s_data, S("."), true);
 
 	if (!pos_ext) {
 		return s_result;
@@ -493,7 +494,7 @@ File_GetDrives(
 	u64 buffer_size = GetLogicalDriveStrings(0, 0);
 
 	static String s_buffer;
-	String_CreateBuffer(&s_buffer, buffer_size, true);
+	String_CreateBuffer(s_buffer, buffer_size, true);
 	GetLogicalDriveStringsA(s_buffer.length, s_buffer.value);
 
 	String s_buffer_it = S(s_buffer);
@@ -501,8 +502,8 @@ File_GetDrives(
 	s64 index_found;
 	String s_find = S("\0", 1);
 
-	while(!String_IsEmpty(&s_buffer_it)) {
-		if (!String_Find(&s_buffer_it, s_find, &index_found))
+	while(!String_IsEmpty(s_buffer_it)) {
+		if (!String_Find(s_buffer_it, s_find, &index_found))
 			break;
 
 		if (index_found) {
@@ -513,10 +514,10 @@ File_GetDrives(
 			Array_Add(a_drives_out, dir_entry);
 		}
 
-		String_AddOffset(&s_buffer_it, index_found + 1);
+		String_AddOffset(s_buffer_it, index_found + 1);
 	}
 
-	String_Destroy(&s_buffer);
+	String_Destroy(s_buffer);
 
 }
 
@@ -528,35 +529,35 @@ File_ChangePath(
 ) {
 	Assert(s_dest_io);
 
-	if (!(   String_EndWith(&s_append, S("..")    , true)
-		  OR String_EndWith(&s_append, S("\\..")  , true)
-		  OR String_EndWith(&s_append, S("\\..\\"), true)
+	if (!(   String_EndWith(s_append, S("..")    , true)
+		  OR String_EndWith(s_append, S("\\..")  , true)
+		  OR String_EndWith(s_append, S("\\..\\"), true)
 	)) {
-		if (    !String_EndWith(s_dest_io, S("\\"), true)
+		if (    !String_EndWith(*s_dest_io, S("\\"), true)
 			AND s_dest_io->length
 		) {
-			String_Append(s_dest_io, S("\\"));
+			String_Append(*s_dest_io, S("\\"));
 		}
 
-		String_Append(s_dest_io, s_append);
+		String_Append(*s_dest_io, s_append);
 		return;
 	}
 
-	while(   String_EndWith(s_dest_io, S("\\"), true)
-		  OR String_EndWith(s_dest_io, S("/") , true)
+	while(   String_EndWith(*s_dest_io, S("\\"), true)
+		  OR String_EndWith(*s_dest_io, S("/") , true)
 	) {
-        String_Cut(s_dest_io, s_dest_io->length - 1);
+        String_Cut(*s_dest_io, s_dest_io->length - 1);
 	}
 
 	s64 pos_found;
-	bool found = String_FindRev(s_dest_io, S("\\"), &pos_found);
+	bool found = String_FindRev(*s_dest_io, S("\\"), &pos_found);
 
 	if (found) {
-		String_Cut(s_dest_io, pos_found);
+		String_Cut(*s_dest_io, pos_found);
 		return;
 	}
 	else {
-		String_Clear(s_dest_io);
+		String_Clear(*s_dest_io);
 		return;
 	}
 }

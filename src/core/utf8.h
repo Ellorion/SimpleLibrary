@@ -1,5 +1,6 @@
 #pragma once
 
+constexpr
 instant s16
 UTF8_GetByteCount(
 	const char *ch
@@ -23,21 +24,17 @@ UTF8_GetByteCount(
 	return utf_char_count;
 }
 
+constexpr
 instant s32
 UTF8_ToCodepoint(
-	String *s_data,
+	const String &s_data,
 	s32 *utf_byte_count = 0
 ) {
-	Assert(s_data);
-
-	String *s_char = s_data;
-	s_char->is_reference = true;
-
     if (utf_byte_count)
 		*utf_byte_count = 1;
 
 	s32 it   = 0;
-	s32 code = (u8)s_char->value[it];
+	s32 code = (u8)s_data.value[it];
 
 	/// ascii
     if (code < 0x80)
@@ -66,7 +63,7 @@ UTF8_ToCodepoint(
 			++bit_shift;
 
 			codepoint <<= bit_remain;
-			codepoint |= s_char->value[++it - it_rev] & ((1 << bit_remain) - 1);
+			codepoint |= s_data.value[++it - it_rev] & ((1 << bit_remain) - 1);
 
 			if (utf_byte_count)
 				*utf_byte_count += 1;
@@ -75,7 +72,7 @@ UTF8_ToCodepoint(
 		if (*utf_byte_count > 1)
 			break;
 
-		code = (u8)s_char->value[--it];
+		code = (u8)s_data.value[--it];
 
 	}
 

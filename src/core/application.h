@@ -33,8 +33,8 @@ Application_GetFilename(
 		String s_key = S("\\");
 		s_filename = S(c_filename);
 
-		u64 index = String_IndexOfRev(&s_filename, s_key, true);
-		String_AddOffset(&s_filename, index + s_key.length);
+		u64 index = String_IndexOfRev(s_filename, s_key, true);
+		String_AddOffset(s_filename, index + s_key.length);
 		s_filename = String_Copy(s_filename);
 	}
 
@@ -51,7 +51,7 @@ Application_GetDirectory(
 	String s_key = S("\\");
 	String s_filename = S(c_filename);
 
-	u64 index = String_IndexOfRev(&s_filename, s_key, true);
+	u64 index = String_IndexOfRev(s_filename, s_key, true);
 	s_filename = String_Copy(s_filename.value, index);
 
 	return s_filename;
@@ -87,20 +87,20 @@ instant bool
 Application_OpenURL(
 	String s_url
 ) {
-	if (String_IsEmpty(&s_url, true))
+	if (String_IsEmpty(s_url, true))
 		return false;
 
 	String s_open_url   = S(s_url);
 	String s_terminator = S("\0", 1);
 
-	if (!String_EndWith(&s_url, s_terminator, true)) {
+	if (!String_EndWith(s_url, s_terminator, true)) {
 		s_open_url = String_Copy(s_open_url);
-		String_Append(&s_open_url, s_terminator);
+		String_Append(s_open_url, s_terminator);
 	}
 
 	ShellExecute(0, "open", s_open_url.value, 0, 0, SW_SHOWNORMAL);
 
-	String_Destroy(&s_open_url);
+	String_Destroy(s_open_url);
 
 	return true;
 }
@@ -109,15 +109,15 @@ instant bool
 Application_OpenDirectory(
 	String s_directory
 ) {
-	if (String_IsEmpty(&s_directory, true))
+	if (String_IsEmpty(s_directory, true))
 		return false;
 
 	String s_open_directory = S(s_directory);
 	String s_terminator = S("\0", 1);
 
-	if (!String_EndWith(&s_directory, s_terminator, true)) {
+	if (!String_EndWith(s_directory, s_terminator, true)) {
 		s_open_directory = String_Copy(s_open_directory);
-		String_Append(&s_open_directory, s_terminator);
+		String_Append(s_open_directory, s_terminator);
 	}
 
 	bool result = PathFileExists(s_open_directory.value);
@@ -125,7 +125,7 @@ Application_OpenDirectory(
 	if (result)
 		ShellExecute(0, "open", s_open_directory.value, 0, 0, SW_SHOWNORMAL);
 
-	String_Destroy(&s_open_directory);
+	String_Destroy(s_open_directory);
 
 	return result;
 
@@ -135,16 +135,16 @@ instant bool
 Application_Execute(
 	String s_command
 ) {
-	if (String_IsEmpty(&s_command, true))
+	if (String_IsEmpty(s_command, true))
 		return false;
 
 	String ts_command;
-	String_Append(&ts_command, S("\""));
-	String_Append(&ts_command, s_command);
-	String_Append(&ts_command, S("\""));
+	String_Append(ts_command, S("\""));
+	String_Append(ts_command, s_command);
+	String_Append(ts_command, S("\""));
 
 	/// length would calc. to 0 otherwise
-	String_Append(&ts_command, S("\0", 1));
+	String_Append(ts_command, S("\0", 1));
 
 	STARTUPINFO info_startup = {};
 	PROCESS_INFORMATION info_proc = {};
@@ -167,7 +167,7 @@ Application_Execute(
 	if (!result)
 		LOG_WARNING("could not open file: " << ts_command.value);
 
-	String_Destroy(&ts_command);
+	String_Destroy(ts_command);
 
 	return result;
 }

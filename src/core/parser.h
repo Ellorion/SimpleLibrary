@@ -38,7 +38,7 @@ Parser_IsRunning(
 	if (Parser_HasError(parser))
 		return false;
 
-	if (String_IsEmpty(&parser->s_data))
+	if (String_IsEmpty(parser->s_data))
 		return false;
 
 	return true;
@@ -111,8 +111,8 @@ Parser_Destroy(
 ) {
 	Assert(parser_io);
 
-	String_Destroy(&parser_io->s_data);
-	String_Destroy(&parser_io->s_error);
+	String_Destroy(parser_io->s_data);
+	String_Destroy(parser_io->s_error);
 	parser_io->has_error = false;
 }
 
@@ -147,9 +147,9 @@ Parser_IsString(
 		parser_io->has_error = true;
 		Assert(!parser_io->s_error.value);
 
-		String_Append(&parser_io->s_error, S("String \""));
-		String_Append(&parser_io->s_error, s_data);
-		String_Append(&parser_io->s_error, S("\" not found"));
+		String_Append(parser_io->s_error, S("String \""));
+		String_Append(parser_io->s_error, s_data);
+		String_Append(parser_io->s_error, S("\" not found"));
 
 		return;
 	}
@@ -173,13 +173,13 @@ Parser_GetStringRef(
 	Parser_SkipUntilToken(parser_io);
 
 	s64 index_found;
-	if (!String_Find(&parser_io->s_data, s_until_match, &index_found)) {
+	if (!String_Find(parser_io->s_data, s_until_match, &index_found)) {
 		parser_io->has_error = true;
 		Assert(!parser_io->s_error.value);
 
-		String_Append(&parser_io->s_error, S("Could not parse string. No \""));
-		String_Append(&parser_io->s_error, s_until_match);
-		String_Append(&parser_io->s_error, S("\" was found."));
+		String_Append(parser_io->s_error, S("Could not parse string. No \""));
+		String_Append(parser_io->s_error, s_until_match);
+		String_Append(parser_io->s_error, S("\" was found."));
 
 		return;
 	}
@@ -206,22 +206,22 @@ Parser_GetStringRef(
 	if (Parser_HasError(parser_io))
 		return;
 
-	String_Destroy(s_data_out);
+	String_Destroy(*s_data_out);
 
 	Parser_SkipUntilToken(parser_io);
 
 	s64 offset_parser = 0;
 
-	if (String_StartWith(&parser_io->s_data, S("\""), true)) {
+	if (String_StartWith(parser_io->s_data, S("\""), true)) {
 		++offset_parser;
 		Parser_AddOffset(parser_io, 1);
 
 		s64 index_found;
-		if (!String_Find(&parser_io->s_data, S("\""), &index_found)) {
+		if (!String_Find(parser_io->s_data, S("\""), &index_found)) {
 			parser_io->has_error = true;
 			Assert(!parser_io->s_error.value);
 
-			String_Append(&parser_io->s_error, S("Could not parse string. No \" was found"));
+			String_Append(parser_io->s_error, S("Could not parse string. No \" was found"));
 
 			return;
 		}
@@ -230,7 +230,7 @@ Parser_GetStringRef(
 
 		if (include_quotes AND offset_parser) {
 			/// include starting & ending '\"'
-			String_AddOffset(s_data_out, -offset_parser);
+			String_AddOffset(*s_data_out, -offset_parser);
 			s_data_out->length += 1;
 		}
 
@@ -291,7 +291,7 @@ Parser_GetBoolean(
 	FOR(PARSER_ARRAY_COUNT(values_false), it) {
 		String ts_value = S(values_false[it]);
 
-		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
+		if (String_StartWith(parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
 
 			*is_true_out = false;
@@ -307,7 +307,7 @@ Parser_GetBoolean(
 	FOR(PARSER_ARRAY_COUNT(values_true), it) {
 		String ts_value = S(values_true[it]);
 
-		if (String_StartWith(&parser_io->s_data, ts_value, true)) {
+		if (String_StartWith(parser_io->s_data, ts_value, true)) {
 			Parser_AddOffset(parser_io, ts_value.length);
 
 			*is_true_out = true;
@@ -318,7 +318,7 @@ Parser_GetBoolean(
 	parser_io->has_error = true;
 	Assert(!parser_io->s_error.value);
 
-	String_Append(&parser_io->s_error, S("No valid boolean value could be parsed"));
+	String_Append(parser_io->s_error, S("No valid boolean value could be parsed"));
 }
 
 instant void
@@ -371,14 +371,14 @@ Parser_GetNumber(
         index_parsing += 1;
 	}
 
-	has_error |= String_EndWith(s_number_out, S("."), true);
+	has_error |= String_EndWith(*s_number_out, S("."), true);
 	has_error |= (s_number_out->length == 0);
 
 	if (has_error) {
 		parser_io->has_error = true;
 		Assert(!parser_io->s_error.value);
 
-		String_Append(&parser_io->s_error, S("No valid number could be parsed"));
+		String_Append(parser_io->s_error, S("No valid number could be parsed"));
 
 		s_number_out->value  = 0;
 		s_number_out->length = 0;
@@ -400,7 +400,7 @@ Parser_IsSection(
 	String s_data;
 	Parser_GetStringRef(parser_io, &s_data, PARSER_MODE_PEEK, false);
 
-	return String_StartWith(&s_data, s_section_id, true);
+	return String_StartWith(s_data, s_section_id, true);
 }
 
 instant bool
@@ -418,7 +418,7 @@ Parser_GetSectionNameRef(
 	Parser_GetStringRef(parser_io, s_data_out, PARSER_MODE_SEEK, false);
 
 	if (is_section)
-		String_AddOffset(s_data_out, s_section_id.length);
+		String_AddOffset(*s_data_out, s_section_id.length);
 
 	return is_section;
 }
@@ -460,11 +460,11 @@ Parser_Token_Peek(
 
 	String s_data_it = S(parser->s_data);
 
-	String_Destroy(s_token_out);
+	String_Destroy(*s_token_out);
 	s_token_out->is_reference = true;
 	s_token_out->value        = s_data_it.value;
 
-	while(!String_IsEmpty(&s_data_it)) {
+	while(!String_IsEmpty(s_data_it)) {
 		++s_token_out->length;
 
 		if (s_data_it.length == 1)
@@ -479,11 +479,11 @@ Parser_Token_Peek(
 		/// with Parser_Token_CanTokenize, group
 		/// them this way
 		if (s_data_it.value[0] == '\r') {
-			String_AddOffset(&s_data_it, 1);
+			String_AddOffset(s_data_it, 1);
 
 			if (s_data_it.value[0] == '\n') {
 				++s_token_out->length;
-				String_AddOffset(&s_data_it, 1);
+				String_AddOffset(s_data_it, 1);
 			}
 
 			break;
@@ -495,7 +495,7 @@ Parser_Token_Peek(
 		if (!Parser_Token_CanTokenize(s_data_it.value[1]))
 			break;
 
-		String_AddOffset(&s_data_it, 1);
+		String_AddOffset(s_data_it, 1);
 	}
 }
 
@@ -527,7 +527,7 @@ Parser_Token_IsMatch(
 
 	if (!(s_token == ts_token)) {
 		parser->has_error = true;
-		String_Overwrite(&parser->s_error, S("Token in parser did not match expected result."));
+		String_Overwrite(parser->s_error, S("Token in parser did not match expected result."));
 		return false;
 	}
 
@@ -549,7 +549,7 @@ Parser_SkipUntil(
 	if (Parser_HasError(parser_io))
 		return;
 
-	if (String_Find(&parser_io->s_data, s_find, &index_found, 0)) {
+	if (String_Find(parser_io->s_data, s_find, &index_found, 0)) {
 		Parser_AddOffset(parser_io, index_found);
 
 		if (skip_past_token)

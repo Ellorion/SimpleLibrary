@@ -15,9 +15,9 @@ Profiler_AnalyseDependencies(
 	Assert(a_dependencies_io);
 
 	String s_filepath;
-	String_Overwrite(&s_filepath, s_path);
-	String_Append(   &s_filepath, s_filename);
-	String_Append(   &s_filepath, S("\0", 1));
+	String_Overwrite(s_filepath, s_path);
+	String_Append(   s_filepath, s_filename);
+	String_Append(   s_filepath, S("\0", 1));
 
 	String s_file_data;
 	File_ReadAll(&s_file_data, s_filepath);
@@ -38,14 +38,14 @@ Profiler_AnalyseDependencies(
 
 		Dependency dep_find;
 
-		if (String_StartWith(&s_token, S("\""), true)) {
+		if (String_StartWith(s_token, S("\""), true)) {
 			Dependency *dep_entry;
 
-			String_AddOffset(&s_token, 1);
+			String_AddOffset(s_token, 1);
 			s_token.length -= 1;
 
 			dep_find.s_file = String_Copy(s_path);
-			String_Append(&dep_find.s_file, s_token);
+			String_Append(dep_find.s_file, s_token);
 
 			bool entry_existed = Array_FindOrAdd(*a_dependencies_io, dep_find, &dep_entry,
 				[](auto element, auto find) {
@@ -67,28 +67,27 @@ Profiler_AnalyseDependencies(
 			if (!entry_existed) {
 				String s_subpath = S(s_path);
 
-				s64 index_pos = String_IndexOfRev(&s_token, S("//", 1), true);
+				s64 index_pos = String_IndexOfRev(s_token, S("//", 1), true);
 
 				if (index_pos > 0) {
 					s_subpath = String_Copy(s_subpath);
 					/// include "//"
-					String_Append(&s_subpath, S(s_token, index_pos + 1));
+					String_Append(s_subpath, S(s_token, index_pos + 1));
 
-					String_AddOffset(&s_token, index_pos + 1);
+					String_AddOffset(s_token, index_pos + 1);
 				}
 
 				Profiler_AnalyseDependencies(s_subpath, s_token, a_dependencies_io);
 
-				String_Destroy(&s_subpath);
+				String_Destroy(s_subpath);
 			}
-
 		}
 
-		String_Destroy(&dep_find.s_file);
+		String_Destroy(dep_find.s_file);
 	}
 
-	String_Destroy(&s_filepath);
-	String_Destroy(&s_file_data);
+	String_Destroy(s_filepath);
+	String_Destroy(s_file_data);
 }
 
 instant void
@@ -113,11 +112,11 @@ Array_Destroy(
 ) {
 	FOR_ARRAY(*a_dependencies, it) {
 		Dependency *dep = &ARRAY_IT(*a_dependencies, it);
-		String_Destroy(&dep->s_file);
+		String_Destroy(dep->s_file);
 
 		FOR_ARRAY(dep->as_depencency, it_dep) {
 			String *s_dependency = &ARRAY_IT(dep->as_depencency, it_dep);
-			String_Destroy(s_dependency);
+			String_Destroy(*s_dependency);
 		}
 
 		Array_DestroyContainer(&dep->as_depencency);

@@ -106,7 +106,7 @@ Tree_PrintAll(
 		return;
 	}
 
-	if (!String_IsEmpty(&tree->s_name)) {
+	if (!String_IsEmpty(tree->s_name)) {
 		if (level) {
 			FOR(level - 1, it)
 				std::cout << "|- ";

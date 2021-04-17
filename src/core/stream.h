@@ -23,7 +23,7 @@ Stream_Clear(
 ) {
 	Assert(stream);
 
-	String_Clear(&stream->s_buffer);
+	String_Clear(stream->s_buffer);
 }
 
 constexpr
@@ -39,7 +39,7 @@ Stream_Close(
 		} break;
 
 		case StreamType::Buffer: {
-			String_Destroy(&stream->s_buffer);
+			String_Destroy(stream->s_buffer);
 		} break;
 
 		default: {
@@ -99,7 +99,7 @@ Stream_GetBuffer(
 constexpr
 Stream &
 operator<<(Stream &out, const String &s_data) {
-	if (String_IsEmpty(&s_data)) {
+	if (String_IsEmpty(s_data)) {
 		LOG_DEBUG("No data available to write in Stream Operator")
 	}
 	else {
@@ -111,7 +111,7 @@ operator<<(Stream &out, const String &s_data) {
 			} break;
 
 			case StreamType::Buffer: {
-				String_Append(&out.s_buffer, s_data, s_data.length);
+				String_Append(out.s_buffer, s_data, s_data.length);
 			} break;
 
 			default:  {

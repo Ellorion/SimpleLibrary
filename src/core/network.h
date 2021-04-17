@@ -64,10 +64,10 @@ Network_HTTP_DestroyURI(
 
     Assert(!uri->s_error.value OR uri->s_error.is_reference);
 
-    String_Destroy(&uri->s_credentials_plain);
-    String_Destroy(&uri->s_domain);
-    String_Destroy(&uri->s_path);
-    String_Destroy(&uri->s_protocol);
+    String_Destroy(uri->s_credentials_plain);
+    String_Destroy(uri->s_domain);
+    String_Destroy(uri->s_path);
+    String_Destroy(uri->s_protocol);
 
     *uri = {};
 }
@@ -88,17 +88,17 @@ Network_HTTP_ParseURL(
 
 	/// check availability
 	/// -----------------------------------------------------------------------
-	if (String_IsEmpty(&ts_url, true)) {
+	if (String_IsEmpty(ts_url, true)) {
 		uri.s_error = S("No URL was assigned.");
 		return uri;
 	}
 
 	/// check protocol
 	/// -----------------------------------------------------------------------
-	index_find = String_IndexOf(&ts_url, s_seperator_protocol, 0, true);
+	index_find = String_IndexOf(ts_url, s_seperator_protocol, 0, true);
 
 	if (index_find > 0) {
-		if (!String_StartWith(&ts_url, S("http"), false)) {
+		if (!String_StartWith(ts_url, S("http"), false)) {
 			uri.s_error = S("Only http protocol is supported.");
 			return uri;
 		}
@@ -107,40 +107,40 @@ Network_HTTP_ParseURL(
 
 		index_find += s_seperator_protocol.length;
 
-		String_AddOffset(&ts_url, index_find);
+		String_AddOffset(ts_url, index_find);
 	}
 
 	/// check credentials
 	/// -----------------------------------------------------------------------
-	index_find = String_IndexOf(&ts_url, s_seperator_credentials, 0, true);
+	index_find = String_IndexOf(ts_url, s_seperator_credentials, 0, true);
 
 	if (index_find > 0) {
 		uri.s_credentials_plain = S(ts_url, index_find);
-		String_AddOffset(&ts_url, index_find + s_seperator_credentials.length);
+		String_AddOffset(ts_url, index_find + s_seperator_credentials.length);
 	}
 
 	/// check domain
 	/// -----------------------------------------------------------------------
-	index_find = String_IndexOf(&ts_url, s_seperator_domain, 0, true);
+	index_find = String_IndexOf(ts_url, s_seperator_domain, 0, true);
 
 	if (index_find < 0)
 		index_find = ts_url.length;
 
 	uri.s_domain = S(ts_url, index_find);
-	String_AddOffset(&ts_url, index_find);
+	String_AddOffset(ts_url, index_find);
 
-	if (String_IsEmpty(&uri.s_domain, true)) {
+	if (String_IsEmpty(uri.s_domain, true)) {
 		uri.s_error = S("Invalid URL used for parsing into URI.");
 		return uri;
 	}
 
 	/// check port
 	/// -----------------------------------------------------------------------
-	index_find = String_IndexOf(&uri.s_domain, s_seperator_port, 0, true);
+	index_find = String_IndexOf(uri.s_domain, s_seperator_port, 0, true);
 
 	if (index_find > 0) {
 		String s_port = S(uri.s_domain);
-		String_AddOffset(&s_port, index_find + s_seperator_port.length);
+		String_AddOffset(s_port, index_find + s_seperator_port.length);
 		uri.port = Convert_ToInt(s_port);
 
 		uri.s_domain.length = index_find;
@@ -211,13 +211,13 @@ Network_DestroyInfo(
 ) {
 	Assert(info);
 
-	String_Destroy(&info->s_gateway_ip);
-	String_Destroy(&info->s_gateway_mask);
+	String_Destroy(info->s_gateway_ip);
+	String_Destroy(info->s_gateway_mask);
 	free(info->s_ip.value);
-	String_Destroy(&info->s_ip_mask);
-	String_Destroy(&info->s_mac);
-	String_Destroy(&info->s_name_adapter);
-	String_Destroy(&info->s_name_device);
+	String_Destroy(info->s_ip_mask);
+	String_Destroy(info->s_mac);
+	String_Destroy(info->s_name_adapter);
+	String_Destroy(info->s_name_device);
 
 	info->s_ip = {};
 	info->s_ip.has_changed = true;
@@ -298,12 +298,12 @@ Network_GetIPByName(
 	String s_ip;
 
 	String ts_name;
-	String_Append(&ts_name, s_name);
-	String_Append(&ts_name, S("\0", 1));
+	String_Append(ts_name, s_name);
+	String_Append(ts_name, S("\0", 1));
 
 	hostent *host = gethostbyname(ts_name.value);
 
-	String_Destroy(&ts_name);
+	String_Destroy(ts_name);
 
 	if (!host)
 		return s_ip;
@@ -334,7 +334,7 @@ Network_Connect(
 
  	String s_ip_address = Network_GetIPByName(s_host_adress);
 
-	if (String_IsEmpty(&s_ip_address)) {
+	if (String_IsEmpty(s_ip_address)) {
 		network.s_error = S("IP loopup failed.");
 		return network;
 	}
@@ -478,7 +478,7 @@ Network_GetName(
 
 	if(gethostname(c_buffer, sizeof(c_buffer)) != SOCKET_ERROR) {
 		s_result = String_Copy(c_buffer, String_GetLength(c_buffer));
-		String_Append(&s_result, S("\0", 1));
+		String_Append(s_result, S("\0", 1));
 	}
 
 	return s_result;
@@ -497,11 +497,11 @@ Network_ConvertToMAC(
 	FOR(mac_address_length, it) {
 		ToHex(*mac_address_it, &c_hex[0], &c_hex[1]);
 
-		String_Append(&s_result, S((char *)&c_hex[0], 1));
-		String_Append(&s_result, S((char *)&c_hex[1], 1));
+		String_Append(s_result, S((char *)&c_hex[0], 1));
+		String_Append(s_result, S((char *)&c_hex[1], 1));
 
 		if (it < mac_address_length - 1)
-			String_Append(&s_result, S("-", 1));
+			String_Append(s_result, S("-", 1));
 
 		++mac_address_it;
 	}
@@ -515,7 +515,7 @@ Network_GetMAC(
 ) {
 	String s_result;
 
-	if (!String_EndWith(&s_ip_address, S("\0", 1), false))
+	if (!String_EndWith(s_ip_address, S("\0", 1), false))
 		return s_result;
 
     ulong mac_address[2];
@@ -555,7 +555,7 @@ Network_GetInfo(
 
 		if (!String_IsEqual(info.s_mac, s_adapter_mac)) {
 			adapter_info_it = adapter_info_it->Next;
-			String_Destroy(&s_adapter_mac);
+			String_Destroy(s_adapter_mac);
 			continue;
 		}
 
@@ -564,9 +564,9 @@ Network_GetInfo(
 		info.s_gateway_ip   = String_Copy(adapter_info_it->GatewayList.IpAddress.String);
 		info.s_gateway_mask = String_Copy(adapter_info_it->GatewayList.IpMask.String);
 
-		String_Append(&info.s_gateway_ip, S("\0", 1));
+		String_Append(info.s_gateway_ip, S("\0", 1));
 
-		String_Destroy(&s_adapter_mac);
+		String_Destroy(s_adapter_mac);
 		break;
 	}
 
@@ -625,7 +625,7 @@ Network_HTTP_ClearCredentials(
 ) {
 	Assert(network);
 
-	String_Clear(&network->HTTP.s_credentials);
+	String_Clear(network->HTTP.s_credentials);
 }
 
 instant bool
@@ -636,15 +636,15 @@ Network_HTTP_SetCredentials(
 ) {
 	Assert(network);
 
-	if (String_IsEmpty(&s_user))
+	if (String_IsEmpty(s_user))
 		return false;
 
-	String_Overwrite(&network->HTTP.s_credentials, s_user);
-	String_Append(&network->HTTP.s_credentials, S(":", 1));
-	String_Append(&network->HTTP.s_credentials, s_pass);
+	String_Overwrite(network->HTTP.s_credentials, s_user);
+	String_Append(network->HTTP.s_credentials, S(":", 1));
+	String_Append(network->HTTP.s_credentials, s_pass);
 
 	String s_encoded = Base64_Encode(network->HTTP.s_credentials);
-	String_Destroy(&network->HTTP.s_credentials);
+	String_Destroy(network->HTTP.s_credentials);
 	network->HTTP.s_credentials = s_encoded;
 
 	return true;
@@ -657,61 +657,15 @@ Network_HTTP_SetCredentials(
 ) {
 	Assert(network);
 
-	if (String_IsEmpty(&s_user_and_pass))
+	if (String_IsEmpty(s_user_and_pass))
 		return false;
 
 	String s_encoded = Base64_Encode(s_user_and_pass);
-	String_Destroy(&network->HTTP.s_credentials);
+	String_Destroy(network->HTTP.s_credentials);
 	network->HTTP.s_credentials = s_encoded;
 
 	return true;
 }
-
-///// @Depricated
-//instant bool
-//Network_HTTP_Request(
-//	Network *network,
-//	String   s_ip,
-//	String   s_path
-//) {
-//	Assert(network);
-//
-//	if (!Network_IsSocketValid(network)) {
-//		*network = Network_Connect(SOCKET_TCP, s_ip, 80);
-//
-//		if (Network_HasError(network))
-//			return false;
-//	}
-//
-//	if (   network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_HEADER
-//		OR network->HTTP.stage == NETWORK_HTTP_STAGE_RESPONSED_DATA
-//	) {
-//		return false;
-//	}
-//
-//	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
-//	String_Clear(&network->s_error);
-//
-//	String s_request;
-//	String_Append(&s_request, S("GET /"));
-//	String_Append(&s_request, s_path);
-//	String_Append(&s_request, S(" HTTP/1.1"));
-//	String_Append(&s_request, S("\r\nHost: "));
-//	String_Append(&s_request, s_ip);
-//
-//	if (Network_HTTP_HasCredentials(network)) {
-//		String_Append(&s_request, S("\r\nAuthorization: Basic "));
-//		String_Append(&s_request, network->HTTP.s_credentials);
-//	}
-//
-//	String_Append(&s_request, S("\r\n\r\n"));
-//
-//	bool success = Network_Send(network, s_request);
-//
-//	String_Destroy(&s_request);
-//
-//	return success;
-//}
 
 instant bool
 Network_HTTP_Request(
@@ -720,7 +674,7 @@ Network_HTTP_Request(
 ) {
 	Assert(network);
 
-	String_Clear(&network->HTTP.s_credentials);
+	String_Clear(network->HTTP.s_credentials);
 
 	/// in case the header file does not deliver that information
 	network->HTTP.content_length = 0;
@@ -754,29 +708,29 @@ Network_HTTP_Request(
 
 	network->HTTP.stage = NETWORK_HTTP_STAGE_REQUESTED;
 	network->HTTP.is_receiving = false;
-	String_Clear(&network->s_error);
+	String_Clear(network->s_error);
 
 	String s_request;
-	String_Append(&s_request, S("GET /"));
-	String_Append(&s_request, uri.s_path);
-	String_Append(&s_request, S(" HTTP/1.1"));
-	String_Append(&s_request, S("\r\nHost: "));
-	String_Append(&s_request, uri.s_domain);
+	String_Append(s_request, S("GET /"));
+	String_Append(s_request, uri.s_path);
+	String_Append(s_request, S(" HTTP/1.1"));
+	String_Append(s_request, S("\r\nHost: "));
+	String_Append(s_request, uri.s_domain);
 
 	if (Network_HTTP_HasCredentials(&uri)) {
 		Network_HTTP_SetCredentials(network, uri.s_credentials_plain);
 
-		String_Append(&s_request, S("\r\nAuthorization: Basic "));
-		String_Append(&s_request, network->HTTP.s_credentials);
+		String_Append(s_request, S("\r\nAuthorization: Basic "));
+		String_Append(s_request, network->HTTP.s_credentials);
 	}
 
-	String_Append(&s_request, S("\r\n\r\n"));
+	String_Append(s_request, S("\r\n\r\n"));
 
 	Network_HTTP_DestroyURI(&uri);
 
 	bool success = Network_Send(network, s_request);
 
-	String_Destroy(&s_request);
+	String_Destroy(s_request);
 
 	return success;
 }
@@ -800,7 +754,7 @@ Network_HTTP_GetResponseRef(
 	}
 
 	if (network->HTTP.s_buffer_chunk.length < network->HTTP.packet_size)
-		String_CreateBuffer(&network->HTTP.s_buffer_chunk, network->HTTP.packet_size, false);
+		String_CreateBuffer(network->HTTP.s_buffer_chunk, network->HTTP.packet_size, false);
 
 	/// header
 	/// =======================================================================
@@ -819,10 +773,10 @@ Network_HTTP_GetResponseRef(
 		}
 
 		String s_header_end_id = S("\r\n\r\n");
-		network->HTTP.header_size = String_IndexOf(&network->HTTP.s_buffer_chunk, s_header_end_id, 0, true);
+		network->HTTP.header_size = String_IndexOf(network->HTTP.s_buffer_chunk, s_header_end_id, 0, true);
 
 		/// in case it was not byRef and had existing data
-		String_Destroy(s_response_out);
+		String_Destroy(*s_response_out);
 
 		if (network->HTTP.header_size < 0) {
 			network->HTTP.stage = NETWORK_HTTP_STAGE_ERROR;
@@ -929,9 +883,9 @@ Network_HTTP_GetResponseRef(
 		AND network->HTTP.bytes_receiving > network->HTTP.header_size
 	) {
 		String s_remaining_chunk = S(network->HTTP.s_buffer_chunk);
-		String_AddOffset(&s_remaining_chunk, network->HTTP.header_size);
+		String_AddOffset(s_remaining_chunk, network->HTTP.header_size);
 
-		String_Destroy(s_response_out);
+		String_Destroy(*s_response_out);
 		*s_response_out = s_remaining_chunk;
 
 		network->HTTP.stage = NETWORK_HTTP_STAGE_RESPONSED_DATA;
@@ -967,7 +921,7 @@ Network_HTTP_GetResponseRef(
 			/// and the transfer is done, but only in case the content-length was not known
 		}
 		else {
-			String_Destroy(s_response_out);
+			String_Destroy(*s_response_out);
 			*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.bytes_receiving);
 
 			return true;
@@ -984,15 +938,6 @@ Network_HTTP_DownloadData(
 	String s_url,
 	bool *has_error
 ) {
-	#define OnErrorReturn()	\
-		if (Network_HasError(&network)) {	\
-			Network_Destroy(&network); \
-			*has_error = true;	\
-			String_Destroy(&s_result); \
-			s_result = S(network.s_error);	\
-			return s_result;	\
-		}
-
 	Assert(has_error);
 
 	Network network;
@@ -1000,6 +945,16 @@ Network_HTTP_DownloadData(
 
 	String s_result;
 	bool is_url_reloacating;
+
+	/// @todo convert to lamda
+	#define OnErrorReturn()	\
+		if (Network_HasError(&network)) {	\
+			Network_Destroy(&network); \
+			*has_error = true;	\
+			String_Destroy(s_result); \
+			s_result = S(network.s_error);	\
+			return s_result;	\
+		}
 
 	/// to make sure it does not end up in an endless loop
 	u16 relocation_count_limit = 5;
@@ -1020,7 +975,7 @@ Network_HTTP_DownloadData(
 				s_url = s_header;
 			}
 			else{
-				String_Overwrite(&s_url, s_header);
+				String_Overwrite(s_url, s_header);
 			}
 
 			--relocation_count_limit;
@@ -1034,7 +989,7 @@ Network_HTTP_DownloadData(
 		String s_response;
 
 		while (Network_HTTP_GetResponseRef(&network, &s_response)) {
-			String_Append(&s_result, s_response);
+			String_Append(s_result, s_response);
 		}
 	}
 

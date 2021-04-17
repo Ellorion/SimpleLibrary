@@ -25,10 +25,9 @@ Image_LoadBMP32(
 
     String s_data_it = S(s_data);
 
-    if (String_StartWith(&s_data_it, S("BM"), true)) {
+    if (String_StartWith(s_data_it, S("BM"), true)) {
 		BITMAPFILEHEADER *bmp_header = (BITMAPFILEHEADER *)s_data_it.value;
-		s_data_it.value  += sizeof(BITMAPFILEHEADER);
-		s_data_it.length -= sizeof(BITMAPFILEHEADER);
+		String_AddOffset(s_data_it, sizeof(BITMAPFILEHEADER));
 		BITMAPINFOHEADER *bmp_info = (BITMAPINFOHEADER *)s_data_it.value;
 
 		///@Info: make sure you free the memory after usage!
@@ -46,7 +45,7 @@ Image_LoadBMP32(
 		Memory_Copy(result.data, s_data_it.value, bmp_info->biSizeImage);
 	}
 
-	String_Destroy(&s_data);
+	String_Destroy(s_data);
 
 	return result;
 }

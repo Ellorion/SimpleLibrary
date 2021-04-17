@@ -4,7 +4,7 @@ instant String
 Base64_Encode(
 	String s_data
 ) {
-	Assert(!String_IsEmpty(&s_data));
+	Assert(!String_IsEmpty(s_data));
 
 	const char encodingTable[] =
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

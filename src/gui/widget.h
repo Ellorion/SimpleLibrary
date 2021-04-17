@@ -169,7 +169,7 @@ Array_Destroy(
 
 	FOR_ARRAY(*a_columns, it) {
 		Widget_Column *t_column = &ARRAY_IT(*a_columns, it);
-		String_Destroy(&t_column->s_name);
+		String_Destroy(t_column->s_name);
 	}
 
 	Array_DestroyContainer(a_columns);
@@ -344,7 +344,7 @@ Widget_HasChanged(
 		FOR_ARRAY(widget_io->data.as_row_data, it) {
 			String *t_data = &ARRAY_IT(widget_io->data.as_row_data, it);
 
-			has_changed |= String_HasChanged(t_data, update_changes);
+			has_changed |= String_HasChanged(*t_data, update_changes);
 		}
 	}
 
@@ -1058,7 +1058,7 @@ Widget_Update(
 
 			[&](String s_value) {
 				return (String_IndexOf(
-							&s_value,
+							s_value,
 							widget_io->data.s_row_filter,
 							0,
 							widget_io->data.is_filter_case_sensitive) >= 0
@@ -1808,7 +1808,7 @@ Widget_GetSelectedRowBuffer(
 	Assert(!widget->data.selected_row_id OR widget->data.selected_row_id < widget->data.as_row_data.count);
 
 	if (!widget->data.as_row_data.count) {
-		String_Clear(s_row_data_out);
+		String_Clear(*s_row_data_out);
 		return;
 	}
 
@@ -1817,8 +1817,8 @@ Widget_GetSelectedRowBuffer(
 
 	String *ts_row_data = &ARRAY_IT(*as_target, widget->data.selected_row_id);
 
-	String_Clear(s_row_data_out);
-	String_Append(s_row_data_out, *ts_row_data);
+	String_Clear(*s_row_data_out);
+	String_Append(*s_row_data_out, *ts_row_data);
 }
 
 instant String
@@ -1837,7 +1837,7 @@ Widget_GetSelectedRowRef(
 		s_result = S(ARRAY_IT(widget->data.as_filter_data, widget->data.selected_row_id));
 	}
 	else {
-		if (String_IsEmpty(&widget->data.s_row_filter, false))
+		if (String_IsEmpty(widget->data.s_row_filter, false))
 			s_result = S(ARRAY_IT(widget->data.as_row_data, widget->data.selected_row_id));
 	}
 
@@ -1926,11 +1926,11 @@ Widget_LoadDirectoryList(
 	/// in case the directory string came from the to be destroyed directory entries
 	/// -> copy a to be destroyed string for a new path
 	static String ts_directory_buffer;
-	String_Append(&ts_directory_buffer, s_directory);
+	String_Append(ts_directory_buffer, s_directory);
 
 	FOR_ARRAY(*a_entries_out, it) {
 		Directory_Entry *t_entry = &ARRAY_IT(*a_entries_out, it);
-		String_Destroy(&t_entry->s_name);
+		String_Destroy(t_entry->s_name);
 	}
 
 	Array_ClearContainer(a_entries_out);
@@ -1938,13 +1938,13 @@ Widget_LoadDirectoryList(
 	widget_io->data.selected_row_id = 0;
 
 	/// remove "\" from directory path (f.e. C:\) for consistency
-	if (String_EndWith(&ts_directory_buffer, S("\\"), true)) {
-		String_Remove(	&ts_directory_buffer,
-						 ts_directory_buffer.length - 1,
-						 ts_directory_buffer.length);
+	if (String_EndWith(ts_directory_buffer, S("\\"), true)) {
+		String_Remove(ts_directory_buffer,
+                      ts_directory_buffer.length - 1,
+                      ts_directory_buffer.length);
 	}
 
-	if (!String_IsEmpty(&ts_directory_buffer)) {
+	if (!String_IsEmpty(ts_directory_buffer)) {
 		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_DIR  , show_full_path);
 		File_ReadDirectory(a_entries_out, ts_directory_buffer, DIR_LIST_ONLY_FILES, show_full_path);
 
@@ -1965,7 +1965,7 @@ Widget_LoadDirectoryList(
 		Widget_AddRowSingle(widget_io, ts_entry_name);
 	}
 
-	String_Clear(&ts_directory_buffer);
+	String_Clear(ts_directory_buffer);
 }
 
 instant Widget
@@ -2000,8 +2000,8 @@ Widget_CreateLabel(
 
 	t_widget.text.font = font;
 
-	if (!String_IsEmpty(&s_data))
-		String_Append(&t_widget.text.s_data, s_data);
+	if (!String_IsEmpty(s_data))
+		String_Append(t_widget.text.s_data, s_data);
 
 	t_widget.trigger.autosize = true;
 
@@ -2040,8 +2040,8 @@ Widget_CreateButton(
 
 	t_widget.text.font = font;
 
-	if (!String_IsEmpty(&s_data))
-		String_Append(&t_widget.text.s_data, s_data);
+	if (!String_IsEmpty(s_data))
+		String_Append(t_widget.text.s_data, s_data);
 
 	t_widget.trigger.autosize = true;
 
@@ -2110,7 +2110,7 @@ Widget_CreateCheckBox(
 
 	t_widget.text.font = font;
 
-	String_Append(&t_widget.text.s_data, s_data);
+	String_Append(t_widget.text.s_data, s_data);
 
 	t_widget.text.data.rect_padding = {1, 1, 3, 1};
 
@@ -2197,8 +2197,8 @@ Widget_UpdateInputNumberPicker(
 
 				char *c_value = Convert_ToCString(t_slide->value);
 
-				String_Clear(&tw_label->text.s_data);
-				String_Append(&tw_label->text.s_data, S(c_value));
+				String_Clear(tw_label->text.s_data);
+				String_Append(tw_label->text.s_data, S(c_value));
 
 				Memory_Free(c_value);
 			}
@@ -2267,7 +2267,7 @@ Widget_CreateNumberPicker(
 	wg_label.text.data.rect_padding = {2, 2, 2, 2};
 
 	char *c_value = Convert_ToCString(slide.value);
-	String_Append(&wg_label.text.s_data, S(c_value));
+	String_Append(wg_label.text.s_data, S(c_value));
 	Memory_Free(c_value);
 
 	Array_Add(&t_widget.a_subwidgets, wg_label);
@@ -2427,8 +2427,8 @@ Widget_UpdateInputComboBox(
 					Widget_GetSelectedRowBuffer(wg_list, &s_row_data);
 
 					if (wg_text->text.s_data != s_row_data) {
-						String_Clear(&wg_text->text.s_data);
-						String_Append(&wg_text->text.s_data, s_row_data);
+						String_Clear(wg_text->text.s_data);
+						String_Append(wg_text->text.s_data, s_row_data);
 						wg_text->events.on_text_change = true;
 
 						wg_text->text.cursor.data.index_select_end   = s_row_data.length;
@@ -2617,8 +2617,8 @@ Widget_LoadFile(
 
 	String *s_data = &widget_io->text.s_data;
 
-	String_Clear(s_data);
-	String_Append(s_data, File_ReadAll(s_filename, true));
+	String_Clear(*s_data);
+	String_Append(*s_data, File_ReadAll(s_filename, true));
 }
 
 instant void

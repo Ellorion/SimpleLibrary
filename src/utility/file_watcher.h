@@ -55,7 +55,7 @@ File_Watch(
 	*file_watcher_out = {};
 
 	file_watcher_out->s_filename = String_Copy(s_filename);
-	String_Append(&file_watcher_out->s_filename, S("\0", 1));
+	String_Append(file_watcher_out->s_filename, S("\0", 1));
 
 	File_HasChanged(file_watcher_out);
 	file_watcher_out->lastWriteTime = {};

@@ -8,7 +8,7 @@ Convert_IntToString(
 	String s_result;
 
 	if (value == 0) {
-		String_Insert(&s_result, '0', 0);
+		String_Insert(s_result, '0', 0);
 	}
 	else {
 		while(value) {
@@ -18,7 +18,7 @@ Convert_IntToString(
 							? (remainder - 10) + 'a'
 							:  remainder       + '0';
 
-				String_Insert(&s_result, ch, 0);
+				String_Insert(s_result, ch, 0);
 			}
 			value /= base;
 		}
@@ -37,8 +37,8 @@ Convert_DoubleToString(
 	s64 number = value;
 
 	String s_number = Convert_IntToString(number);
-	String_Append(&s_result, s_number);
-	String_Destroy(&s_number);
+	String_Append(s_result, s_number);
+	String_Destroy(s_number);
 
 	u64 pow = 1;
 	u8  num_of_remainders_it = num_of_remainders;
@@ -51,19 +51,19 @@ Convert_DoubleToString(
 	if (pow > 1) {
 	    double remainder = (value - number) * pow;
 
-		String_Append(&s_result, S("."));
+		String_Append(s_result, S("."));
 
 		if (remainder) {
 			String s_remainder = Convert_IntToString(remainder);
 
-			String_Append(&s_result, s_remainder);
+			String_Append(s_result, s_remainder);
 			num_of_remainders -= s_remainder.length;
 
-			String_Destroy(&s_remainder);
+			String_Destroy(s_remainder);
 		}
 
 		while(num_of_remainders) {
-			String_Append(&s_result, S("0"));
+			String_Append(s_result, S("0"));
 			--num_of_remainders;
 		}
 	}
@@ -85,7 +85,7 @@ Convert_ToCString(
 	if (!c_length)
 		return;
 
-	if (String_IsEmpty(s_data)) {
+	if (String_IsEmpty(*s_data)) {
 		c_buffer_out[0] = '\0';
 		return;
 	}
@@ -118,8 +118,8 @@ Convert_ToStringBuffer(
 
 	String s_data = S(c_data, c_length);
 
-	String_Destroy(s_data_out);
-	String_Append(s_data_out, s_data);
+	String_Destroy(*s_data_out);
+	String_Append(*s_data_out, s_data);
 }
 
 
@@ -152,7 +152,7 @@ Convert_SizeToString(
 	u8 num_remainders = (index > 0) ? 2 : 0;
 
 	String s_result = Convert_DoubleToString(size, num_remainders);
-	String_Append(&s_result, S(units_size[index]));
+	String_Append(s_result, S(units_size[index]));
 
 	return s_result;
 }

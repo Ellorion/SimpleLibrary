@@ -65,6 +65,7 @@ Memory_GetHeader(
 	*header_out = (*(Memory_Header *)mem);
 }
 
+constexpr
 instant void *
 _Memory_Alloc_Empty(
 	u64 size
@@ -79,6 +80,7 @@ _Memory_Alloc_Empty(
 	return mem;
 }
 
+constexpr
 instant void
 Memory_Copy(
 	const void *dest_out,
@@ -108,6 +110,7 @@ Memory_Copy(
 	_data = _Memory_Free(_data);
 
 template <typename T>
+constexpr
 instant T
 _Memory_Free(
 	T data
@@ -170,6 +173,7 @@ _Memory_Resize(
 	return mem;
 }
 
+constexpr
 instant void
 Memory_Set(
 	void *dest_out,

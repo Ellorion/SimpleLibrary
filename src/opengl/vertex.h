@@ -220,13 +220,13 @@ Vertex_Load(
 
 		if (attrib_position < 0) {
 			String s_error;
-			String_Append(&s_error, S("[Vertex] Shader and attributes mismatch.\n    Missing: \""));
-			String_Append(&s_error, S(entry->name));
-			String_Append(&s_error, S("\"\0", 2));
+			String_Append(s_error, S("[Vertex] Shader and attributes mismatch.\n    Missing: \""));
+			String_Append(s_error, S(entry->name));
+			String_Append(s_error, S("\"\0", 2));
 
 			AssertMessage(false, s_error.value);
 
-			String_Destroy(&s_error);
+			String_Destroy(s_error);
 
 			continue;
 		}

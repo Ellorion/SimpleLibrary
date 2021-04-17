@@ -45,7 +45,7 @@ Array_Destroy(
 		while(array_out->count) {
 			String s_data_it = Array_Remove(array_out,
 											array_out->count - 1);
-			String_Destroy(&s_data_it);
+			String_Destroy(s_data_it);
 		}
 	}
 
@@ -69,7 +69,7 @@ Array_Clear(
 	if (!array_out->by_reference) {
 		FOR_ARRAY(*array_out, it) {
 			String *ts_data = &ARRAY_IT(*array_out, it);
-			String_Destroy(ts_data);
+			String_Destroy(*ts_data);
 		}
 	}
 
@@ -93,17 +93,17 @@ Array_SplitRefBuffer(
 
 	s64 index_found;
 
-	bool is_running = !String_IsEmpty(&s_data_it);
+	bool is_running = !String_IsEmpty(s_data_it);
 
 	while(is_running) {
-		if (!String_Find(&s_data_it, s_delimiter, &index_found)) {
+		if (!String_Find(s_data_it, s_delimiter, &index_found)) {
 			/// add (the last or first) line without a delimiter
 			index_found = s_data_it.length;
 			type = DELIMITER_IGNORE;
 
 			Assert(s_data_it.length <= s_data->length);
 
-			if (String_IsEmpty(&s_data_it))
+			if (String_IsEmpty(s_data_it))
 				break;
 
 			is_running = false;
@@ -163,18 +163,18 @@ Array_SplitBuffer(
 	String s_data_it = S(*s_data);
 
 	s64 pos_found;
-	while(String_Find(&s_data_it, s_delimiter, &pos_found)) {
+	while(String_Find(s_data_it, s_delimiter, &pos_found)) {
 		if (pos_found) {
 			String s_element;
 
 			if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count) {
-				String_Append(&s_element, s_delimiter);
+				String_Append(s_element, s_delimiter);
 			}
 
-			String_Append(&s_element, s_data_it, pos_found);
+			String_Append(s_element, s_data_it, pos_found);
 
 			if (type == DELIMITER_ADD_BACK) {
-				String_Append(&s_element, s_delimiter);
+				String_Append(s_element, s_delimiter);
 			}
 
 			Array_Add(as_buffer_out, s_element);
@@ -186,7 +186,7 @@ Array_SplitBuffer(
 			Array_AddEmpty(as_buffer_out, &s_element);
 
 			if (type == DELIMITER_ADD_BACK) {
-				String_Append(s_element, s_delimiter);
+				String_Append(*s_element, s_delimiter);
 			}
 		}
 
@@ -194,13 +194,13 @@ Array_SplitBuffer(
 		s_data_it.length -= pos_found + s_delimiter.length;
 	}
 
-	if (!String_IsEmpty(&s_data_it)) {
+	if (!String_IsEmpty(s_data_it)) {
 		String s_element;
 
 		if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count)
-			String_Append(&s_element, s_delimiter);
+			String_Append(s_element, s_delimiter);
 
-		String_Append(&s_element, s_data_it);
+		String_Append(s_element, s_data_it);
 		Array_Add(as_buffer_out, s_element);
 	}
 }
@@ -228,9 +228,9 @@ Array_SplitLinesRef(
 
 	String s_data_it = S(*s_data);
 
-	while(!String_IsEmpty(&s_data_it)) {
-		s64 index        = String_IndexOf(&s_data_it, S("\r"), 0, true);
-		s64 index_return = String_IndexOf(&s_data_it, S("\n"), 0, true);
+	while(!String_IsEmpty(s_data_it)) {
+		s64 index        = String_IndexOf(s_data_it, S("\r"), 0, true);
+		s64 index_return = String_IndexOf(s_data_it, S("\n"), 0, true);
 
 		bool found_carriage = true;
 
@@ -243,7 +243,7 @@ Array_SplitLinesRef(
 
 		/// no endline char found -> add string remainder
 		if (index < 0) {
-			if (include_empty_lines OR !String_IsEmpty(&s_data_it, true))
+			if (include_empty_lines OR !String_IsEmpty(s_data_it, true))
 				Array_Add(&as_result, s_data_it);
 
 			break;
@@ -251,17 +251,17 @@ Array_SplitLinesRef(
 
 		String s_data_adding = S(s_data_it, index);
 
-		if (include_empty_lines OR !String_IsEmpty(&s_data_adding, true))
+		if (include_empty_lines OR !String_IsEmpty(s_data_adding, true))
 			Array_Add(&as_result, s_data_adding);
 
 		/// skip "\r" or "\n"
-		String_AddOffset(&s_data_it, index + 1);
+		String_AddOffset(s_data_it, index + 1);
 
 		/// skip "\n" in "\r\n"
 		if (    found_carriage
-			AND String_IndexOf(&s_data_it, S("\n"), 0, true) == 0
+			AND String_IndexOf(s_data_it, S("\n"), 0, true) == 0
 		) {
-			String_AddOffset(&s_data_it, 1);
+			String_AddOffset(s_data_it, 1);
 		}
 	}
 
@@ -287,7 +287,7 @@ Array_SplitWordsBuffer(
 		Array_Reserve(as_words_out, String_CalcWordCount(*s_data));
 	}
 
-	if (String_IsEmpty(s_data))
+	if (String_IsEmpty(*s_data))
 		return 0;
 
 	String *s_element;
@@ -353,7 +353,7 @@ Array_FindFirstString(
 
 	FOR_ARRAY(*as_find, it) {
 		String *ts_find = &ARRAY_IT(*as_find, it);
-		s64 t_index_found = String_IndexOf(s_data, *ts_find, 0, true);
+		s64 t_index_found = String_IndexOf(*s_data, *ts_find, 0, true);
 
 		if (t_index_found >= 0) {
 			if (t_index_found < index_lowest) {
@@ -397,15 +397,13 @@ String_GetDelimiterSection(
 	FOR_ARRAY(as_section, it) {
 		if (it == index) {
 			String *ts_entry = &ARRAY_IT(as_section, it);
-
-			String_Append(&s_result, *ts_entry);
+			String_Append(s_result, *ts_entry);
 
 			break;
 		}
 	}
 
-	String_TrimLeft(&s_result);
-	String_TrimRight(&s_result);
+	String_Trim(s_result);
 
 	return s_result;
 }
@@ -428,15 +426,13 @@ String_GetDelimiterSectionRef(
 	FOR_ARRAY(as_section, it) {
 		if (it == index) {
 			String *ts_entry = &ARRAY_IT(as_section, it);
-
 			s_result = S(*ts_entry);
 
 			break;
 		}
 	}
 
-	String_TrimLeft(&s_result);
-	String_TrimRight(&s_result);
+	String_Trim(s_result);
 
 	return s_result;
 }

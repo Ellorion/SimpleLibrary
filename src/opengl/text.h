@@ -85,7 +85,7 @@ Font_HasError(
 ) {
 	Assert(font);
 
-	return (!String_IsEmpty(&font->s_error));
+	return (!String_IsEmpty(font->s_error));
 }
 
 instant u32
@@ -141,18 +141,18 @@ Font_Load(
     Font font = {};
     String s_font_data = File_ReadAll(s_file, true);
 
-    if (String_IsEmpty(&s_font_data, true)) {
-		String_Append(&font.s_error, S("Font \""));
-		String_Append(&font.s_error, s_file);
-		String_Append(&font.s_error, S("\" does not exist."));
-		String_Append(&font.s_error, S("\0", 1));
+    if (String_IsEmpty(s_font_data, true)) {
+		String_Append(font.s_error, S("Font \""));
+		String_Append(font.s_error, s_file);
+		String_Append(font.s_error, S("\" does not exist."));
+		String_Append(font.s_error, S("\0", 1));
     }
     else {
 		if (stbtt_GetNumberOfFonts((u8 *)s_font_data.value) == 0) {
-			String_Append(&font.s_error, S("Font \""));
-			String_Append(&font.s_error, s_file);
-			String_Append(&font.s_error, S("\" is corrupted or not a valid TrueType font file."));
-			String_Append(&font.s_error, S("\0", 1));
+			String_Append(font.s_error, S("Font \""));
+			String_Append(font.s_error, s_file);
+			String_Append(font.s_error, S("\" is corrupted or not a valid TrueType font file."));
+			String_Append(font.s_error, S("\0", 1));
 		}
 		else {
 			font.s_data = s_font_data;
@@ -180,8 +180,8 @@ Font_Destroy(
         Codepoint_Destroy(t_codepoint);
 	}
 
-	String_Destroy(&font_out->s_data);
-	String_Destroy(&font_out->s_error);
+	String_Destroy(font_out->s_data);
+	String_Destroy(font_out->s_error);
 
 	*font_out = {};
 }
@@ -502,7 +502,7 @@ Array_Destroy(
 
 	FOR_ARRAY(*a_text_lines, it) {
 		Text_Line *t_textline = &ARRAY_IT(*a_text_lines, it);
-		String_Destroy(&t_textline->s_data);
+		String_Destroy(t_textline->s_data);
 	}
 
 	Array_DestroyContainer(a_text_lines);
@@ -518,10 +518,10 @@ Text_SetData(
 	if (text->s_data.is_reference) {
 		text->s_data = {};
 	} else {
-		String_Clear(&text->s_data);
+		String_Clear(text->s_data);
 	}
 
-	String_Append(&text->s_data, s_data);
+	String_Append(text->s_data, s_data);
 }
 
 instant Text
@@ -544,7 +544,7 @@ Text_Create(
 	text.data.align_x	= align_x;
 	text.data.color		= {1, 1, 1, 1};
 
-	if (!String_IsEmpty(&s_data))
+	if (!String_IsEmpty(s_data))
 		Text_SetData(&text, s_data);
 
 	return text;
@@ -556,7 +556,7 @@ Text_Destroy(
 ) {
 	Assert(text_out);
 
-	String_Destroy(&text_out->s_data);
+	String_Destroy(text_out->s_data);
 }
 
 instant bool
@@ -656,7 +656,7 @@ Text_CalcLineCount(
 
 		index_data += ts_word->length;
 
-		if (String_EndWith(ts_word, S("\n"), true)) {
+		if (String_EndWith(*ts_word, S("\n"), true)) {
 			++count_lines;
 			line_start = true;
 
@@ -740,7 +740,7 @@ Text_BuildLines(
 
 			index_data += ts_word->length;
 
-			if (String_EndWith(ts_word, S("\n"), true)) {
+			if (String_EndWith(*ts_word, S("\n"), true)) {
 				Array_AddEmpty(a_text_line_out, &text_line);
 				text_line->s_data.value = &ts_data->value[index_data];
 
@@ -815,7 +815,7 @@ Text_BuildLines(
 
 			index_data += ts_word->length;
 
-			if (String_EndWith(ts_word, S("\n"), true)) {
+			if (String_EndWith(*ts_word, S("\n"), true)) {
 				Array_AddEmpty(a_text_line_out, &text_line);
 				line_start = true;
 
@@ -897,11 +897,11 @@ Text_ReserveMemory(
 
 		String s_data_it = S(text_line->s_data);
 
-		while(!String_IsEmpty(&s_data_it)) {
+		while(!String_IsEmpty(s_data_it)) {
 			Codepoint codepoint;
 			s32 utf_byte_count = 0;
 
-			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
+			s32 cp = String_GetCodepoint(s_data_it, &utf_byte_count);
 
  			Codepoint_GetDataConditional(
 				font,
@@ -943,7 +943,7 @@ Text_ReserveMemory(
 				}
 			}
 
-			String_AddOffset(&s_data_it, utf_byte_count);
+			String_AddOffset(s_data_it, utf_byte_count);
 		}
 	}
 
@@ -988,11 +988,11 @@ Vertex_AddText(
 
 	u64 x_align_offset = Text_GetAlignOffsetX(font, align_x, s_data, codepoint_space.advance, rect.w);
 
-	while (!String_IsEmpty(&s_data_it)) {
+	while (!String_IsEmpty(s_data_it)) {
 		Codepoint codepoint;
 		s32 utf_byte_count = 0;
 
-		s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
+		s32 cp = String_GetCodepoint(s_data_it, &utf_byte_count);
 
 		Codepoint_GetDataConditional(
 			font,
@@ -1053,7 +1053,7 @@ Vertex_AddText(
 
 		rect_position.x += codepoint.advance - codepoint.left_side_bearing;
 
-		String_AddOffset(&s_data_it, utf_byte_count);
+		String_AddOffset(s_data_it, utf_byte_count);
 	}
 }
 
@@ -1162,7 +1162,7 @@ Text_Exists(
 ) {
 	Assert(text);
 
-	return (!String_IsEmpty(&text->s_data));
+	return (!String_IsEmpty(text->s_data));
 }
 
 instant bool
@@ -1172,7 +1172,7 @@ Text_Update(
 	Assert(text_io);
 
 	if (!text_io->font) {
-		if (!String_IsEmpty(&text_io->s_data))
+		if (!String_IsEmpty(text_io->s_data))
 			LOG_INFO("No font is set, while text is available.");
 
 		return false;
@@ -1185,7 +1185,7 @@ Text_Update(
 
 	/// redraw text
 	if (text_io->data.use_no_linebreak) {
-		String_RemoveLineBreaks(&text_io->s_data);
+		String_RemoveLineBreaks(text_io->s_data);
 	}
 
 	u64 number_of_line_breaks = 0;
@@ -1297,11 +1297,11 @@ Text_Cursor_FindIndex(
 
 		String s_data_it = S(text_line->s_data);
 
-		while(!String_IsEmpty(&s_data_it)) {
+		while(!String_IsEmpty(s_data_it)) {
 			Codepoint codepoint;
 			s32 utf_byte_count = 0;
 
-			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
+			s32 cp = String_GetCodepoint(s_data_it, &utf_byte_count);
 
 			Codepoint_GetDataConditional(
 				text->font,
@@ -1324,7 +1324,7 @@ Text_Cursor_FindIndex(
 			cursor_index += utf_byte_count;
 			rect_position_it.x += rect_position_it.w;
 
-			String_AddOffset(&s_data_it, utf_byte_count);
+			String_AddOffset(s_data_it, utf_byte_count);
 		}
 	}
 
@@ -1530,7 +1530,7 @@ Text_Cursor_Move(
 				if (cursor->data.index_select_end < text_io->s_data.length)
 					cursor->data.index_select_end -= 1;
 
-				if (String_EndWith(&text_line->s_data, S("\r\n"), true))
+				if (String_EndWith(text_line->s_data, S("\r\n"), true))
 					cursor->data.index_select_end -= 1;
 
 				if (cursor->data.index_select_end != index_cursor) {
@@ -1692,11 +1692,11 @@ Text_Cursor_Update(
 
 		index_line_x = 0;
 
-		while(!String_IsEmpty(&s_data_it)) {
+		while(!String_IsEmpty(s_data_it)) {
 			Codepoint codepoint;
 			s32 utf_byte_count = 0;
 
-			s32 cp = String_GetCodepoint(&s_data_it, &utf_byte_count);
+			s32 cp = String_GetCodepoint(s_data_it, &utf_byte_count);
 
 			Codepoint_GetDataConditional(
 				text_io->font,
@@ -1789,7 +1789,7 @@ Text_Cursor_Update(
 
 			is_newline_char_once = is_newline_char;
 
-			String_AddOffset(&s_data_it, utf_byte_count);
+			String_AddOffset(s_data_it, utf_byte_count);
 		}
 
 		if (it_line + 1 < text_io->a_text_lines.count) {
@@ -1832,7 +1832,7 @@ Text_GetSelection(
 	Assert(text);
 	Assert(s_data_out);
 
-	String_Clear(s_data_out);
+	String_Clear(*s_data_out);
 
 	Text_Cursor *cursor = &text->cursor;
 
@@ -1863,7 +1863,7 @@ Text_RemoveSelection(
 	/// overwrite selected text
 	if (cursor->data.index_select_start != cursor->data.index_select_end) {
 		String_Remove(
-			&text_io->s_data,
+			text_io->s_data,
 			cursor->data.index_select_start,
 			cursor->data.index_select_end
 		);
@@ -1962,7 +1962,7 @@ Text_UpdateInput(
 		if (offset_index_x < 0 AND cursor_index)
 			--cursor_index;
 
-		s32 codepoint = String_GetCodepointAtIndex(&text_io->s_data, cursor_index, &utf_byte_count);
+		s32 codepoint = String_GetCodepointAtIndex(text_io->s_data, cursor_index, &utf_byte_count);
 
 		if (    codepoint > 0
 			AND keyboard->pressing[VK_CONTROL]
@@ -1976,7 +1976,7 @@ Text_UpdateInput(
 						  AND cursor_index < text_io->s_data.length
 					) {
 						cursor_index += utf_byte_count;
-						codepoint = String_GetCodepointAtIndex(&text_io->s_data, cursor_index, &utf_byte_count);
+						codepoint = String_GetCodepointAtIndex(text_io->s_data, cursor_index, &utf_byte_count);
 						Assert(codepoint >= 0);
 					}
 
@@ -1986,13 +1986,13 @@ Text_UpdateInput(
             }
             else {
 				if (cursor_index) {
-					s32 codepoint = String_GetCodepointAtIndex(&text_io->s_data, cursor_index - 1, &utf_byte_count);
+					s32 codepoint = String_GetCodepointAtIndex(text_io->s_data, cursor_index - 1, &utf_byte_count);
 					Assert(codepoint >= 0);
 
 					CODEPOINT_TYPE cp_type = Codepoint_GetType(codepoint);
 
 					do {
-						codepoint = String_GetCodepointAtIndex(&text_io->s_data, --cursor_index - 1, &utf_byte_count);
+						codepoint = String_GetCodepointAtIndex(text_io->s_data, --cursor_index - 1, &utf_byte_count);
 						Assert(codepoint >= 0);
 					} while(
 							cp_type == Codepoint_GetType(codepoint)
@@ -2056,12 +2056,12 @@ Text_UpdateInput(
 				String s_clipboard = Clipboard_GetText();
 
 				cursor->move_index_x = 	String_Insert(
-											&text_io->s_data,
+											text_io->s_data,
 											s_clipboard,
 											cursor->data.index_select_end
 										);
 
-				String_Destroy(&s_clipboard);
+				String_Destroy(s_clipboard);
 
 				IF_SET(cursor_changed_out) = true;
 
@@ -2093,7 +2093,7 @@ Text_UpdateInput(
 
 				if (is_char_valid AND can_insert_char) {
 					cursor->move_index_x = String_Insert(
-												&text_io->s_data,
+												text_io->s_data,
 												key,
 												cursor->data.index_select_end
 											);
@@ -2119,7 +2119,7 @@ Text_UpdateInput(
 				AND cursor->data.index_select_end + 1 <= text_io->s_data.length) {
 
 				String_Insert(
-					&text_io->s_data,
+					text_io->s_data,
 					'\b',
 					cursor->data.index_select_end + 1
 				);
@@ -2225,7 +2225,7 @@ Text_GetSize(
 	s32 advance_space = -1
 ) {
 	Assert(font);
-	Assert(!String_IsEmpty(&s_data));
+	Assert(!String_IsEmpty(s_data));
 
 	IF_SET(height_out_opt) = Font_GetLineHeight(font);
 
