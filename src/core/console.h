@@ -2,7 +2,7 @@
 
 instant void
 ConWriteNL(
-    String s_text
+    const String &s_text
 ) {
     String_PrintLine(s_text);
 }
