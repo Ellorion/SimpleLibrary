@@ -28,24 +28,24 @@ struct CPU_Features {
 	bool _3dnow_ext;
 };
 
-instant void
+instant CPU_ID
 CPU_GetID(
-	u32 id,
-	CPU_ID *cpu_id_out
+	u32 id
 ) {
-	Assert(cpu_id_out);
+	CPU_ID cpu_id_out;
 
 	asm volatile
 		("cpuid" :
-		 "=a" (cpu_id_out->EAX), "=b" (cpu_id_out->EBX),
-		 "=c" (cpu_id_out->ECX), "=d" (cpu_id_out->EDX)
+		 "=a" (cpu_id_out.EAX), "=b" (cpu_id_out.EBX),
+		 "=c" (cpu_id_out.ECX), "=d" (cpu_id_out.EDX)
 		: "a" (id), "c" (0));
+
+    return cpu_id_out;
 }
 
 instant String
 CPU_GetVendor() {
-	CPU_ID cpu_id;
-	CPU_GetID(0, &cpu_id);
+	auto cpu_id = CPU_GetID(0);
 
 	String s_vendor = String_CreateBuffer(12);
 
@@ -58,8 +58,7 @@ CPU_GetVendor() {
 
 instant CPU_Type
 CPU_GetInfo() {
-	CPU_ID cpu_id;
-	CPU_GetID(1, &cpu_id);
+	auto cpu_id = CPU_GetID(1);
 
 	CPU_Type cpu_type = {0};
 
@@ -80,8 +79,7 @@ CPU_GetFeatures() {
 	bool is_Intel = (s_vendor == "GenuineIntel");
 	bool is_AMD   = (s_vendor == "AuthenticAMD");
 
-	CPU_ID cpu_id;
-	CPU_GetID(1, &cpu_id);
+	auto cpu_id = CPU_GetID(1);
 
 	CPU_Features cpu_features = {0};
 

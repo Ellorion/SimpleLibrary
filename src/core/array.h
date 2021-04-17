@@ -472,3 +472,41 @@ instant bool
 MatchesAny(T &checkAgainst, Array<T> &a_oneOf) {
     return Array_Find(a_oneOf, checkAgainst);
 }
+
+/// Usage:
+///     Array<String> a_test;
+///     Iter(a_test, [&](String item, u64 index) {...
+///     Iter(a_test, [&](auto item, u64 index) {...
+///     Iter(a_test, [&](const String &item, u64 index) {...
+template <class T, typename Func>
+constexpr
+instant void
+Iter(
+    Array<T> arr,
+    Func func
+) {
+    u64 index = 0;
+
+    FOR_ARRAY_START(arr, it, index) {
+        auto item = ARRAY_IT(arr, it);
+        func(item, index);
+        ++index;
+    }
+}
+
+template <class T, typename Func>
+constexpr
+instant void
+Iter(
+    Array<T> arr,
+    u64 indexStart,
+    Func func
+) {
+    u64 index = indexStart;
+
+    FOR_ARRAY_START(arr, it, index) {
+        auto item = ARRAY_IT(arr, it);
+        func(item, index);
+        ++index;
+    }
+}

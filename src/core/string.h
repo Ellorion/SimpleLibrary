@@ -1,7 +1,7 @@
 #pragma once
 
 #define String_Split Array_Split
-#define LOG(text) std::cout << text << std::endl;
+#define LOG std::cout
 
 /// set to 0 to disable it
 #define STRING_BUFFER_DEFAULT_SIZE	14
