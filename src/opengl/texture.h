@@ -120,7 +120,7 @@ Texture_Reload(
 		*texture_io = Texture_Load(image.data, image.width, image.height, format_input, false);
 		texture_io->flip_h = image.flip_h;
 
-		Image_Destroy(&image);
+		Image_Destroy(image);
 
 		return;
 	}

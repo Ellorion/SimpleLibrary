@@ -11,7 +11,7 @@ struct Image {
 /// 32-bit BMP only!
 instant Image
 Image_LoadBMP32(
-	String s_filename
+	const String &s_filename
 ) {
 	Image result = {};
 
@@ -52,11 +52,8 @@ Image_LoadBMP32(
 
 instant void
 Image_Destroy(
-	Image *image_out
+	Image &image_out
 ) {
-	Assert(image_out);
-
-	Memory_Free(image_out->data);
-
-	*image_out = {};
+	Memory_Free(image_out.data);
+    image_out = {};
 }
