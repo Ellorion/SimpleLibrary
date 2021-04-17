@@ -111,11 +111,11 @@ Vertex_Destroy(
 	FOR_ARRAY(vertex_out->a_attributes, it) {
 		Vertex_Buffer<float> *t_attribute = &ARRAY_IT(vertex_out->a_attributes, it);
 		glDeleteBuffers(1, &t_attribute->id);
-		Array_DestroyContainer(&t_attribute->a_buffer);
+		Array_DestroyContainer(t_attribute->a_buffer);
 	}
 
 	glDeleteVertexArrays(1, &vertex_out->array_id);
-	Array_DestroyContainer(&vertex_out->a_attributes);
+	Array_DestroyContainer(vertex_out->a_attributes);
 
 	*vertex_out = {};
 }
@@ -131,7 +131,7 @@ Array_Destroy(
 		Vertex_Destroy(t_vertex);
 	}
 
-	Array_DestroyContainer(a_vertex);
+	Array_DestroyContainer(*a_vertex);
 }
 
 inline void
@@ -282,7 +282,7 @@ Vertex_ClearAttributes(
 
 	FOR_ARRAY(vertex_out->a_attributes, it) {
 		auto *t_attribute = &ARRAY_IT(vertex_out->a_attributes, it);
-		Array_ClearContainer(&t_attribute->a_buffer);
+		Array_ClearContainer(t_attribute->a_buffer);
 	}
 }
 
@@ -297,7 +297,7 @@ Vertex_ClearAttributes(
 
 		FOR_ARRAY(t_vertex->a_attributes, it_attrib) {
 			auto *t_attribute = &ARRAY_IT(t_vertex->a_attributes, it_attrib);
-			Array_ClearContainer(&t_attribute->a_buffer);
+			Array_ClearContainer(t_attribute->a_buffer);
 		}
 	}
 }
@@ -384,7 +384,7 @@ Vertex_FindOrAdd(
 	Vertex  t_vertex_find;
 	t_vertex_find.texture = *texture_find;
 
-	bool found = Array_FindOrAdd(a_vertex_io, t_vertex_find, &t_vertex_entry);
+	bool found = Array_FindOrAdd(*a_vertex_io, t_vertex_find, &t_vertex_entry);
 
 	if (!t_vertex_entry->array_id)
 		Vertex_Create(t_vertex_entry, VERTEX_RECT);
@@ -409,7 +409,7 @@ Vertex_FindOrAddAttribute(
 	t_attribute_find.name = c_attribute_name;
 	t_attribute_find.group_count = group_count;
 
-	return Array_FindOrAdd(&vertex_io->a_attributes, t_attribute_find, a_buffer_out);
+	return Array_FindOrAdd(vertex_io->a_attributes, t_attribute_find, a_buffer_out);
 }
 
 instant void
@@ -423,9 +423,9 @@ Vertex_AddTexturePosition(
 	Vertex_Buffer<float> *t_attribute;
 
 	Vertex_FindOrAddAttribute(vertex_io, 2, "vertex_position", &t_attribute);
-	Array_Reserve(&t_attribute->a_buffer, 2);
-	Array_Add(&t_attribute->a_buffer, x);
-	Array_Add(&t_attribute->a_buffer, y);
+	Array_Reserve(t_attribute->a_buffer, 2);
+	Array_Add(t_attribute->a_buffer, x);
+	Array_Add(t_attribute->a_buffer, y);
 }
 
 instant void
@@ -440,18 +440,18 @@ Vertex_AddRect32(
 	Vertex_Buffer<float> *t_attribute;
 
 	Vertex_FindOrAddAttribute(vertex_io, 4, "vertex_position", &t_attribute);
-	Array_Reserve(&t_attribute->a_buffer, 4);
-	Array_Add(&t_attribute->a_buffer, (float)rect.x);
-	Array_Add(&t_attribute->a_buffer, (float)rect.y);
-	Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
-	Array_Add(&t_attribute->a_buffer, (float)rect.y + rect.h);
+	Array_Reserve(t_attribute->a_buffer, 4);
+	Array_Add(t_attribute->a_buffer, (float)rect.x);
+	Array_Add(t_attribute->a_buffer, (float)rect.y);
+	Array_Add(t_attribute->a_buffer, (float)rect.x + rect.w);
+	Array_Add(t_attribute->a_buffer, (float)rect.y + rect.h);
 
 	Vertex_FindOrAddAttribute(vertex_io, 4, "rect_color", &t_attribute);
-	Array_Reserve(&t_attribute->a_buffer, 4);
-	Array_Add(&t_attribute->a_buffer, (float)color.r);
-	Array_Add(&t_attribute->a_buffer, (float)color.g);
-	Array_Add(&t_attribute->a_buffer, (float)color.b);
-	Array_Add(&t_attribute->a_buffer, (float)color.a);
+	Array_Reserve(t_attribute->a_buffer, 4);
+	Array_Add(t_attribute->a_buffer, (float)color.r);
+	Array_Add(t_attribute->a_buffer, (float)color.g);
+	Array_Add(t_attribute->a_buffer, (float)color.b);
+	Array_Add(t_attribute->a_buffer, (float)color.a);
 }
 
 instant void
@@ -470,17 +470,17 @@ Vertex_AddPoint(
 
 	Vertex_FindOrAddAttribute(vertex_io, 3, "vertex_position", &t_attribute);
 
-	Array_Reserve(&t_attribute->a_buffer, 3);
-	Array_Add(&t_attribute->a_buffer, point.x);
-	Array_Add(&t_attribute->a_buffer, point.y);
-	Array_Add(&t_attribute->a_buffer, point.z);
+	Array_Reserve(t_attribute->a_buffer, 3);
+	Array_Add(t_attribute->a_buffer, point.x);
+	Array_Add(t_attribute->a_buffer, point.y);
+	Array_Add(t_attribute->a_buffer, point.z);
 
 	Vertex_FindOrAddAttribute(vertex_io, 4, "vertex_color", &t_attribute);
-	Array_Reserve(&t_attribute->a_buffer, 4);
-	Array_Add(&t_attribute->a_buffer, (float)color.r);
-	Array_Add(&t_attribute->a_buffer, (float)color.g);
-	Array_Add(&t_attribute->a_buffer, (float)color.b);
-	Array_Add(&t_attribute->a_buffer, (float)color.a);
+	Array_Reserve(t_attribute->a_buffer, 4);
+	Array_Add(t_attribute->a_buffer, (float)color.r);
+	Array_Add(t_attribute->a_buffer, (float)color.g);
+	Array_Add(t_attribute->a_buffer, (float)color.b);
+	Array_Add(t_attribute->a_buffer, (float)color.a);
 }
 
 instant void
@@ -494,11 +494,11 @@ Vertex_AddRectTexture(
 	Vertex_Buffer<float> *t_attribute;
 
 	Vertex_FindOrAddAttribute(vertex_io, 4, "vertex_position", &t_attribute);
-	Array_Reserve(&t_attribute->a_buffer, 4);
-	Array_Add(&t_attribute->a_buffer, (float)rect.x);
-	Array_Add(&t_attribute->a_buffer, (float)rect.y);
-	Array_Add(&t_attribute->a_buffer, (float)rect.x + rect.w);
-	Array_Add(&t_attribute->a_buffer, (float)rect.y + rect.h);
+	Array_Reserve(t_attribute->a_buffer, 4);
+	Array_Add(t_attribute->a_buffer, (float)rect.x);
+	Array_Add(t_attribute->a_buffer, (float)rect.y);
+	Array_Add(t_attribute->a_buffer, (float)rect.x + rect.w);
+	Array_Add(t_attribute->a_buffer, (float)rect.y + rect.h);
 }
 
 instant void

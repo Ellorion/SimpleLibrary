@@ -8,48 +8,62 @@
 
 #define String_SplitLinesRef	Array_SplitLinesRef
 
+constexpr
 instant String *
 Array_Add(
-    Array<String> *array_io,
+    Array<String> &arr,
     String &element
 ) {
-    Assert(array_io);
-
     constexpr u64 length = 1;
 
-    if (array_io->count + length > array_io->max) {
-        array_io->max += length;
-        array_io->memory = (String *)_Memory_Resize( array_io->memory,
-                                                array_io->max * sizeof(String));
+    if (arr.count + length > arr.max) {
+        arr.max += length;
+        arr.memory = (String *)_Memory_Resize(arr.memory,
+                                              arr.max * sizeof(String));
     }
 
-    array_io->count += length;
-    u64 target = array_io->count - 1; /// convert to index
+    arr.count += length;
+    u64 target = arr.count - 1; /// convert to index
 
-    array_io->memory[target] = element;
+    arr.memory[target] = element;
 
     /// ownership transference:
     /// prevent f.e. memory corruption with String_Destroy
     element.is_reference = true;
 
-    return &array_io->memory[target];
+    return &arr.memory[target];
 }
 
+constexpr
+instant Array<String *>
+Array_Add(
+    Array<String> &arr,
+    std::initializer_list<String> list
+) {
+    Array<String *> as_result;
+
+    for (const auto &item : list) {
+        auto pItem = Array_Add(arr, item);
+        Array_Add(as_result, pItem);
+    }
+
+    return as_result;
+}
+
+constexpr
 instant void
 Array_Destroy(
-	Array<String> *array_out
+	Array<String> &arr_out
 ) {
-	Assert(array_out);
-
-	if (!array_out->by_reference) {
-		while(array_out->count) {
-			String s_data_it = Array_Remove(array_out,
-											array_out->count - 1);
+	if (!arr_out.by_reference) {
+		while(arr_out.count) {
+			String s_data_it = Array_Remove(arr_out,
+											arr_out.count - 1);
 			String_Destroy(s_data_it);
 		}
 	}
 
-    Array_DestroyContainer(array_out);
+    Array_DestroyContainer(arr_out);
 }
 
 enum DELIMITER_TYPE {
@@ -60,22 +74,21 @@ enum DELIMITER_TYPE {
 	DELIMITER_ADD_BACK
 };
 
+constexpr
 instant void
 Array_Clear(
-	Array<String> *array_out
+	Array<String> &arr_out
 ) {
-	Assert(array_out);
-
-	if (!array_out->by_reference) {
-		FOR_ARRAY(*array_out, it) {
-			String *ts_data = &ARRAY_IT(*array_out, it);
-			String_Destroy(*ts_data);
+	if (!arr_out.by_reference) {
+		FOR_ARRAY_AUTO(arr_out, it) {
+			String_Destroy(*it);
 		}
 	}
 
-    Array_ClearContainer(array_out);
+    Array_ClearContainer(arr_out);
 }
 
+constexpr
 instant void
 Array_SplitRefBuffer(
 	Array<String> *as_buffer_out,
@@ -86,7 +99,7 @@ Array_SplitRefBuffer(
 ) {
 	Assert(s_data);
 
-	Array_Clear(as_buffer_out);
+	Array_Clear(*as_buffer_out);
 	as_buffer_out->by_reference = true;
 
 	String s_data_it = S(*s_data);
@@ -111,7 +124,7 @@ Array_SplitRefBuffer(
 
 		if (index_found OR add_empty_entry) {
 			String *s_element;
-			Array_AddEmpty(as_buffer_out, &s_element);
+			Array_AddEmpty(*as_buffer_out, &s_element);
 
 			if (type == DELIMITER_ADD_BACK OR index_found == 0)
 				s_element->length += s_delimiter.length;
@@ -158,7 +171,7 @@ Array_SplitBuffer(
 	Assert(s_data);
 	Assert(as_buffer_out);
 
-	Array_Clear(as_buffer_out);
+	Array_Clear(*as_buffer_out);
 
 	String s_data_it = S(*s_data);
 
@@ -177,13 +190,13 @@ Array_SplitBuffer(
 				String_Append(s_element, s_delimiter);
 			}
 
-			Array_Add(as_buffer_out, s_element);
+			Array_Add(*as_buffer_out, s_element);
 		}
 		else
 		if (add_empty_entry) {
 			/// in case of f.e: "\n\n\n" with "\n" as delimiter
 			String *s_element;
-			Array_AddEmpty(as_buffer_out, &s_element);
+			Array_AddEmpty(*as_buffer_out, &s_element);
 
 			if (type == DELIMITER_ADD_BACK) {
 				String_Append(*s_element, s_delimiter);
@@ -201,7 +214,7 @@ Array_SplitBuffer(
 			String_Append(s_element, s_delimiter);
 
 		String_Append(s_element, s_data_it);
-		Array_Add(as_buffer_out, s_element);
+		Array_Add(*as_buffer_out, s_element);
 	}
 }
 
@@ -244,7 +257,7 @@ Array_SplitLinesRef(
 		/// no endline char found -> add string remainder
 		if (index < 0) {
 			if (include_empty_lines OR !String_IsEmpty(s_data_it, true))
-				Array_Add(&as_result, s_data_it);
+				Array_Add(as_result, s_data_it);
 
 			break;
 		}
@@ -252,7 +265,7 @@ Array_SplitLinesRef(
 		String s_data_adding = S(s_data_it, index);
 
 		if (include_empty_lines OR !String_IsEmpty(s_data_adding, true))
-			Array_Add(&as_result, s_data_adding);
+			Array_Add(as_result, s_data_adding);
 
 		/// skip "\r" or "\n"
 		String_AddOffset(s_data_it, index + 1);
@@ -280,11 +293,11 @@ Array_SplitWordsBuffer(
 	MEASURE_START();
 
 	if (as_words_out->max) {
-		Array_Clear(as_words_out);
+		Array_Clear(*as_words_out);
 	}
 	else {
 		as_words_out->by_reference = true;
-		Array_Reserve(as_words_out, String_CalcWordCount(*s_data));
+		Array_Reserve(*as_words_out, String_CalcWordCount(*s_data));
 	}
 
 	if (String_IsEmpty(*s_data))
@@ -292,7 +305,7 @@ Array_SplitWordsBuffer(
 
 	String *s_element;
 
-	Array_AddEmpty(as_words_out, &s_element);
+	Array_AddEmpty(*as_words_out, &s_element);
 
 	u64 index_start = 0;
 	u64 index_end   = 0;
@@ -312,7 +325,7 @@ Array_SplitWordsBuffer(
 				s_element->length = (index_end - index_start);
 			}
 
-			Array_AddEmpty(as_words_out, &s_element);
+			Array_AddEmpty(*as_words_out, &s_element);
 
 			if (value == '\n')
 				++number_of_linebreaks;
@@ -391,7 +404,7 @@ String_GetDelimiterSection(
 
 	static Array<String> as_section;
 
-	Array_Clear(&as_section);
+	Array_Clear(as_section);
 	as_section = Array_Split(s_data, s_delimiter, DELIMITER_IGNORE, true);
 
 	FOR_ARRAY(as_section, it) {
@@ -420,7 +433,7 @@ String_GetDelimiterSectionRef(
 	/// since it is likely to be used more than once
 	static Array<String> as_section;
 
-	Array_Clear(&as_section);
+	Array_Clear(as_section);
 	as_section = Array_SplitRef(s_data, s_delimiter, DELIMITER_IGNORE, true);
 
 	FOR_ARRAY(as_section, it) {

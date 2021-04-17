@@ -152,29 +152,29 @@ String_PrintLine(
 constexpr
 instant void
 String_AddOffset(
-	String &s_data_io,
+	String &s_data,
 	s64 offset
 ) {
-	Assert(s_data_io.is_reference);
+	Assert(s_data.is_reference);
 
-	u64 prev_length = s_data_io.length;
+	u64 prev_length = s_data.length;
 	u64 next_length = prev_length -= offset;
 
 	/// underflow prevention
 	if (    offset > 0
 		AND next_length > prev_length
 	) {
-		s_data_io.value  += s_data_io.length;
-		s_data_io.length -= s_data_io.length;
+		s_data.value  += s_data.length;
+		s_data.length -= s_data.length;
 	}
 	else {
-		s_data_io.value  += offset;
+		s_data.value  += offset;
 
 		/// underflow check
-		if (s_data_io.length - offset < s_data_io.length)
-			s_data_io.length -= offset;
+		if (s_data.length - offset < s_data.length)
+			s_data.length -= offset;
 		else
-			s_data_io.length  = 0;
+			s_data.length  = 0;
 	}
 }
 
@@ -213,15 +213,15 @@ String_IsEmpty(
 constexpr
 instant void
 String_Destroy(
-	String &s_data_io
+	String &s_data
 ) {
-	if (!s_data_io.is_reference) {
-		Memory_Free(s_data_io.value);
+	if (!s_data.is_reference) {
+		Memory_Free(s_data.value);
 	}
 
-	s_data_io = {};
+	s_data = {};
 
-	s_data_io.has_changed = true;
+	s_data.has_changed = true;
 }
 
 constexpr
@@ -250,27 +250,27 @@ String_Copy(
 constexpr
 instant void
 String_Resize(
-	String &s_data_io,
+	String &s_data,
 	s64 new_length
 ) {
 	Assert(new_length > 0);
 
-	if (new_length > (s64)s_data_io.length) {
-		char *t_value_old = s_data_io.value;
-		s_data_io.value = Memory_Resize(t_value_old, char, new_length);
+	if (new_length > (s64)s_data.length) {
+		char *t_value_old = s_data.value;
+		s_data.value = Memory_Resize(t_value_old, char, new_length);
 	}
 
-	s_data_io.length = new_length;
+	s_data.length = new_length;
 }
 
 constexpr
 instant bool
 String_Append(
-	String &s_dest_io,
+	String &s_data,
 	const String &s_source,
 	u64 length_append = 0
 ) {
-    Assert(!s_dest_io.is_reference);
+    Assert(!s_data.is_reference);
 
     if (length_append == 0)
 		length_append = s_source.length;
@@ -282,11 +282,11 @@ String_Append(
 
 	Assert(length_append <= s_source.length);
 
-	u64 index_start = s_dest_io.length;
-	String_Resize(s_dest_io, s_dest_io.length + length_append);
-	Memory_Copy(s_dest_io.value + index_start, s_source.value, length_append);
+	u64 index_start = s_data.length;
+	String_Resize(s_data, s_data.length + length_append);
+	Memory_Copy(s_data.value + index_start, s_source.value, length_append);
 
-	s_dest_io.has_changed = true;
+	s_data.has_changed = true;
 
 	return true;
 }
@@ -294,21 +294,21 @@ String_Append(
 constexpr
 instant u64
 String_Insert(
-	String &s_dest_io,
+	String &s_data,
 	const String &s_source,
 	u64 index_start
 ) {
-	Assert(!s_dest_io.is_reference);
+	Assert(!s_data.is_reference);
 
-	u64 dest_length_old = s_dest_io.length;
+	u64 dest_length_old = s_data.length;
 
-	String_Resize(s_dest_io, s_dest_io.length + s_source.length);
+	String_Resize(s_data, s_data.length + s_source.length);
 
-	Memory_Copy(s_dest_io.value + index_start + s_source.length,
-				s_dest_io.value + index_start,
+	Memory_Copy(s_data.value + index_start + s_source.length,
+				s_data.value + index_start,
 				dest_length_old - index_start);
 
-	Memory_Copy(s_dest_io.value + index_start,
+	Memory_Copy(s_data.value + index_start,
 				s_source.value,
 				s_source.length);
 
@@ -648,14 +648,14 @@ String_FindRev(
 constexpr
 instant void
 String_Cut(
-	String &s_data_io,
+	String &s_data,
 	u32 length
 ) {
-    Assert(!s_data_io.is_reference);
+    Assert(!s_data.is_reference);
 
-	if (length < s_data_io.length) {
-		s_data_io.length = length;
-		s_data_io.has_changed = true;
+	if (length < s_data.length) {
+		s_data.length = length;
+		s_data.has_changed = true;
 	}
 }
 
@@ -682,74 +682,74 @@ String_EndWith(
 constexpr
 instant void
 String_ToLower(
-	String &s_data_io
+	String &s_data
 ) {
-	Assert(!s_data_io.is_reference);
+	Assert(!s_data.is_reference);
 
 	u64 index = 0;
-	u64 len_max = s_data_io.length + 1;
+	u64 len_max = s_data.length + 1;
 
 	while(index < len_max) {
-        String_ToLower(s_data_io.value[index]);
+        String_ToLower(s_data.value[index]);
 		++index;
 	}
 
-	s_data_io.has_changed = true;
+	s_data.has_changed = true;
 }
 
 constexpr
 instant void
 String_ToUpper(
-	String &s_data_io
+	String &s_data
 ) {
-	Assert(!s_data_io.is_reference);
+	Assert(!s_data.is_reference);
 
 	u64 index = 0;
-	u64 len_max = s_data_io.length + 1;
+	u64 len_max = s_data.length + 1;
 
 	while(index < len_max) {
-        String_ToUpper(s_data_io.value[index]);
+        String_ToUpper(s_data.value[index]);
 		++index;
 	}
 
-	s_data_io.has_changed = true;
+	s_data.has_changed = true;
 }
 
 /// no utf support
 constexpr
 instant void
 String_Reverse(
-	String &s_data_io
+	String &s_data
 ) {
-    Assert(!s_data_io.is_reference);
+    Assert(!s_data.is_reference);
 
-	u64 length = s_data_io.length;
+	u64 length = s_data.length;
 
 	for(u64 it = 0; it < (length >> 1); ++it) {
-		char temp = s_data_io.value[it];
+		char temp = s_data.value[it];
 		/// don't reverse the '\0'!
-		s_data_io.value[it] = s_data_io.value[length - it - 1];
-		s_data_io.value[length - it - 1] = temp;
+		s_data.value[it] = s_data.value[length - it - 1];
+		s_data.value[length - it - 1] = temp;
 	}
 
-	s_data_io.has_changed = true;
+	s_data.has_changed = true;
 }
 
 constexpr
 instant void
 String_TrimLeft(
-	String &s_data_io
+	String &s_data
 ) {
-	if (s_data_io.is_reference) {
-		while(!String_IsEmpty(s_data_io)) {
-			char ch = s_data_io.value[0];
+	if (s_data.is_reference) {
+		while(!String_IsEmpty(s_data)) {
+			char ch = s_data.value[0];
 
 			switch (ch) {
 				case ' ':
 				case '\r':
 				case '\n':
 				case '\t': {
-					String_AddOffset(s_data_io, 1);
+					String_AddOffset(s_data, 1);
 					continue;
 				} break;
 			}
@@ -758,7 +758,7 @@ String_TrimLeft(
 		}
 	}
 	else {
-		String s_data_it = S(s_data_io);
+		String s_data_it = S(s_data);
 
 		u64 trim_length = 0;
 
@@ -780,9 +780,9 @@ String_TrimLeft(
 		}
 
 		if (trim_length) {
-			s_data_io.length -= trim_length;
-			Memory_Copy(s_data_io.value, s_data_io.value + trim_length, s_data_io.length);
-			s_data_io.has_changed = true;
+			s_data.length -= trim_length;
+			Memory_Copy(s_data.value, s_data.value + trim_length, s_data.length);
+			s_data.has_changed = true;
 		}
 	}
 }
@@ -790,16 +790,16 @@ String_TrimLeft(
 constexpr
 instant void
 String_TrimRight(
-	String &s_data_io
+	String &s_data
 ) {
-	if (String_IsEmpty(s_data_io, false))
+	if (String_IsEmpty(s_data, false))
 		return;
 
-	u64 length = s_data_io.length;
+	u64 length = s_data.length;
 
 	while(length > 0) {
-		if (    s_data_io.value[length - 1] <= 32
-			AND s_data_io.value[length - 1] != 127
+		if (    s_data.value[length - 1] <= 32
+			AND s_data.value[length - 1] != 127
 		) {
 			--length;
 		}
@@ -808,27 +808,27 @@ String_TrimRight(
 		}
 	}
 
-	s_data_io.length  = length;
-	s_data_io.has_changed = true;
+	s_data.length  = length;
+	s_data.has_changed = true;
 }
 
 constexpr
 instant void
 String_Trim(
-	String &s_data_io
+	String &s_data
 ) {
-	String_TrimLeft(s_data_io);
-	String_TrimRight(s_data_io);
+	String_TrimLeft(s_data);
+	String_TrimRight(s_data);
 }
 
 constexpr
 instant u64
 String_Remove(
-	String &s_data_io,
+	String &s_data,
 	s64 index_start,
 	s64 index_end
 ) {
-	Assert(!s_data_io.is_reference);
+	Assert(!s_data.is_reference);
 
 	Assert(index_start >= 0);
 	Assert(index_end   >= 0);
@@ -839,16 +839,16 @@ String_Remove(
 	if (index_start > index_end)
 		SWAP(s64, &index_start, &index_end);
 
-	if (index_end > (s64)s_data_io.length)
-		index_end = s_data_io.length;
+	if (index_end > (s64)s_data.length)
+		index_end = s_data.length;
 
-	u64 length = s_data_io.length - index_end;
+	u64 length = s_data.length - index_end;
 	u64 rm_count = (index_end - index_start);
 
-	Memory_Copy(s_data_io.value + index_start, s_data_io.value + index_end, length);
-	s_data_io.length -= rm_count;
+	Memory_Copy(s_data.value + index_start, s_data.value + index_end, length);
+	s_data.length -= rm_count;
 
-	s_data_io.has_changed = true;
+	s_data.has_changed = true;
 
 	return rm_count;
 }
@@ -856,38 +856,38 @@ String_Remove(
 constexpr
 instant void
 String_Replace(
-	String &s_data_io,
+	String &s_data,
 	const String &s_find,
 	const String &s_replace
 ) {
-	Assert(!s_data_io.is_reference);
+	Assert(!s_data.is_reference);
 
 	s64 index_found = 0;
 	s64 index_start = 0;
 
-  	while(String_Find(s_data_io, s_find, &index_found, index_start)) {
-		String_Remove(s_data_io, index_found, index_found + s_find.length);
-		String_Insert(s_data_io, s_replace, index_found);
+  	while(String_Find(s_data, s_find, &index_found, index_start)) {
+		String_Remove(s_data, index_found, index_found + s_find.length);
+		String_Insert(s_data, s_replace, index_found);
 		index_start += index_found + s_replace.length;
 	}
 
-	s_data_io.has_changed = true;
+	s_data.has_changed = true;
 }
 
 constexpr
 instant void
 String_RemoveLineBreaks(
-	String &s_data_io
+	String &s_data
 ) {
-	Assert(!s_data_io.is_reference);
+	Assert(!s_data.is_reference);
 
 	{ // "\r"
 		String s_find = S("\r");
 
 		s64 index_found = 0;
 
-		while(String_Find(s_data_io, s_find, &index_found, index_found)) {
-			String_Remove(s_data_io, index_found, index_found + s_find.length);
+		while(String_Find(s_data, s_find, &index_found, index_found)) {
+			String_Remove(s_data, index_found, index_found + s_find.length);
 		}
 	}
 
@@ -896,35 +896,35 @@ String_RemoveLineBreaks(
 
 		s64 index_found = 0;
 
-		while(String_Find(s_data_io, s_find, &index_found, index_found)) {
-			String_Remove(s_data_io, index_found, index_found + s_find.length);
+		while(String_Find(s_data, s_find, &index_found, index_found)) {
+			String_Remove(s_data, index_found, index_found + s_find.length);
 		}
 	}
 
-	s_data_io.has_changed = true;
+	s_data.has_changed = true;
 }
 
 constexpr
 instant void
 String_Cut(
-	String &s_data_io,
+	String &s_data,
 	const String &s_start,
 	const String &s_end
 ) {
-    Assert(!s_data_io.is_reference);
+    Assert(!s_data.is_reference);
 
 	s64 start = 0, end = 0;
 
 	while (true) {
-		start = String_IndexOf(s_data_io, s_start, 0, true);
+		start = String_IndexOf(s_data, s_start, 0, true);
 
 		if (start < 0)
 			break;
 
-		end = String_IndexOf(s_data_io, s_end, start, true);
+		end = String_IndexOf(s_data, s_end, start, true);
 
 		if (end > start)
-			String_Remove(s_data_io, start, end + s_end.length);
+			String_Remove(s_data, start, end + s_end.length);
 		else
 			break;
 	}
@@ -974,11 +974,11 @@ String_GetCodepointAtIndex(
 constexpr
 instant s64
 String_Insert(
-	String &s_data_io,
+	String &s_data,
 	const char c_data,
 	u64 index_start
 ) {
-	Assert(!s_data_io.is_reference);
+	Assert(!s_data.is_reference);
 
 	s32 length = 0;
 
@@ -988,29 +988,29 @@ String_Insert(
 			length = 0;
 
 			/// nothing to remove
-			if (String_IsEmpty(s_data_io))
+			if (String_IsEmpty(s_data))
 				return 0;
 
 			/// overflow prevention
-			if (index_start > s_data_io.length)
-				index_start = s_data_io.length;
+			if (index_start > s_data.length)
+				index_start = s_data.length;
 
 			bool is_return = false;
 
 			/// remove 2 chars, if it is line-break
 			/// ---------------------------------------------------------------
-			if (s_data_io.value[index_start + length - 1] == '\n') {
+			if (s_data.value[index_start + length - 1] == '\n') {
 				--length;
 				is_return = true;
 			}
 
-			if (s_data_io.value[index_start + length - 1] == '\r') {
+			if (s_data.value[index_start + length - 1] == '\r') {
 				--length;
 
 				/// index between '\r\n'
 				/// -> if '\r' should be removed, remove '\n' too
-				if (!is_return AND (index_start < s_data_io.length)) {
-					if (s_data_io.value[index_start + length + 1] == '\n') {
+				if (!is_return AND (index_start < s_data.length)) {
+					if (s_data.value[index_start + length + 1] == '\n') {
 						--length;
 						++index_start;
 					}
@@ -1020,7 +1020,7 @@ String_Insert(
 			/// no linebreak chars to remove -> check for utf-8 bytes
 			if (!length) {
 				s32 utf_byte_count = 0;
-				String_GetCodepointAtIndex(s_data_io, index_start - 1, &utf_byte_count);
+				String_GetCodepointAtIndex(s_data, index_start - 1, &utf_byte_count);
  				length = -utf_byte_count;
 
 				s64 index_end = index_start + length;
@@ -1029,13 +1029,13 @@ String_Insert(
 					index_start = index_start - index_end;
 			}
 
-			String_Remove(s_data_io, index_start, index_start + length);
+			String_Remove(s_data, index_start, index_start + length);
 		}
 	}
 	else
 	if (c_data == '\r' OR c_data == '\n') {
 		length = 1;
- 		String_Insert(s_data_io, S("\n"), index_start);
+ 		String_Insert(s_data, S("\n"), index_start);
 	}
 	else {
 		length = 1;
@@ -1046,10 +1046,10 @@ String_Insert(
 		s_data.has_changed = true;
 		s_data.is_reference = true;
 
-		String_Insert(s_data_io, s_data, index_start);
+		String_Insert(s_data, s_data, index_start);
 	}
 
-	s_data_io.has_changed = true;
+	s_data.has_changed = true;
 
 	return length;
 }
@@ -1079,47 +1079,47 @@ String_CalcWordCount(
 constexpr
 instant bool
 String_AppendCircle(
-	String &s_data_io,
-	const String &s_data,
+	String &s_data,
+	const String &s_input,
 	u32 buffer_limit,
 	bool reset_full_buffer
 ) {
-	Assert(!s_data_io.is_reference);
+	Assert(!s_data.is_reference);
 
-	if (String_IsEmpty(s_data, false))  return false;
+	if (String_IsEmpty(s_input, false))  return false;
 	if (!buffer_limit)  	             return false;
 
-	if (s_data_io.length + s_data.length > buffer_limit) {
+	if (s_data.length + s_input.length > buffer_limit) {
 		if (reset_full_buffer) {
-			String_Clear(s_data_io);
+			String_Clear(s_data);
 		}
 		else {
-			u32 diff = (s_data_io.length + s_data.length) - buffer_limit;
-			String_Remove(s_data_io, 0, diff);
+			u32 diff = (s_data.length + s_input.length) - buffer_limit;
+			String_Remove(s_data, 0, diff);
 		}
 	}
 
-	String_Append(s_data_io, s_data);
+	String_Append(s_data, s_data);
 
-	return (s_data_io.length == buffer_limit);
+	return (s_data.length == buffer_limit);
 }
 
 constexpr
 instant void
 String_Overwrite(
-	String &s_dest_io,
+	String &s_dest,
 	const String &s_source
 ) {
-	String_Clear(s_dest_io);
-	String_Append(s_dest_io, s_source);
+	String_Clear(s_dest);
+	String_Append(s_dest, s_source);
 }
 
 constexpr
 instant void
 String_Flush(
-	String &s_data_io
+	String &s_data
 ) {
-	Memory_Set(s_data_io.value, 0, s_data_io.length);
+	Memory_Set(s_data.value, 0, s_data.length);
 }
 
 constexpr

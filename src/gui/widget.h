@@ -172,7 +172,7 @@ Array_Destroy(
 		String_Destroy(t_column->s_name);
 	}
 
-	Array_DestroyContainer(a_columns);
+	Array_DestroyContainer(*a_columns);
 }
 
 instant void
@@ -263,7 +263,7 @@ Widget_AddRowSingle(
 	}
 
 	String *ts_data;
-	Array_AddEmpty(&widget_io->data.as_row_data, &ts_data);
+	Array_AddEmpty(widget_io->data.as_row_data, &ts_data);
 	*ts_data = String_Copy(s_row_data.value, s_row_data.length);
 }
 
@@ -587,7 +587,7 @@ Widget_Redraw(
 				Array_Destroy(&widget_io->a_vertex_fans);
 
 				Vertex *vertex_new;
-				Array_AddEmpty(&widget_io->a_vertex_fans, &vertex_new);
+				Array_AddEmpty(widget_io->a_vertex_fans, &vertex_new);
 
 				if (widget_io->data.has_focus) {
 					Vertex_CreateCircleBuffer(vertex_new,
@@ -604,7 +604,7 @@ Widget_Redraw(
 
 				widget_io->data.border_size = (widget_io->text.font->size / 10);
 
-				Array_AddEmpty(&widget_io->a_vertex_fans, &vertex_new);
+				Array_AddEmpty(widget_io->a_vertex_fans, &vertex_new);
 
 				Vertex_CreateCircleBuffer(vertex_new,
 										  pt_center,
@@ -612,7 +612,7 @@ Widget_Redraw(
 										  widget_io->data.color_background);
 
 				if (widget_io->data.is_checked) {
-					Array_AddEmpty(&widget_io->a_vertex_fans, &vertex_new);
+					Array_AddEmpty(widget_io->a_vertex_fans, &vertex_new);
 
 					Vertex_CreateCircleBuffer(vertex_new,
 										  pt_center,
@@ -1053,8 +1053,8 @@ Widget_Update(
 		Widget_UseScrollDefault(widget_io);
 
 		Array_Filter(
-			&widget_io->data.as_filter_data,
-			&widget_io->data.as_row_data,
+			widget_io->data.as_filter_data,
+			widget_io->data.as_row_data,
 
 			[&](String s_value) {
 				return (String_IndexOf(
@@ -1267,15 +1267,15 @@ Widget_UpdateFocus(
 		return;
 
 	static Array<Widget *> ap_widgets_all;
-	Array_ClearContainer(&ap_widgets_all);
+	Array_ClearContainer(ap_widgets_all);
 
 	FOR_ARRAY(*ap_widgets_io, it_widget) {
 		Widget *t_widget = ARRAY_IT(*ap_widgets_io, it_widget);
-		Array_Add(&ap_widgets_all, t_widget);
+		Array_Add(ap_widgets_all, t_widget);
 
 		FOR_ARRAY(t_widget->a_subwidgets, it_sub) {
 			Widget *t_subwidget = &ARRAY_IT(t_widget->a_subwidgets, it_sub);
-			Array_Add(&ap_widgets_all, t_subwidget);
+			Array_Add(ap_widgets_all, t_subwidget);
 		}
 	}
 
@@ -1889,7 +1889,7 @@ Widget_ClearRows(
 	Assert(widget_io);
 	Assert(widget_io->type == WIDGET_LISTBOX);
 
-	Array_Clear(&widget_io->data.as_row_data);
+	Array_Clear(widget_io->data.as_row_data);
 
 	Widget_UseScrollDefault(widget_io);
 }
@@ -1905,12 +1905,12 @@ Layout_Add(
 	Layout_Add(layout_io, &widget->layout_data);
 
 	/// convinence
-	Array_Add(&layout_io->ap_widgets, widget);
+	Array_Add(layout_io->ap_widgets, widget);
 
 	Layout_Block *last_block = 0;
 	Layout_GetLastBlock(layout_io, &last_block);
 
-	Array_Add(&last_block->ap_widgets, widget);
+	Array_Add(last_block->ap_widgets, widget);
 }
 
 instant void
@@ -1933,7 +1933,7 @@ Widget_LoadDirectoryList(
 		String_Destroy(t_entry->s_name);
 	}
 
-	Array_ClearContainer(a_entries_out);
+	Array_ClearContainer(*a_entries_out);
 
 	widget_io->data.selected_row_id = 0;
 
@@ -2270,10 +2270,10 @@ Widget_CreateNumberPicker(
 	String_Append(wg_label.text.s_data, S(c_value));
 	Memory_Free(c_value);
 
-	Array_Add(&t_widget.a_subwidgets, wg_label);
-	Array_Add(&t_widget.a_subwidgets, wg_button_up);
-	Array_Add(&t_widget.a_subwidgets, wg_button_down);
-	Array_Add(&t_widget.a_subwidgets, wg_spreader);
+	Array_Add(t_widget.a_subwidgets, wg_label);
+	Array_Add(t_widget.a_subwidgets, wg_button_up);
+	Array_Add(t_widget.a_subwidgets, wg_button_down);
+	Array_Add(t_widget.a_subwidgets, wg_spreader);
 
 	return t_widget;
 }
@@ -2507,13 +2507,13 @@ Widget_CreateComboBox(
 	wg_button.text.data.rect_padding = {3, -1, 3, -1};
 	wg_button.data.border_size = 2;
 
-	Widget *twg_text = Array_Add(&t_widget.a_subwidgets, wg_text);
+	Widget *twg_text = Array_Add(t_widget.a_subwidgets, wg_text);
 	Assert(t_widget.a_subwidgets.count - 1 == WIDGET_COMBOBOX_TEXT);
 
-	Widget *twg_button = Array_Add(&t_widget.a_subwidgets, wg_button);
+	Widget *twg_button = Array_Add(t_widget.a_subwidgets, wg_button);
 	Assert(t_widget.a_subwidgets.count - 1 == WIDGET_COMBOBOX_TOGGLE);
 
-	Widget *twg_list   = Array_Add(&t_widget.a_subwidgets, wg_list);
+	Widget *twg_list   = Array_Add(t_widget.a_subwidgets, wg_list);
 	Assert(t_widget.a_subwidgets.count - 1 == WIDGET_COMBOBOX_LIST);
 
 	twg_list->widget_focus_on_popout = twg_text;
@@ -2601,7 +2601,7 @@ Widget_AddColumn(
 	else
 		column.width = width_in_pixel;
 
-	Array_Add(&widget_io->data.a_table_columns, column);
+	Array_Add(widget_io->data.a_table_columns, column);
 }
 
 instant void

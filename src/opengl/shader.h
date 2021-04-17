@@ -72,7 +72,7 @@ ShaderSet_Add(
     Assert(shader);
 
 	ShaderProgram *shader_prog;
-	u64 array_id = Array_AddEmpty(&shader_set_io->a_shaders, &shader_prog);
+	u64 array_id = Array_AddEmpty(shader_set_io->a_shaders, &shader_prog);
 
 	AssertMessage(	array_id == shader->type,
 					"[ShaderSet] Shader added out of SHADER_PROG_TYPE order.");

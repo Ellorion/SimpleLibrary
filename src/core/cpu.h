@@ -112,17 +112,17 @@ CPU_GetFeaturesList(
 
 	CPU_Features cpu_features = CPU_GetFeatures();
 
-	if (cpu_features.mmx)     Array_Add(&a_features_out, S("MMX"));
-	if (cpu_features.mmx_ext) Array_Add(&a_features_out, S("MMX Ext"));
+	if (cpu_features.mmx)     Array_Add(a_features_out, S("MMX"));
+	if (cpu_features.mmx_ext) Array_Add(a_features_out, S("MMX Ext"));
 
-	if (cpu_features.sse)     Array_Add(&a_features_out, S("SSE"));
-	if (cpu_features.sse2)    Array_Add(&a_features_out, S("SSE2"));
-	if (cpu_features.sse3)    Array_Add(&a_features_out, S("SSE3"));
-	if (cpu_features.sse4_1)  Array_Add(&a_features_out, S("SSE4.1"));
-	if (cpu_features.sse4_2)  Array_Add(&a_features_out, S("SSE4.2"));
+	if (cpu_features.sse)     Array_Add(a_features_out, S("SSE"));
+	if (cpu_features.sse2)    Array_Add(a_features_out, S("SSE2"));
+	if (cpu_features.sse3)    Array_Add(a_features_out, S("SSE3"));
+	if (cpu_features.sse4_1)  Array_Add(a_features_out, S("SSE4.1"));
+	if (cpu_features.sse4_2)  Array_Add(a_features_out, S("SSE4.2"));
 
-	if (cpu_features._3dnow)     Array_Add(&a_features_out, S("3DNow"));
-	if (cpu_features._3dnow_ext) Array_Add(&a_features_out, S("3DNow Ext"));
+	if (cpu_features._3dnow)     Array_Add(a_features_out, S("3DNow"));
+	if (cpu_features._3dnow_ext) Array_Add(a_features_out, S("3DNow Ext"));
 
 	return a_features_out;
 }

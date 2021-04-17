@@ -6,7 +6,7 @@ Array<u32> Prime_Fill(u32 max) {
     if (max+1 > max)
         ++max;
 
-    Array_Reserve(&a_prime, max);
+    Array_Reserve(a_prime, max);
 
     auto isUnknownPrime = [&](Array<u32> a_prime, u32 x) -> bool {
         u32 q = sqrt(x);
@@ -37,14 +37,14 @@ Array<u32> Prime_Fill(u32 max) {
             continue;
 
         if (isUnknownPrime(a_prime, it))
-            Array_Add(&a_prime, it);
+            Array_Add(a_prime, it);
     }
 
-    if (max > 0) Array_Add(&a_prime, 1u);
-    if (max > 1) Array_Add(&a_prime, 2u);
-    if (max > 2) Array_Add(&a_prime, 3u);
-    if (max > 4) Array_Add(&a_prime, 5u);
-    if (max > 6) Array_Add(&a_prime, 7u);
+    if (max > 0) Array_Add(a_prime, 1u);
+    if (max > 1) Array_Add(a_prime, 2u);
+    if (max > 2) Array_Add(a_prime, 3u);
+    if (max > 4) Array_Add(a_prime, 5u);
+    if (max > 6) Array_Add(a_prime, 7u);
 
     return a_prime;
 }

@@ -27,10 +27,10 @@ Array_Destroy(
 		Tuple<Texture, Array<float>> *t_tuple = &ARRAY_IT(*array_out, it);
 		Array<float> *a_second = &t_tuple->second;
 
-		Array_DestroyContainer(a_second);
+		Array_DestroyContainer(*a_second);
 	}
 
-	Array_DestroyContainer(array_out);
+	Array_DestroyContainer(*array_out);
 }
 
 instant bool

@@ -59,7 +59,7 @@ Profiler_AnalyseDependencies(
 					dep_entry->s_file = String_Copy(dep_entry->s_file);
 
 				String *added_element;
-				if (Array_AddUnique(&dep_entry->as_depencency, s_filepath, &added_element)) {
+				if (Array_AddUnique(dep_entry->as_depencency, s_filepath, &added_element)) {
 					*added_element = String_Copy(*added_element);
 				}
 			}
@@ -119,8 +119,8 @@ Array_Destroy(
 			String_Destroy(*s_dependency);
 		}
 
-		Array_DestroyContainer(&dep->as_depencency);
+		Array_DestroyContainer(dep->as_depencency);
 	}
 
-	Array_DestroyContainer(a_dependencies);
+	Array_DestroyContainer(*a_dependencies);
 }

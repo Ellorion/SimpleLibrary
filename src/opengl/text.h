@@ -291,7 +291,7 @@ Codepoint_GetData(
 
     Codepoint *t_entry;
 
-    if (!Array_FindOrAdd(&font->a_codepoint, t_codepoint_find, &t_entry)) {
+    if (!Array_FindOrAdd(font->a_codepoint, t_codepoint_find, &t_entry)) {
 		/// get texture
 		t_entry->texture = Codepoint_ToTexture(font, codepoint);
     }
@@ -505,7 +505,7 @@ Array_Destroy(
 		String_Destroy(t_textline->s_data);
 	}
 
-	Array_DestroyContainer(a_text_lines);
+	Array_DestroyContainer(*a_text_lines);
 }
 
 instant void
@@ -707,18 +707,18 @@ Text_BuildLines(
 
 	MEASURE_START();
 
-	Array_ClearContainer(a_text_line_out);
+	Array_ClearContainer(*a_text_line_out);
 
 	/// convert to number of fixed line-breaks
 	if (!text->data.use_word_wrap) {
-		Array_Reserve(a_text_line_out, number_of_linebreaks + 1);
+		Array_Reserve(*a_text_line_out, number_of_linebreaks + 1);
 
 		/// words will be in sequential order in memory!
 		u64 index_data = 0;
 		String *ts_data = &ARRAY_IT(*as_words, 0);
 
 		if (as_words->count) {
-			Array_AddEmpty(a_text_line_out, &text_line);
+			Array_AddEmpty(*a_text_line_out, &text_line);
 			text_line->s_data.value = &ts_data->value[index_data];
 
 			current_height += line_height;
@@ -741,7 +741,7 @@ Text_BuildLines(
 			index_data += ts_word->length;
 
 			if (String_EndWith(*ts_word, S("\n"), true)) {
-				Array_AddEmpty(a_text_line_out, &text_line);
+				Array_AddEmpty(*a_text_line_out, &text_line);
 				text_line->s_data.value = &ts_data->value[index_data];
 
 				/// height for the next (empty) line
@@ -777,7 +777,7 @@ Text_BuildLines(
 		String *ts_data = &ARRAY_IT(*as_words, 0);
 
 		if (as_words->count) {
-			Array_AddEmpty(a_text_line_out, &text_line);
+			Array_AddEmpty(*a_text_line_out, &text_line);
 			current_height += line_height;
 			text_line->s_data.value = ts_data->value;
 		}
@@ -801,7 +801,7 @@ Text_BuildLines(
 				AND (rect_line_current.x - rect.x) + advance_word > rect.w
 				AND !text->data.use_no_linebreak
 			) {
-				Array_AddEmpty(a_text_line_out, &text_line);
+				Array_AddEmpty(*a_text_line_out, &text_line);
 				current_height += line_height;
 				line_start = true;
 
@@ -816,7 +816,7 @@ Text_BuildLines(
 			index_data += ts_word->length;
 
 			if (String_EndWith(*ts_word, S("\n"), true)) {
-				Array_AddEmpty(a_text_line_out, &text_line);
+				Array_AddEmpty(*a_text_line_out, &text_line);
 				line_start = true;
 
 				text_line->s_data.value = &ts_data->value[index_data];
@@ -953,17 +953,17 @@ Text_ReserveMemory(
 		/// reserve "vertex_position"
 		Vertex *t_vertex = &ARRAY_IT(*a_vertex_chars_io, it);
 		t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
-		Array_Reserve(&t_attribute->a_buffer, t_attribute->group_count);
+		Array_Reserve(t_attribute->a_buffer, t_attribute->group_count);
 		t_attribute->group_count = 2;
 
 		/// reserve "text_color"
 		t_attribute = &ARRAY_IT(t_vertex->a_attributes, 1);
-		Array_Reserve(&t_attribute->a_buffer, t_attribute->group_count);
+		Array_Reserve(t_attribute->a_buffer, t_attribute->group_count);
 		t_attribute->group_count = 3;
 
 		/// reserve "render_area"
 		t_attribute = &ARRAY_IT(t_vertex->a_attributes, 2);
-		Array_Reserve(&t_attribute->a_buffer, t_attribute->group_count);
+		Array_Reserve(t_attribute->a_buffer, t_attribute->group_count);
 		t_attribute->group_count = 4;
 	}
 }
@@ -1024,30 +1024,30 @@ Vertex_AddText(
 				t_attribute = &ARRAY_IT(t_vertex->a_attributes, 0);
 				Assert(S("vertex_position") == t_attribute->name);
 
-				Array_ReserveAdd(&t_attribute->a_buffer, 2);
-				Array_Add(&t_attribute->a_buffer, rect_position.x + x_align_offset);
-				Array_Add(&t_attribute->a_buffer, rect_position.y);
+				Array_ReserveAdd(t_attribute->a_buffer, 2);
+				Array_Add(t_attribute->a_buffer, rect_position.x + x_align_offset);
+				Array_Add(t_attribute->a_buffer, rect_position.y);
 			}
 
 			{
 				t_attribute = &ARRAY_IT(t_vertex->a_attributes, 1);
 				Assert(S("text_color") == t_attribute->name);
 
-				Array_ReserveAdd(&t_attribute->a_buffer, 3);
-				Array_Add(&t_attribute->a_buffer, color.r);
-				Array_Add(&t_attribute->a_buffer, color.g);
-				Array_Add(&t_attribute->a_buffer, color.b);
+				Array_ReserveAdd(t_attribute->a_buffer, 3);
+				Array_Add(t_attribute->a_buffer, color.r);
+				Array_Add(t_attribute->a_buffer, color.g);
+				Array_Add(t_attribute->a_buffer, color.b);
 			}
 
 			{
 				t_attribute = &ARRAY_IT(t_vertex->a_attributes, 2);
 				Assert(S("render_area") == t_attribute->name);
 
-				Array_ReserveAdd(&t_attribute->a_buffer, 4);
-				Array_Add(&t_attribute->a_buffer, (float)rect_crop.x);
-				Array_Add(&t_attribute->a_buffer, (float)rect_crop.y);
-				Array_Add(&t_attribute->a_buffer, (float)rect_crop.w);
-				Array_Add(&t_attribute->a_buffer, (float)rect_crop.h);
+				Array_ReserveAdd(t_attribute->a_buffer, 4);
+				Array_Add(t_attribute->a_buffer, (float)rect_crop.x);
+				Array_Add(t_attribute->a_buffer, (float)rect_crop.y);
+				Array_Add(t_attribute->a_buffer, (float)rect_crop.w);
+				Array_Add(t_attribute->a_buffer, (float)rect_crop.h);
 			}
 		}
 

@@ -20,7 +20,7 @@ MemorySegment_Add(
 ) {
 	Assert(a_segments);
 
-	Array_AddUnique(a_segments, segment);
+	Array_AddUnique(*a_segments, segment);
 }
 
 instant void

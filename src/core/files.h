@@ -36,7 +36,7 @@ File_HasExtension(
 		}
     }
 
-    Array_Destroy(&as_extentions);
+    Array_Destroy(as_extentions);
 
 	return result;
 }
@@ -422,7 +422,7 @@ File_ReadDirectory(
 				else
 					dir_entry.type = DIR_ENTRY_FILE;
 
-				Array_Add(a_entries_io, dir_entry);
+				Array_Add(*a_entries_io, dir_entry);
 			}
 		} while (FindNextFile(id_directory, &file_data));
 
@@ -440,7 +440,7 @@ File_ReadDirectory(
 
 			dir_entry.type = DIR_ENTRY_DIR;
 
-			Array_Add(a_entries_io, dir_entry);
+			Array_Add(*a_entries_io, dir_entry);
 		}
 	}
 
@@ -497,7 +497,7 @@ File_GetDrives(
 ) {
 	Assert(a_drives_out);
 
-	Array_DestroyContainer(a_drives_out);
+	Array_DestroyContainer(*a_drives_out);
 
 	u64 buffer_size = GetLogicalDriveStrings(0, 0);
 
@@ -519,7 +519,7 @@ File_GetDrives(
 			dir_entry.s_name = S(s_buffer_it, index_found);
 			dir_entry.type   = DIR_ENTRY_DRIVE;
 
-			Array_Add(a_drives_out, dir_entry);
+			Array_Add(*a_drives_out, dir_entry);
 		}
 
 		String_AddOffset(s_buffer_it, index_found + 1);

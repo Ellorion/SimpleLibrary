@@ -125,7 +125,7 @@ Layout_CreateBlock(
 
 	Layout_Block *t_block;
 
-	Array_AddEmpty(&layout_io->a_layout_blocks, &t_block);
+	Array_AddEmpty(layout_io->a_layout_blocks, &t_block);
 
 	t_block->type = type;
 	t_block->dock = dock_direction;
@@ -185,7 +185,7 @@ Layout_Add(
 	Layout_Block *current_block = 0;
 
 	Layout_GetLastBlock(layout_io, &current_block);
-	Array_Add(&current_block->ap_layout_data, layout_data);
+	Array_Add(current_block->ap_layout_data, layout_data);
 }
 
 /// layout_block->expand_index (widgets):
@@ -671,7 +671,7 @@ Layout_ReserveSection(
 	layout_io->section.size = size;
 
 	Layout *t_layout;
-	Array_AddEmpty(&layout_io->section.a_sublayouts, &t_layout);
+	Array_AddEmpty(layout_io->section.a_sublayouts, &t_layout);
 
 	/// rect_full will be updated with remaining size during arrangment
 	Layout_Create(t_layout, {0, 0, 0, 0}, layout_io->fill_last_block);
