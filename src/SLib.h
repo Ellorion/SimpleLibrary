@@ -446,7 +446,6 @@ MatchesAny(S &&checkAgainst, T &&...oneOf) {
 #include "utility/clipboard.h"
 #include "utility/file_watcher.h"
 #include "utility/csv.h"
-#include "utility/helper.h"
 #include "utility/profiler.h"
 #include "utility/prime.h"
 
@@ -461,3 +460,5 @@ MatchesAny(S &&checkAgainst, T &&...oneOf) {
 #include "gui/widget.h"
 
 #include "core/console.h"
+
+#include "utility/helper.h"

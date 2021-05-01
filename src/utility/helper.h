@@ -122,3 +122,30 @@ Array_Sort_Descending(
 	///		return (one > two);
 	///	});
 }
+
+Font Font_Create(Window &window, const String &s_fontFile, u16 fontSize, bool isRequired) {
+    Font font = Font_Load(s_fontFile, fontSize);
+
+    if (Font_HasError(&font)) {
+		MessageBox(window.hWnd, font.s_error.value, 0, MB_OK);
+
+		if (isRequired)
+            std::exit(EXIT_FAILURE);
+	}
+
+	MemorySegment_Add(&window.a_segments_reset, font.events);
+
+	return font;
+}
+
+Tuple<Window, ShaderSet> Window_CreateOGL(const char *title, u16 width, u16 height, bool useVSync, Keyboard *keyboard_opt = nullptr, Mouse *mouse_opt = nullptr) {
+    Window window = Window_Create(title, width, height, true, true, keyboard_opt, mouse_opt);
+    OpenGL_UseVSync(&window, useVSync);
+    OpenGL_SetBlending(true);
+
+    ShaderSet shaderSet = ShaderSet_Create(&window);
+
+    MemorySegment_Add(&window.a_segments_reset, window.events);
+
+    return {window, shaderSet};
+}
