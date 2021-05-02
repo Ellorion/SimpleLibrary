@@ -669,7 +669,7 @@ String_EndWith(
 	if (s_endwith.length > s_data.length)
 		return false;
 
-	String ts_data = s_data;
+	String ts_data = S(s_data);
     String_AddOffset(ts_data, (ts_data.length - s_endwith.length));
 	Assert(ts_data.length = s_endwith.length);
 

@@ -275,6 +275,14 @@ _AssertMessage(
 	#define MEASURE_END_AVG(_text, _count)
 #endif
 
+#define VALUE(_condition) \
+    { \
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE); \
+    SetConsoleTextAttribute(hConsole, 13); \
+    std::cout << "[" << __FILE__ << "] [" << __FUNCTION__ << "::" << __LINE__ << "] " << #_condition << ": " << (_condition) << "\n"; \
+    SetConsoleTextAttribute(hConsole, 15); \
+    }
+
 /// ::: Utilities
 /// ===========================================================================
 #define MIN(val_1, val_2) ((val_1 < val_2) ? val_1 : val_2)
