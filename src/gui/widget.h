@@ -1972,9 +1972,9 @@ instant Widget
 Widget_CreateLabel(
 	Window *window,
 	Font *font,
-	Rect rect_box,
 	String s_data,
-	TEXT_ALIGN_X_TYPE text_align_x = TEXT_ALIGN_X_LEFT
+	TEXT_ALIGN_X_TYPE text_align_x = TEXT_ALIGN_X_LEFT,
+    Rect rect_box = {}
 ) {
 	Assert(window);
 	Assert(font);
@@ -2012,8 +2012,8 @@ instant Widget
 Widget_CreateButton(
 	Window *window,
 	Font *font,
-	Rect rect_box,
-	String s_data
+	String s_data,
+	Rect rect_box = {}
 ) {
 	Assert(window);
 	Assert(font);
@@ -2052,7 +2052,7 @@ instant Widget
 Widget_CreateListBox(
 	Window *window,
 	Font *font,
-	Rect rect_box
+	Rect rect_box = {}
 ) {
 	Assert(window);
 	Assert(font);
@@ -2085,9 +2085,9 @@ instant Widget
 Widget_CreateCheckBox(
 	Window *window,
 	Font *font,
-	Rect rect_box,
 	String s_data,
-	bool checked
+	bool checked,
+    Rect rect_box = {}
 ) {
 	Assert(window);
 	Assert(font);
@@ -2122,8 +2122,8 @@ Widget_CreateCheckBox(
 instant Widget
 Widget_CreatePictureBox(
 	Window *window,
-	Rect rect_box,
-	Texture *texture = 0
+	Texture *texture = 0,
+	Rect rect_box = {}
 ) {
 	Assert(window);
 
@@ -2238,8 +2238,8 @@ instant Widget
 Widget_CreateNumberPicker(
 	Window *window,
 	Font *font,
-	Rect rect_box,
-	Widget_Slide slide
+	Widget_Slide slide,
+	Rect rect_box = {}
 ) {
 	Widget t_widget = {};
 
@@ -2253,9 +2253,9 @@ Widget_CreateNumberPicker(
 
 	t_widget.is_focusable = false;
 
-	Widget wg_label       = Widget_CreateLabel( window, font, {0, 0, 50, 24}, {});
-	Widget wg_button_up   = Widget_CreateButton(window, font, {0, 0, 24, 24}, S("<"));
-	Widget wg_button_down = Widget_CreateButton(window, font, {0, 0, 24, 24}, S(">"));
+	Widget wg_label       = Widget_CreateLabel( window, font, S(""), TEXT_ALIGN_X_LEFT, {0, 0, 50, 24});
+	Widget wg_button_up   = Widget_CreateButton(window, font, S("<"), {0, 0, 24, 24});
+	Widget wg_button_down = Widget_CreateButton(window, font, S(">"), {0, 0, 24, 24});
 	Widget wg_spreader    = Widget_CreateSpreader(window);
 
 	wg_button_up.OwnerDraw   = Widget_RedrawNumberPickerButton;
@@ -2282,8 +2282,8 @@ instant Widget
 Widget_CreateTextBox(
 	Window *window,
 	Font *font,
-	Rect rect_box,
-	bool is_multiline
+	bool is_multiline,
+	Rect rect_box = {}
 ) {
 	Widget t_widget = {};
 
@@ -2475,8 +2475,8 @@ instant Widget
 Widget_CreateComboBox(
 	Window *window,
 	Font *font,
-	Rect rect_box,
-	s32 combo_height
+	s32 combo_height,
+	Rect rect_box = {}
 ) {
 	Widget t_widget = {};
 
@@ -2489,8 +2489,8 @@ Widget_CreateComboBox(
 	t_widget.layout_data.settings.rect = rect_box;
 	t_widget.layout_data.settings.auto_width = true;
 
-	Widget wg_text   = Widget_CreateTextBox(window, font, {}, false);
-	Widget wg_button = Widget_CreateButton( window, font, {}, S("+"));
+	Widget wg_text   = Widget_CreateTextBox(window, font, false);
+	Widget wg_button = Widget_CreateButton( window, font, S("+"));
 	Widget wg_list   = Widget_CreateListBox(window, font, {0, 0, 0, combo_height});
 
 	wg_text.UpdateCustomInputs   = Widget_UpdateInputComboBox;
@@ -2527,8 +2527,8 @@ instant Widget
 Widget_CreateProgressbar(
 	Window *window,
 	Font *font,
-	Rect rect_box,
-	Widget_Slide slide
+	Widget_Slide slide,
+	Rect rect_box = {}
 ) {
 	Widget t_widget = {};
 
@@ -2555,7 +2555,7 @@ instant Widget
 Widget_CreateListView(
 	Window *window,
 	Font *font,
-	Rect rect_box
+	Rect rect_box = {}
 ) {
 	Assert(window);
 	Assert(font);
