@@ -138,14 +138,18 @@ Font Font_Create(Window &window, const String &s_fontFile, u16 fontSize, bool is
 	return font;
 }
 
-Tuple<Window, ShaderSet> Window_CreateOGL(const char *title, u16 width, u16 height, bool useVSync, Keyboard *keyboard_opt = nullptr, Mouse *mouse_opt = nullptr) {
+Window Window_CreateOGL(const char *title, u16 width, u16 height, bool useVSync, Keyboard *keyboard_opt = nullptr, Mouse *mouse_opt = nullptr) {
     Window window = Window_Create(title, width, height, true, true, keyboard_opt, mouse_opt);
     OpenGL_UseVSync(&window, useVSync);
     OpenGL_SetBlending(true);
 
-    ShaderSet shaderSet = ShaderSet_Create(&window);
-
     MemorySegment_Add(&window.a_segments_reset, window.events);
 
-    return {window, shaderSet};
+    return window;
+}
+
+ShaderSet ShaderSet_CreateAndSet(Window &window) {
+    auto shader_set = ShaderSet_Create(window);
+    ShaderSet_SetWindow(shader_set, window);
+    return shader_set;
 }

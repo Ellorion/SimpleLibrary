@@ -16,13 +16,10 @@ struct ShaderSet {
 
 instant void
 ShaderSet_SetWindow(
-	ShaderSet *shader_set,
-	Window *window
+	ShaderSet &shader_set,
+	Window &window
 ) {
-	Assert(shader_set);
-	Assert(window);
-
-	shader_set->window = window;
+	shader_set.window = &window;
 }
 
 instant void
@@ -108,12 +105,10 @@ ShaderSet_Add(
 
 instant ShaderSet
 ShaderSet_Create(
-	Window *window
+	Window &window
 ) {
-	Assert(window);
-
 	ShaderSet shader_set;
-	ShaderSet_SetWindow(&shader_set, window);
+	ShaderSet_SetWindow(shader_set, window);
 
 	ShaderSet_Add(&shader_set, &shader_rect);
 	ShaderSet_Add(&shader_set, &shader_text);
