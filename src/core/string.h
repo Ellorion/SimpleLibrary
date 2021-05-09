@@ -1040,13 +1040,13 @@ String_Insert(
 	else {
 		length = 1;
 
-		String s_data;
-		s_data.value   = (char *)&c_data;
-		s_data.length  = length;
-		s_data.has_changed = true;
-		s_data.is_reference = true;
+		String s_data_char;
+		s_data_char.value   = (char *)&c_data;
+		s_data_char.length  = length;
+		s_data_char.has_changed = true;
+		s_data_char.is_reference = true;
 
-		String_Insert(s_data, s_data, index_start);
+		String_Insert(s_data, s_data_char, index_start);
 	}
 
 	s_data.has_changed = true;

@@ -1,5 +1,8 @@
 #pragma once
 
+#define KEYSYM_CONTROL(_sym) \
+    ((_sym)-'a'+1)
+
 template <typename T, typename Func>
 instant void
 Array_AddRange(

@@ -250,7 +250,7 @@ Widget_IsListType(
 instant void
 Widget_AddRowSingle(
 	Widget *widget_io,
-	String s_row_data
+	const String &s_row_data
 ) {
 	/// list contained in subwidgets
 	switch (widget_io->type) {
@@ -414,22 +414,20 @@ Widget_AddBorderSizes(
 ///        which are embedded into a widget
 instant void
 Widget_SetFocus(
-	Widget *widget_io
+	Widget &widget
 ) {
- 	Assert(widget_io);
-
-	if (!widget_io->is_focusable)
+	if (!widget.is_focusable)
 		return;
 
-    if (widget_io->widget_focus_current) {
-    	widget_io->widget_focus_current->data.has_focus = false;
+    if (widget.widget_focus_current) {
+    	widget.widget_focus_current->data.has_focus = false;
     }
 
-    widget_io->data.has_focus = true;
-    widget_io->widget_focus_current = widget_io;
+    widget.data.has_focus = true;
+    widget.widget_focus_current = &widget;
 
-    if (widget_io->data.is_floating)
-		widget_io->data.is_popout = true;
+    if (widget.data.is_floating)
+		widget.data.is_popout = true;
 }
 
 instant void
@@ -1037,11 +1035,11 @@ Widget_Update(
 
 		if (widget_io->data.can_popout_focus_change) {
 			if (widget_io->data.is_popout) {
-				Widget_SetFocus(widget_io);
+				Widget_SetFocus(*widget_io);
 			}
 			else {
 				if (widget_io->widget_focus_on_popout) {
-					Widget_SetFocus(widget_io->widget_focus_on_popout);
+					Widget_SetFocus(*widget_io->widget_focus_on_popout);
 				}
 			}
 		}
@@ -1607,7 +1605,9 @@ Widget_UpdateInput(
 		if (mouse->up[0]) {
 			got_focus = is_hovering;
 
-			widget_io->events.on_trigger = is_hovering;
+			if (widget_io->type != WIDGET_TYPE::WIDGET_TEXTBOX) {
+                widget_io->events.on_trigger = is_hovering;
+			}
 
 			/// listbox entry selection
 			if (is_scrollable_list) {
@@ -1634,7 +1634,9 @@ Widget_UpdateInput(
 
 		/// right mouse button
 		if (mouse->up[2]) {
-			widget_io->events.on_trigger_secondary = is_hovering;
+            if (widget_io->type != WIDGET_TYPE::WIDGET_TEXTBOX) {
+                widget_io->events.on_trigger_secondary = is_hovering;
+            }
 		}
 
 		/// disable mouse-drag-mode
@@ -2377,7 +2379,7 @@ Widget_UpdateInputComboBox(
 				}
 
 				if (keyboard->up[VK_DOWN]) {
-					Widget_SetFocus(wg_list);
+					Widget_SetFocus(*wg_list);
 				}
 			}
 		} break;
@@ -2464,11 +2466,24 @@ Widget_UpdateInputComboBox(
 
 instant String *
 Widget_GetTextData(
-	Widget *widget
+	Widget &widget
 ) {
-	Assert(widget);
+	return &widget.text.s_data;
+}
 
-	return &widget->text.s_data;
+instant String
+Widget_GetTextDataRef(
+	const Widget &widget
+) {
+	return S(widget.text.s_data);
+}
+
+instant void
+Widget_SetText(
+    Widget &widget,
+    const String &s_data
+) {
+    String_Overwrite(widget.text.s_data, s_data);
 }
 
 instant Widget
@@ -2638,7 +2653,7 @@ Widget_SwapLayout(
 	*layout_active     = layout_swap_to;
 
 	if ((*ap_widgets_active)->count)
-		Widget_SetFocus(ARRAY_IT((**ap_widgets_active), 0));
+		Widget_SetFocus(*ARRAY_IT((**ap_widgets_active), 0));
 }
 
 template <typename Func>
