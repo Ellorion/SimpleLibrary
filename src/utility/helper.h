@@ -148,6 +148,10 @@ Window Window_CreateOGL(const char *title, u16 width, u16 height, bool useVSync,
 
     MemorySegment_Add(&window.a_segments_reset, window.events);
 
+    if (mouse_opt) {
+        MemorySegment_AddMouse(&window.a_segments_reset, mouse_opt);
+    }
+
     return window;
 }
 

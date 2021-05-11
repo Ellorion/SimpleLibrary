@@ -110,7 +110,7 @@ File_CreateDirectory(
 
 instant File
 File_Open(
-	String s_filename,
+	const String &s_filename,
 	const char *mode
 ) {
 	Assert(mode);

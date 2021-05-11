@@ -19,27 +19,23 @@ struct Stream {
 constexpr
 instant void
 Stream_Clear(
-	Stream *stream
+	Stream &stream
 ) {
-	Assert(stream);
-
-	String_Clear(stream->s_buffer);
+	String_Clear(stream.s_buffer);
 }
 
 constexpr
 instant void
 Stream_Close(
-	Stream *stream
+	Stream &stream
 ) {
-	Assert(stream);
-
-	switch (stream->type) {
+	switch (stream.type) {
 		case StreamType::File: {
-			File_Close(stream->file);
+			File_Close(stream.file);
 		} break;
 
 		case StreamType::Buffer: {
-			String_Destroy(stream->s_buffer);
+			String_Destroy(stream.s_buffer);
 		} break;
 
 		default: {
@@ -54,7 +50,7 @@ Stream_Close(
 constexpr
 instant Tuple<Stream, bool>
 Stream_Open(
-	File &file
+	const File &file
 ) {
     Stream stream;
 
@@ -75,17 +71,15 @@ Stream_Open(
 constexpr
 instant String
 Stream_GetBuffer(
-	Stream *stream
+	const Stream &stream
 ) {
-	Assert(stream);
-
-	switch (stream->type) {
+	switch (stream.type) {
 		case StreamType::File: {
 			AssertMessage(false, "File-Stream does not use the internal buffer.");
 		} break;
 
 		case StreamType::Buffer: {
-			return S(stream->s_buffer);
+			return S(stream.s_buffer);
 		} break;
 
 		default: {
@@ -129,6 +123,21 @@ constexpr
 Stream &
 operator<<(Stream &out, const Array<T> a_data) {
     FOR_ARRAY_AUTO(a_data, it) {
+        out << *it << S("\n");
+    }
+
+    out << S("\n");
+
+    return out;
+}
+
+template <class T>
+constexpr
+Stream &
+operator<<(Stream &out, const Array<T> *a_data) {
+    Assert(a_data);
+
+    FOR_ARRAY_AUTO(*a_data, it) {
         out << *it << S("\n");
     }
 

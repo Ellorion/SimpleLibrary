@@ -1111,7 +1111,10 @@ String_Overwrite(
 	const String &s_source
 ) {
 	String_Clear(s_dest);
-	String_Append(s_dest, s_source);
+
+	if (!String_IsEmpty(s_source)) {
+        String_Append(s_dest, s_source);
+	}
 }
 
 constexpr
@@ -1148,7 +1151,7 @@ operator == (
 	const String &s_data1,
 	const String &s_data2
 ) {
-    bool is_case_sensitive = (s_data1.is_case_sensitive && s_data2.is_case_sensitive);
+    bool is_case_sensitive = (s_data1.is_case_sensitive AND s_data2.is_case_sensitive);
 
 	return String_IsEqual(s_data1, s_data2, 0, is_case_sensitive);
 }

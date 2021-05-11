@@ -133,7 +133,7 @@ struct Widget {
 		bool on_list_change_index = false;
 		bool on_list_change_final = false;
 
-		bool on_text_change = false;
+		bool on_text_changed = false;
 
 		bool on_trigger = false;
 		bool on_trigger_secondary = false;
@@ -330,13 +330,13 @@ Widget_HasChanged(
 	/// a list would iterate over the list items and reuse "text"
 	/// for every list element incl. might change (some) of its settings,
 	/// that is why the list data change checking will happen seperately
-	if (!has_changed && !Widget_IsListType(widget_io)) {
+	if (!has_changed AND !Widget_IsListType(widget_io)) {
 		///@Note: updating text changed status will happen
 		///       in a Text_Update
 		has_changed |= Text_HasChanged(&widget_io->text, false);
 	}
 
-	if (!has_changed && widget_io->text.font)
+	if (!has_changed AND widget_io->text.font)
 		has_changed |= (widget_io->text.font->events.flags != 0);
 
 	if (!has_changed) {
@@ -705,6 +705,13 @@ Widget_InvalidateBackground(
 	Widget_Redraw(widget_io);
 }
 
+instant Array<String> *
+Widget_GetListArray(
+    Widget &widget
+) {
+    return &widget.data.as_row_data;
+}
+
 instant void
 Widget_GetListArrayFiltered(
 	Widget *widget,
@@ -713,7 +720,7 @@ Widget_GetListArrayFiltered(
 	Assert(widget);
 	Assert(as_row_data_out);
 
-	Array<String> *as_target = &widget->data.as_row_data;
+	Array<String> *as_target = Widget_GetListArray(*widget);
 
 	if (widget->data.s_row_filter.length) {
 		as_target = &widget->data.as_filter_data;
@@ -969,7 +976,7 @@ Widget_Update(
 			Widget_InvalidateBackground(widget_io);
 		}
 
-		widget_io->events.on_text_change = Text_Update(text);
+		widget_io->events.on_text_changed = Text_Update(text);
 	}
 	else {
 		Widget_UpdateListBox(widget_io);
@@ -1751,7 +1758,7 @@ Widget_UpdateInput(
 
 		Text_UpdateInput(&widget_io->text, keyboard, &has_text_changed, &has_cursor_changed);
 
-		widget_io->events.on_text_change = has_text_changed;
+		widget_io->events.on_text_changed = has_text_changed;
 
 		if (has_cursor_changed) {
 			Widget_Cursor_ResetBlinking(widget_io);
@@ -1848,12 +1855,11 @@ Widget_GetSelectedRowRef(
 
 instant u64
 Widget_GetSelectedRowID(
-	Widget *widget
+	const Widget &widget
 ) {
-	Assert(widget);
-	Assert(!widget->data.selected_row_id OR widget->data.selected_row_id < widget->data.as_row_data.count);
+	Assert(!widget.data.selected_row_id OR widget.data.selected_row_id < widget.data.as_row_data.count);
 
-	return widget->data.selected_row_id;
+	return widget.data.selected_row_id;
 }
 
 instant bool
@@ -2431,7 +2437,7 @@ Widget_UpdateInputComboBox(
 					if (wg_text->text.s_data != s_row_data) {
 						String_Clear(wg_text->text.s_data);
 						String_Append(wg_text->text.s_data, s_row_data);
-						wg_text->events.on_text_change = true;
+						wg_text->events.on_text_changed = true;
 
 						wg_text->text.cursor.data.index_select_end   = s_row_data.length;
 						wg_text->text.cursor.data.index_select_start = 0;
