@@ -162,6 +162,14 @@ struct Widget {
 Widget *Widget::widget_focus_current = 0;
 
 instant void
+Widget_SetFilterCaseSensitive(
+    Widget &widget,
+    bool value
+) {
+    widget.data.is_filter_case_sensitive = value;
+}
+
+instant void
 Array_Destroy(
 	Array<Widget_Column> *a_columns
 ) {
