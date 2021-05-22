@@ -2066,6 +2066,9 @@ Text_UpdateInput(
 				IF_SET(cursor_changed_out) = true;
 
 				Text_Cursor_Update(text_io);
+
+				Text_Update(text_io);
+				text_io->s_data.has_changed = true;
 			} break;
 
 			/// control + x
@@ -2082,6 +2085,10 @@ Text_UpdateInput(
 			} break;
 
 			default: {
+			    if (keyboard->pressing[VK_CONTROL]) {
+                    break;
+			    }
+
 				*move_type = CURSOR_MOVE_X;
 				bool was_selection_removed = Text_RemoveSelection(text_io);
 
