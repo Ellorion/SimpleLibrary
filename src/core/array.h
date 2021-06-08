@@ -229,12 +229,12 @@ Array_Find(
     return false;
 }
 
-template <typename T, typename Func>
+template <typename T, typename F, typename Func>
 constexpr
 instant bool
 Array_Find(
     Array<T> &arr,
-    T find,
+    F find,
     u64 *index_opt,
     Func OnSearch
 ) {
@@ -469,7 +469,28 @@ Array_Filter(
 template <typename T>
 constexpr
 instant bool
-MatchesAny(T &checkAgainst, Array<T> &a_oneOf) {
+Array_IsEmpty(
+    const Array<T> &arr
+) {
+    return (arr.count == 0);
+}
+
+template <typename T>
+constexpr
+instant u64
+Array_Count(
+    const Array<T> &arr
+) {
+    return arr.count;
+}
+
+template <typename T>
+constexpr
+instant bool
+MatchesAny(
+    T &checkAgainst,
+    Array<T> &a_oneOf
+) {
     return Array_Find(a_oneOf, checkAgainst);
 }
 

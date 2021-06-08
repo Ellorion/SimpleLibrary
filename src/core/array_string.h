@@ -162,25 +162,22 @@ Array_SplitRef(
 /// Will copy string values, so array content has to be free'd
 instant void
 Array_SplitBuffer(
-	Array<String> *as_buffer_out,
-	String *s_data,
-	String  s_delimiter,
+	Array<String> &as_buffer_out,
+	const String &s_data,
+	const String s_delimiter,
 	DELIMITER_TYPE type,
 	bool add_empty_entry
 ) {
-	Assert(s_data);
-	Assert(as_buffer_out);
+	Array_Clear(as_buffer_out);
 
-	Array_Clear(*as_buffer_out);
-
-	String s_data_it = S(*s_data);
+	String s_data_it = S(s_data);
 
 	s64 pos_found;
 	while(String_Find(s_data_it, s_delimiter, &pos_found)) {
 		if (pos_found) {
 			String s_element;
 
-			if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count) {
+			if (type == DELIMITER_ADD_FRONT AND as_buffer_out.count) {
 				String_Append(s_element, s_delimiter);
 			}
 
@@ -190,13 +187,13 @@ Array_SplitBuffer(
 				String_Append(s_element, s_delimiter);
 			}
 
-			Array_Add(*as_buffer_out, s_element);
+			Array_Add(as_buffer_out, s_element);
 		}
 		else
 		if (add_empty_entry) {
 			/// in case of f.e: "\n\n\n" with "\n" as delimiter
 			String *s_element;
-			Array_AddEmpty(*as_buffer_out, &s_element);
+			Array_AddEmpty(as_buffer_out, &s_element);
 
 			if (type == DELIMITER_ADD_BACK) {
 				String_Append(*s_element, s_delimiter);
@@ -210,24 +207,24 @@ Array_SplitBuffer(
 	if (!String_IsEmpty(s_data_it)) {
 		String s_element;
 
-		if (type == DELIMITER_ADD_FRONT AND as_buffer_out->count)
+		if (type == DELIMITER_ADD_FRONT AND as_buffer_out.count)
 			String_Append(s_element, s_delimiter);
 
 		String_Append(s_element, s_data_it);
-		Array_Add(*as_buffer_out, s_element);
+		Array_Add(as_buffer_out, s_element);
 	}
 }
 
 instant Array<String>
 Array_Split(
-	String *s_data,
-	String  s_delimiter,
+	const String &s_data,
+	const String s_delimiter,
 	DELIMITER_TYPE type,
 	bool add_empty_entry
 ) {
 	Array<String> as_result;
 
-	Array_SplitBuffer(&as_result, s_data, s_delimiter, type, add_empty_entry);
+	Array_SplitBuffer(as_result, s_data, s_delimiter, type, add_empty_entry);
 
 	return as_result;
 }
@@ -405,7 +402,7 @@ String_GetDelimiterSection(
 	static Array<String> as_section;
 
 	Array_Clear(as_section);
-	as_section = Array_Split(s_data, s_delimiter, DELIMITER_IGNORE, true);
+	as_section = Array_Split(*s_data, s_delimiter, DELIMITER_IGNORE, true);
 
 	FOR_ARRAY(as_section, it) {
 		if (it == index) {

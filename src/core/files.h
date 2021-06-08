@@ -25,7 +25,7 @@ File_HasExtension(
 	if (String_IsEmpty(s_extension, true))
 		return true;
 
-	Array<String> as_extentions = Array_Split(&s_extension, S("|"), DELIMITER_IGNORE, true);
+	Array<String> as_extentions = Array_Split(s_extension, S("|"), DELIMITER_IGNORE, true);
 
     FOR_ARRAY(as_extentions, it) {
     	String ts_data = ARRAY_IT(as_extentions, it);

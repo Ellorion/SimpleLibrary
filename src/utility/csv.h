@@ -14,7 +14,7 @@ CSV_Load(
 			String *s_row = &ARRAY_IT(as_rows, it_row);
 
 			/// can get overwritten after the prev. split was copied
-			as_rowitem = Array_Split(s_row, S(","), DELIMITER_IGNORE, true);
+			as_rowitem = Array_Split(*s_row, S(","), DELIMITER_IGNORE, true);
 			/// will copy the content, so do not destroy it
 			Array_Add(a_csv, as_rowitem);
 		}

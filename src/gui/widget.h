@@ -2,11 +2,19 @@
 
 struct Widget;
 
+struct Widget_Item {
+    const String s_name;
+    Color32 colorText;
+};
+
 typedef void (*Widget_OwnerDraw)
 	(Widget *widget_io);
 
 typedef void (*Widget_UpdateCustomInputsSub)
 	(Widget *widget_parent_io, u64 sub_index);
+
+typedef void (*Widget_DrawItem)
+	(Widget *widget_io, Widget_Item *item);
 
 instant bool
 Widget_Update(Widget *widget_io);
@@ -144,6 +152,7 @@ struct Widget {
 	/// Custom Events
 	Widget_OwnerDraw OwnerDraw = 0;
 	Widget_UpdateCustomInputsSub UpdateCustomInputs = 0;
+	Widget_DrawItem OnDrawItem = 0;
 
 	/// Rendering
 	Text   text;
@@ -157,6 +166,8 @@ struct Widget {
 
 	/// Content
 	Array<Widget> a_subwidgets;
+
+	Array<void *> a_dataLink;
 };
 
 Widget *Widget::widget_focus_current = 0;
@@ -814,8 +825,12 @@ Widget_UpdateListBox(
 	FOR_ARRAY(*as_target, it_row) {
 		String *ts_data = &ARRAY_IT(*as_target, it_row);
 
-		u64 number_of_lines = Array_SplitWordsBuffer(ts_data, &text->as_words);
-		rect_text->h = Text_BuildLines(text, &text->as_words, number_of_lines, &text->a_text_lines);
+		Widget_Item item = {S(*ts_data), text->data.color};
+
+		if (widget_io->OnDrawItem) {
+            widget_io->OnDrawItem(widget_io, &item);
+            text->data.color = item.colorText;
+		}
 
 		Color32 t_color_rect = widget_io->data.color_outline;
 
@@ -825,6 +840,9 @@ Widget_UpdateListBox(
 			else
 				t_color_rect = widget_io->data.color_outline_inactive;
 		}
+
+		u64 number_of_lines = Array_SplitWordsBuffer(ts_data, &text->as_words);
+		rect_text->h = Text_BuildLines(text, &text->as_words, number_of_lines, &text->a_text_lines);
 
 		Rect rect_box = *rect_text;
 		rect_box.x -= pad_left;
@@ -837,6 +855,11 @@ Widget_UpdateListBox(
 		s32 height_row_step = rect_text->h + widget_io->data.spacing;
 		rect_text->y += height_row_step;
 		widget_io->rect_content.h += height_row_step;
+
+		/// reset custom item settings
+		if (widget_io->OnDrawItem) {
+            text->data.color = text->data_prev.color;
+		}
 	}
 
 	if (widget_io->rect_content.h) {

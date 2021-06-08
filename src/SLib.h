@@ -316,6 +316,7 @@ struct Color32 {
 
 namespace Color {
 	Color32 White = {1.0f, 1.0f, 1.0f, 1.0f};
+	Color32 Blue  = {0.0f, 0.0f, 1.0f, 1.0f};
 };
 
 template<typename K, typename L>
