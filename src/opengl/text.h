@@ -1191,7 +1191,7 @@ Text_Update(
 	u64 number_of_line_breaks = 0;
 
 	if (text_io->s_data.has_changed)
-		number_of_line_breaks = Array_SplitWordsBuffer(&text_io->s_data, &text_io->as_words);
+		number_of_line_breaks = Array_SplitWordsBuffer(text_io->s_data, &text_io->as_words);
 
 	s32 text_height = Text_BuildLines(text_io, &text_io->as_words, number_of_line_breaks, &text_io->a_text_lines);
 
@@ -2216,7 +2216,7 @@ Text_GetSize(
 	static Array<Text_Line> a_text_lines;
 
 	if (height_out_opt) {
-		u64 number_of_lines = Array_SplitWordsBuffer(&text->s_data, &as_words);
+		u64 number_of_lines = Array_SplitWordsBuffer(text->s_data, &as_words);
 		*height_out_opt = Text_BuildLines(text, &as_words, number_of_lines, &a_text_lines);
 	}
 

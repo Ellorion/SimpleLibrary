@@ -3,7 +3,7 @@
 struct Widget;
 
 struct Widget_Item {
-    const String s_name;
+    String s_name;
     Color32 colorText;
 };
 
@@ -823,13 +823,19 @@ Widget_UpdateListBox(
 	Widget_GetListArrayFiltered(widget_io, &as_target);
 
 	FOR_ARRAY(*as_target, it_row) {
-		String *ts_data = &ARRAY_IT(*as_target, it_row);
+	    /// if the string is changing in OnDrawItem,
+	    /// the data in s_name must be overwritten,
+	    /// otherwise this line would require a copy
+	    /// even when OnDrawItem would not be used or
+	    /// the string is not changing
+		String s_data = ARRAY_IT(*as_target, it_row);
 
-		Widget_Item item = {S(*ts_data), text->data.color};
+		Widget_Item item = {S(s_data), text->data.color};
 
 		if (widget_io->OnDrawItem) {
             widget_io->OnDrawItem(widget_io, &item);
             text->data.color = item.colorText;
+            s_data = item.s_name;
 		}
 
 		Color32 t_color_rect = widget_io->data.color_outline;
@@ -841,7 +847,7 @@ Widget_UpdateListBox(
 				t_color_rect = widget_io->data.color_outline_inactive;
 		}
 
-		u64 number_of_lines = Array_SplitWordsBuffer(ts_data, &text->as_words);
+		u64 number_of_lines = Array_SplitWordsBuffer(s_data, &text->as_words);
 		rect_text->h = Text_BuildLines(text, &text->as_words, number_of_lines, &text->a_text_lines);
 
 		Rect rect_box = *rect_text;
@@ -860,6 +866,8 @@ Widget_UpdateListBox(
 		if (widget_io->OnDrawItem) {
             text->data.color = text->data_prev.color;
 		}
+
+		String_Destroy(item.s_name);
 	}
 
 	if (widget_io->rect_content.h) {

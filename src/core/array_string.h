@@ -281,10 +281,9 @@ Array_SplitLinesRef(
 /// returns number of line-breaks
 instant u64
 Array_SplitWordsBuffer(
-	String *s_data,
+	const String &s_data,
 	Array<String> *as_words_out
 ) {
-	Assert(s_data);
 	Assert(as_words_out);
 
 	MEASURE_START();
@@ -294,10 +293,10 @@ Array_SplitWordsBuffer(
 	}
 	else {
 		as_words_out->by_reference = true;
-		Array_Reserve(*as_words_out, String_CalcWordCount(*s_data));
+		Array_Reserve(*as_words_out, String_CalcWordCount(s_data));
 	}
 
-	if (String_IsEmpty(*s_data))
+	if (String_IsEmpty(s_data))
 		return 0;
 
 	String *s_element;
@@ -309,8 +308,8 @@ Array_SplitWordsBuffer(
 
 	u64 number_of_linebreaks = 0;
 
-	FOR(s_data->length, it) {
-		char value = s_data->value[it];
+	FOR(s_data.length, it) {
+		char value = s_data.value[it];
 
 		index_end = it;
 
@@ -318,7 +317,7 @@ Array_SplitWordsBuffer(
 			++index_end;
 
 			if (index_end - index_start > 0) {
-				s_element->value  = s_data->value + index_start;
+				s_element->value  = s_data.value + index_start;
 				s_element->length = (index_end - index_start);
 			}
 
@@ -332,14 +331,14 @@ Array_SplitWordsBuffer(
 		}
 	}
 
-	s_element->value = s_data->value + index_start;
+	s_element->value = s_data.value + index_start;
 
 	/// for everything (left) that has no space or line-break
 	if (index_end - index_start > 0)
 		s_element->length = (index_end - index_start) + 1;
 	else
 	if (index_start == index_end)
-		s_element->length = s_data->length - index_start;
+		s_element->length = s_data.length - index_start;
 
 	MEASURE_END("");
 
