@@ -5,6 +5,10 @@
 /// then hover over the to-be-auto-clicked
 /// area for repeated left-clicks (mouse)
 
+/// toggle auto-click with right-click (mouse)
+/// then hover over the to-be-auto-clicked
+/// area for repeated left-clicks (mouse)
+
 instant void
 Window_HandleEvents(
 	Window *window
@@ -12,43 +16,37 @@ Window_HandleEvents(
 	Timer timer_autoclick;
 	Time_Reset(&timer_autoclick);
 
-	ShaderSet shader_set = ShaderSet_Create(window);
-
-	OpenGL_SetBlending(true);
+	ShaderSet shader_set = ShaderSet_CreateAndSet(*window);
 
 	Keyboard *keyboard = window->keyboard;
 	Assert(keyboard);
 
-	String s_font;
-	String_Append(&s_font, S("default.ttf"));
-	Font font_20 = Font_Load(s_font, 20);
+	auto font_20 = Font_Create(*window, S("default.ttf"), 20, true);
 
 	if (Font_HasError(&font_20)) {
 		MessageBox(window->hWnd, font_20.s_error.value, 0, MB_OK);
 		return;
 	}
 
-	Widget wg_autoclick = Widget_CreateButton(window, &font_20, {}, S("Auto-Click"));
+	Widget wg_autoclick = Widget_CreateButton(window, &font_20, S("Auto-Click"));
 
 	Array<Widget *> ap_widgets;
-	Array_Add(&ap_widgets, &wg_autoclick);
+	Array_Add(ap_widgets, &wg_autoclick);
 
-	Layout layout;
-	Layout_Create(&layout, {0, 0, window->width, window->height}, true);
+	MemorySegment_AddWidgets(&window->a_segments_reset, &ap_widgets);
+
+    Layout layout;
+	Layout_Create(&layout, window, true);
 	{
 		Layout_CreateBlock(&layout, LAYOUT_TYPE_X, LAYOUT_DOCK_TOPLEFT);
 		Layout_Add(&layout, &wg_autoclick);
 	}
 
-	MemorySegment_Add(&window->a_segments_reset, window->events);
-	MemorySegment_Add(&window->a_segments_reset, font_20.events);
-	MemorySegment_AddWidgets(&window->a_segments_reset, &ap_widgets);
-
 	while(window->is_running) {
 		/// Events
 		/// ===================================================================
 		Window_ReadMessage(window);
-		Layout_Rearrange(&layout, {0, 0, window->width, window->height});
+		Layout_Rearrange(&layout, window);
 
 		Widget_Update(&ap_widgets, keyboard);
 
@@ -81,14 +79,13 @@ Window_HandleEvents(
 	ShaderSet_Destroy(&shader_set);
 }
 
-int main() {
+APPLICATION_MAIN {
 	Keyboard keyboard;
 	Mouse    mouse;
 
-	Window window = Window_Create("Auto-Clicker", 320, 240, true, true, &keyboard, &mouse);
+	Window window = Window_CreateOGL("Auto-Clicker", 320, 240, true, &keyboard, &mouse);
 	Window_AlwaysOnTop(&window);
 
-	OpenGL_UseVSync(&window, true);
 	Window_HandleEvents(&window);
 
 	Window_Destroy(&window);
