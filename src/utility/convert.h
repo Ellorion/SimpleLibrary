@@ -205,13 +205,145 @@ Convert_ToCString(
 	return buffer;
 }
 
-instant s32
+instant
+s32
 Convert_ToInt(
-	String s_data
+	const String &s_data
 ) {
 	char *c_data = String_CreateCBufferCopy(s_data);
 	s32 result = atoi(c_data);
 	Memory_Free(c_data);
 
 	return result;
+}
+
+instant
+double
+Convert_ToDouble(
+	const String &s_data
+) {
+	char *c_data = String_CreateCBufferCopy(s_data);
+	float result = atof(c_data);
+	Memory_Free(c_data);
+
+	return result;
+}
+
+instant s64
+String_ParseNumber(
+    const String &s_data,
+    s64 *result = nullptr,
+    u64 *length = nullptr,
+    bool check_sign = false
+) {
+    s64 nr_index = -1;
+    u64 nr_chars = 0;
+
+    String s_dataIt = S(s_data);
+
+    FOR(s_dataIt.length, it) {
+        if (IsNumeric(s_dataIt.value[it])) {
+            if (!nr_chars) {
+                nr_index = it;
+            }
+
+            ++nr_chars;
+        }
+        else {
+            if (nr_chars) {
+                break;
+            }
+        }
+    }
+
+    if (nr_index >= 0) {
+        String_AddOffset(s_dataIt, nr_index);
+        String s_number = S(s_dataIt, nr_chars);
+
+        s64 number = Convert_ToInt(s_number);
+
+        if (check_sign) {
+            if (nr_index) {
+                if (s_number.value[-1] == '-') {
+                    number = -number;
+                    --nr_index;
+                    ++nr_chars;
+                }
+            }
+        }
+
+        if (result) {
+            *result = number;
+        }
+    }
+
+    if (length) {
+        *length = nr_chars;
+    }
+
+    return nr_index;
+}
+
+instant s64
+String_ParseNumber(
+    const String &s_data,
+    double *result = nullptr,
+    u64 *length = nullptr,
+    bool check_sign = false
+) {
+    s64 nr_index = -1;
+    u64 nr_chars = 0;
+    bool found_dot = false;
+
+    String s_dataIt = S(s_data);
+
+    FOR(s_dataIt.length, it) {
+        if (IsNumeric(s_dataIt.value[it])) {
+            if (!nr_chars) {
+                nr_index = it;
+            }
+
+            ++nr_chars;
+        }
+        else if (nr_chars && s_dataIt.value[it] == '.') {
+            if (found_dot) {
+                break;
+            }
+
+            found_dot = true;
+            ++nr_chars;
+        }
+        else {
+            if (nr_chars) {
+                break;
+            }
+        }
+    }
+
+    if (nr_index >= 0) {
+        String_AddOffset(s_dataIt, nr_index);
+        String s_number = S(s_dataIt, nr_chars);
+
+        double number = Convert_ToDouble(s_number);
+
+        if (check_sign) {
+            if (nr_index) {
+                if (s_number.value[-1] == '-') {
+                    number = -number;
+                    --nr_index;
+                    ++nr_chars;
+                }
+            }
+        }
+
+        if (result) {
+            *result = number;
+        }
+    }
+
+    if (length) {
+        *length = nr_chars;
+    }
+
+    return nr_index;
 }
