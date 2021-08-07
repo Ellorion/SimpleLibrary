@@ -1,20 +1,35 @@
 #include "../SimpleLibrary/src/SLib.h"
 
 struct Game {
+    String s_name_console;
     String s_name;
     bool completed = false;
+    bool is_save_internal = false;
 };
 
 constexpr
 Stream &
 operator<<(Stream &out, const Array<Game> a_data) {
+    out << S("# Console, Name, Completed, InternalSave\n");
+
     FOR_ARRAY_AUTO(a_data, it) {
+        if (!String_IsEmpty(it->s_name_console)) {
+            out << it->s_name_console;
+        }
+        out << S(";");
+
         out << it->s_name;
         out << S(";");
 
         if (it->completed) {
             out << S("X");
         }
+        out << S(";");
+
+        if (it->is_save_internal) {
+            out << S("X");
+        }
+        out << S(";");
 
         out << S("\n");
     }
@@ -29,38 +44,69 @@ void Storage_Load(Array<Game> &a_data, File &file) {
 
     while (File_ReadUntil(file, &s_data, S("\n"))) {
         if (String_IsEmpty(s_data, true))
-            break;
+            continue;
+
+        if (String_StartWith(s_data, S("#"), false))
+            continue;
 
         auto row = String_Split(s_data, S(";"), DELIMITER_IGNORE, true);
 
-        if (!Array_IsEmpty(row)) {
-            Game game = {ARRAY_IT(row, 0)};
+        Game game = {ARRAY_IT(row, 0), ARRAY_IT(row, 1)};
 
-            if (Array_Count(row) > 1) {
-                game.completed = !String_IsEmpty(ARRAY_IT(row, 1));
-            }
-
-            Array_Add(a_data, game);
+        if (Array_Count(row) > 2) {
+            game.completed = !String_IsEmpty(ARRAY_IT(row, 2));
         }
+
+        if (Array_Count(row) > 3) {
+            game.is_save_internal = !String_IsEmpty(ARRAY_IT(row, 3));
+        }
+
+        Array_Add(a_data, game);
     }
 }
 
-void onListBoxDrawItem(Widget *widget, Widget_Item *item) {
-    Assert(!Array_IsEmpty(widget->a_customData));
+String createGameLabel(Game *game) {
+    String s_text;
 
-    auto a_games = (Array<Game> *)ARRAY_IT(widget->a_customData, 0);
+    if (!String_IsEmpty(game->s_name_console)) {
+        String_Append(s_text, S("["));
+        String_Append(s_text, game->s_name_console);
+        String_Append(s_text, S("] "));
+    }
+
+    String_Append(s_text, game->s_name);
+
+    if(!game->is_save_internal) {
+        String_Append(s_text, S(" (onSD)"));
+    }
+
+    return s_text;
+}
+
+void onListBoxDrawItem(Widget *widget, Widget_Item *item) {
+    Assert(!Array_IsEmpty(widget->a_dataLink));
+
+    auto a_games = (Array<Game> *)ARRAY_IT(widget->a_dataLink, 0);
 
     u64 index;
 
-    Array_Find(*a_games, (Game){S(item->s_name)}, &index, [](auto g1, auto g2) {
-        return (g1.s_name == g2.s_name);
+    /// @todo ceate slHash
+    Array_Find(*a_games, nullptr, &index, [&](auto g1, auto g2) {
+        auto game_item = createGameLabel(&g1);
+        bool is_equal = (game_item == item->s_name);
+        String_Destroy(game_item);
+        return is_equal;
     });
 
     Assert(index >= 0);
 
-    if (ARRAY_IT(*a_games, index).completed) {
+    Game *curGame = &ARRAY_IT(*a_games, index);
+
+    if (curGame->completed) {
         item->colorText = Color::Blue;
     }
+
+    item->s_name = createGameLabel(curGame);
 }
 
 APPLICATION_MAIN {
@@ -104,11 +150,12 @@ APPLICATION_MAIN {
 	Storage_Load(a_games, file);
 	File_Close(file);
 
-    Array_Add(wgList.a_customData, (void *)&a_games);
+    Array_Add(wgList.a_dataLink, (void *)&a_games);
 	wgList.OnDrawItem = onListBoxDrawItem;
 
     FOR_ARRAY_AUTO(a_games, game) {
-        Array_Add(*a_list, game->s_name);
+        auto item = createGameLabel(game);
+        Array_Add(*a_list, item);
     }
 
 	Array_Sort_Ascending(a_list);
