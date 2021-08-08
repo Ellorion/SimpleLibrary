@@ -92,17 +92,15 @@ constexpr
 instant void
 Array_SplitRefBuffer(
 	Array<String> *as_buffer_out,
-	String *s_data,
+	const String &s_data,
 	String  s_delimiter,
 	DELIMITER_TYPE type,
 	bool add_empty_entry
 ) {
-	Assert(s_data);
-
 	Array_Clear(*as_buffer_out);
 	as_buffer_out->by_reference = true;
 
-	String s_data_it = S(*s_data);
+	String s_data_it = S(s_data);
 
 	s64 index_found;
 
@@ -114,7 +112,7 @@ Array_SplitRefBuffer(
 			index_found = s_data_it.length;
 			type = DELIMITER_IGNORE;
 
-			Assert(s_data_it.length <= s_data->length);
+			Assert(s_data_it.length <= s_data.length);
 
 			if (String_IsEmpty(s_data_it))
 				break;
@@ -147,7 +145,7 @@ Array_SplitRefBuffer(
 
 instant Array<String>
 Array_SplitRef(
-	String *s_data,
+	const String &s_data,
 	String  s_delimiter,
 	DELIMITER_TYPE type,
 	bool add_empty_entry
@@ -419,7 +417,7 @@ String_GetDelimiterSection(
 
 instant String
 String_GetDelimiterSectionRef(
-	String *s_data,
+	const String &s_data,
 	String  s_delimiter,
 	u64 index,
 	bool auto_trim = true

@@ -85,7 +85,7 @@ Application_RegisterHotKey(
 
 instant bool
 Application_OpenURL(
-	String s_url
+	const String &s_url
 ) {
 	if (String_IsEmpty(s_url, true))
 		return false;

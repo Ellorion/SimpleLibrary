@@ -4,13 +4,12 @@ struct Game {
     String s_name_console;
     String s_name;
     bool completed = false;
-    bool is_save_internal = false;
 };
 
 constexpr
 Stream &
 operator<<(Stream &out, const Array<Game> a_data) {
-    out << S("# Console, Name, Completed, InternalSave\n");
+    out << S("# Console, Name, Completed\n");
 
     FOR_ARRAY_AUTO(a_data, it) {
         if (!String_IsEmpty(it->s_name_console)) {
@@ -22,11 +21,6 @@ operator<<(Stream &out, const Array<Game> a_data) {
         out << S(";");
 
         if (it->completed) {
-            out << S("X");
-        }
-        out << S(";");
-
-        if (it->is_save_internal) {
             out << S("X");
         }
         out << S(";");
@@ -57,10 +51,6 @@ void Storage_Load(Array<Game> &a_data, File &file) {
             game.completed = !String_IsEmpty(ARRAY_IT(row, 2));
         }
 
-        if (Array_Count(row) > 3) {
-            game.is_save_internal = !String_IsEmpty(ARRAY_IT(row, 3));
-        }
-
         Array_Add(a_data, game);
     }
 }
@@ -76,31 +66,35 @@ String createGameLabel(Game *game) {
 
     String_Append(s_text, game->s_name);
 
-    if(!game->is_save_internal) {
-        String_Append(s_text, S(" (onSD)"));
+    return s_text;
+}
+
+Game *findGameByListItemName(const Widget &widget, const String &s_name) {
+    auto a_games = (Array<Game> *)ARRAY_IT(widget.a_dataLink, 0);
+
+    u64 index;
+
+    Array_Find(*a_games, nullptr, &index, [&](auto g1, auto g2) {
+        auto game_item = createGameLabel(&g1);
+        bool is_equal = (game_item == s_name);
+        String_Destroy(game_item);
+        return is_equal;
+    });
+
+    Game *game = nullptr;
+
+    if (index >= 0) {
+        game = &ARRAY_IT(*a_games, index);
     }
 
-    return s_text;
+    return game;
 }
 
 void onListBoxDrawItem(Widget *widget, Widget_Item *item) {
     Assert(!Array_IsEmpty(widget->a_dataLink));
 
-    auto a_games = (Array<Game> *)ARRAY_IT(widget->a_dataLink, 0);
-
-    u64 index;
-
-    /// @todo ceate slHash
-    Array_Find(*a_games, nullptr, &index, [&](auto g1, auto g2) {
-        auto game_item = createGameLabel(&g1);
-        bool is_equal = (game_item == item->s_name);
-        String_Destroy(game_item);
-        return is_equal;
-    });
-
-    Assert(index >= 0);
-
-    Game *curGame = &ARRAY_IT(*a_games, index);
+    auto curGame = findGameByListItemName(*widget, item->s_name);
+    Assert(curGame);
 
     if (curGame->completed) {
         item->colorText = Color::Blue;
@@ -193,6 +187,25 @@ APPLICATION_MAIN {
                 auto a_list = Widget_GetListArray(wgList);
                 Array_Remove(*a_list, Widget_GetSelectedRowID(wgList));
             }
+        }
+
+        if (wgList.events.on_list_change_final) {
+            auto s_name = Widget_GetSelectedRowRef(wgList);
+            auto game = findGameByListItemName(wgList, s_name);
+
+            String s_url_amazon;
+            String_Append(s_url_amazon, S("https://www.amazon.de/s?k="));
+            String_Append(s_url_amazon, game->s_name_console);
+
+            auto as_words = String_SplitRef(game->s_name, S(" "), DELIMITER_IGNORE, false);
+
+            FOR_ARRAY_AUTO(as_words, it) {
+                String_Append(s_url_amazon, S("+"));
+                String_Append(s_url_amazon, *it);
+            }
+
+            Application_OpenURL(s_url_amazon);
+            String_Destroy(s_url_amazon);
         }
 
         if (keyboard.up[VK_ESCAPE])

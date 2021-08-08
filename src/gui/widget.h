@@ -1871,22 +1871,21 @@ Widget_GetSelectedRowBuffer(
 
 instant String
 Widget_GetSelectedRowRef(
-	Widget *widget
+	const Widget &widget
 ) {
-	Assert(widget);
-	Assert(!widget->data.selected_row_id OR widget->data.selected_row_id < widget->data.as_row_data.count);
+	Assert(!widget.data.selected_row_id OR widget.data.selected_row_id < widget.data.as_row_data.count);
 
 	String s_result = {};
 
-	if (!widget->data.as_row_data.count)
+	if (!widget.data.as_row_data.count)
 		return s_result;
 
-	if (widget->data.as_filter_data.count) {
-		s_result = S(ARRAY_IT(widget->data.as_filter_data, widget->data.selected_row_id));
+	if (widget.data.as_filter_data.count) {
+		s_result = S(ARRAY_IT(widget.data.as_filter_data, widget.data.selected_row_id));
 	}
 	else {
-		if (String_IsEmpty(widget->data.s_row_filter, false))
-			s_result = S(ARRAY_IT(widget->data.as_row_data, widget->data.selected_row_id));
+		if (String_IsEmpty(widget.data.s_row_filter, false))
+			s_result = S(ARRAY_IT(widget.data.as_row_data, widget.data.selected_row_id));
 	}
 
 	return s_result;

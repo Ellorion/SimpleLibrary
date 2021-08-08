@@ -789,7 +789,7 @@ Network_HTTP_GetResponseRef(
 		/// return http header
 		*s_response_out = S(network->HTTP.s_buffer_chunk, network->HTTP.header_size);
 
-		String s_http_code = String_GetDelimiterSectionRef(s_response_out, S(" "), 1, true);
+		String s_http_code = String_GetDelimiterSectionRef(*s_response_out, S(" "), 1, true);
 		network->HTTP.response_code = Convert_ToInt(s_http_code);
 
 		switch (network->HTTP.response_code) {
