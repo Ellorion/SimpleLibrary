@@ -491,10 +491,19 @@ String_Copy(
 constexpr
 instant char *
 String_CreateCBufferCopy(
-	const String &s_source
+	const String &s_source,
+	MemoryArena *arena = nullptr
 ) {
-	char *c_buffer = Memory_Create(char, s_source.length + 1);
-	Memory_Copy(c_buffer, s_source.value, s_source.length);
+	char *c_buffer = nullptr;
+
+	if (!arena) {
+        c_buffer = Memory_Create(char, s_source.length + 1);
+	}
+	else {
+        c_buffer = (char *)_Memory_Alloc_Empty(s_source.length + 1);
+	}
+
+    Memory_Copy(c_buffer, s_source.value, s_source.length);
 
 	return c_buffer;
 }

@@ -52,6 +52,22 @@ struct Memory_Header {
 	u32 sig;
 };
 
+
+constexpr
+instant void *
+_Memory_Alloc_Empty(
+	u64 size
+) {
+    void *mem = calloc(1, size + sizeof(Memory_Header));
+
+    AssertMessage(mem, "Memory could not be allocated.");
+
+    ((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
+    mem = (char *)mem + sizeof(Memory_Header);
+
+    return mem;
+}
+
 instant void
 Memory_GetHeader(
 	Memory_Header *header_out,
@@ -63,45 +79,6 @@ Memory_GetHeader(
 	mem = (char *)mem - sizeof(Memory_Header);
 
 	*header_out = (*(Memory_Header *)mem);
-}
-
-constexpr
-instant void *
-_Memory_Alloc_Empty(
-	u64 size
-) {
-	void *mem = calloc(1, size + sizeof(Memory_Header));
-
-	AssertMessage(mem, "Memory could not be allocated.");
-
-	((Memory_Header *)mem)->sig = MEMORY_SIGNATURE;
-	mem = (char *)mem + sizeof(Memory_Header);
-
-	return mem;
-}
-
-constexpr
-instant void
-Memory_Copy(
-	const void *dest_out,
-	const void *src,
-	u64 length
-) {
-	if (!dest_out OR !src OR !length)	return;
-	if (dest_out == src)				return;
-
-    char *c_dest = (char *)dest_out;
-    char *c_src  = (char *)src;
-
-    if (dest_out > src) {
-		while(length-- > 0)
-			c_dest[length] = c_src[length];
-    }
-    else {
-		FOR(length, it) {
-			c_dest[it] = c_src[it];
-		}
-    }
 }
 
 /// will set the free'd pointer to 0
@@ -134,6 +111,90 @@ _Memory_Free(
 	}
 
 	return 0;
+}
+
+struct MemoryArena {
+    void *pool = nullptr;
+    u64 size = 0;
+    u64 pos = 0;
+};
+
+constexpr
+instant MemoryArena
+MemoryArena_Create(
+    u64 size
+) {
+    MemoryArena arena;
+
+    arena.size = size;
+    arena.pool = _Memory_Alloc_Empty(arena.size);
+
+    return arena;
+}
+
+constexpr
+instant void *
+MemoryArena_Alloc (
+    MemoryArena &arena,
+    u64 size
+) {
+    if (size > arena.size - arena.pos) {
+        AssertMessage(false, "Memory (temp) could not be allocated.");
+    }
+
+    if (!arena.pool) {
+        AssertMessage(false, "Memory (temp) not initialized.");
+    }
+
+    void *mem = arena.pool;
+
+    arena.pool = (char *)arena.pool + size;
+    arena.pos  += size;
+
+    return mem;
+}
+
+constexpr
+instant void
+MemoryArena_Clear(
+    MemoryArena &arena
+) {
+    arena.pos = 0;
+}
+
+
+constexpr
+instant void
+MemoryArena_Free(
+    MemoryArena &arena
+) {
+    MemoryArena_Clear(arena);
+    arena.size = 0;
+    Memory_Free(arena.pool);
+}
+
+constexpr
+instant void
+Memory_Copy(
+	const void *dest_out,
+	const void *src,
+	u64 length
+) {
+	if (!dest_out OR !src OR !length)	return;
+	if (dest_out == src)				return;
+
+    char *c_dest = (char *)dest_out;
+    char *c_src  = (char *)src;
+
+    if (dest_out > src) {
+		while(length-- > 0)
+			c_dest[length] = c_src[length];
+    }
+    else {
+		FOR(length, it) {
+			c_dest[it] = c_src[it];
+		}
+    }
 }
 
 
