@@ -1,43 +1,5 @@
 #pragma once
 
-#define MEMORY_INFO MEMORYSTATUSEX
-
-instant MEMORY_INFO
-Memory_GetInfoRAM(
-) {
-	MEMORY_INFO memInfo;
-	memInfo.dwLength = sizeof(MEMORY_INFO);
-	GlobalMemoryStatusEx(&memInfo);
-
-	return memInfo;
-}
-
-instant unsigned long long
-Memory_GetRAMVirtualTotal(
-) {
-	return Memory_GetInfoRAM().ullTotalPageFile;
-}
-
-instant unsigned long long
-Memory_GetRAMVirtualCurrent(
-) {
-	auto memInfo = Memory_GetInfoRAM();
-	return (memInfo.ullTotalPageFile - memInfo.ullAvailPageFile);
-}
-
-instant unsigned long long
-Memory_GetRAMPhysicalTotal(
-) {
-	return Memory_GetInfoRAM().ullTotalPhys;
-}
-
-instant unsigned long long
-Memory_GetRAMPhysicalCurrent(
-) {
-	auto memInfo = Memory_GetInfoRAM();
-	return (memInfo.ullTotalPhys - memInfo.ullAvailPhys);
-}
-
 #define Memory_Create(type, length) \
 		((type *)_Memory_Alloc_Empty(sizeof(type) * length))
 
@@ -51,7 +13,6 @@ Memory_GetRAMPhysicalCurrent(
 struct Memory_Header {
 	u32 sig;
 };
-
 
 constexpr
 instant void *
@@ -111,66 +72,6 @@ _Memory_Free(
 	}
 
 	return 0;
-}
-
-struct MemoryArena {
-    void *pool = nullptr;
-    u64 size = 0;
-    u64 pos = 0;
-};
-
-constexpr
-instant MemoryArena
-MemoryArena_Create(
-    u64 size
-) {
-    MemoryArena arena;
-
-    arena.size = size;
-    arena.pool = _Memory_Alloc_Empty(arena.size);
-
-    return arena;
-}
-
-constexpr
-instant void *
-MemoryArena_Alloc (
-    MemoryArena &arena,
-    u64 size
-) {
-    if (size > arena.size - arena.pos) {
-        AssertMessage(false, "Memory (temp) could not be allocated.");
-    }
-
-    if (!arena.pool) {
-        AssertMessage(false, "Memory (temp) not initialized.");
-    }
-
-    void *mem = arena.pool;
-
-    arena.pool = (char *)arena.pool + size;
-    arena.pos  += size;
-
-    return mem;
-}
-
-constexpr
-instant void
-MemoryArena_Clear(
-    MemoryArena &arena
-) {
-    arena.pos = 0;
-}
-
-
-constexpr
-instant void
-MemoryArena_Free(
-    MemoryArena &arena
-) {
-    MemoryArena_Clear(arena);
-    arena.size = 0;
-    Memory_Free(arena.pool);
 }
 
 constexpr

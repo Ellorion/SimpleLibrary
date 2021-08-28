@@ -425,6 +425,8 @@ MatchesAny(S &&checkAgainst, T &&...oneOf) {
 }
 
 #include "core/memory.h"
+#include "core/memory_info.h"
+#include "core/memory_arena.h"
 #include "core/array.h"
 #include "core/string.h"
 #include "core/array_const.h"
