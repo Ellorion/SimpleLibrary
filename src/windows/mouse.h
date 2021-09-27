@@ -57,7 +57,7 @@ Mouse_AutoHide(
 
     /// reset timer on mouse move window event
     if (msg_message == WM_MOUSEMOVE) {
-		Time_Reset(&timer_mouse_move);
+		Time_Reset(timer_mouse_move);
 		if (!is_cursor_visible) {
 			is_cursor_visible = true;
 			Mouse_Show();

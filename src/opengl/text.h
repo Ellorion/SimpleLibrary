@@ -2173,7 +2173,7 @@ Text_Render(
 		AND text_io->data.is_editable
 		AND text_io->cursor.vertex_cursor.a_attributes.count
 	) {
-		if (Time_HasElapsed(&text_io->cursor.timer_blinking, text_io->cursor.blink_inverval_ms)) {
+		if (Time_HasElapsed(text_io->cursor.timer_blinking, text_io->cursor.blink_inverval_ms)) {
 			/// @Info: if this does not update, font.events might not be reset with memorysegment
 			text_io->cursor.is_blink_on = !text_io->cursor.is_blink_on;
 		}

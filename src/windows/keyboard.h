@@ -247,7 +247,7 @@ Keyboard_WaitForIdle(
 	if (*pending_event) {
 		static Timer timer_input_delay;
 
-		if (Time_HasElapsed(&timer_input_delay, delay_in_ms, true)) {
+		if (Time_HasElapsed(timer_input_delay, delay_in_ms, true)) {
 			if (!Keyboard_IsPressingAnyKey(keyboard_out)) {
 				*pending_event = false;
 			}

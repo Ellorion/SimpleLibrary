@@ -53,6 +53,14 @@ String_GetLength(
 	return result;
 }
 
+constexpr
+instant u64
+String_GetLength(
+	const String &s_data
+) {
+    return s_data.length;
+}
+
 /// (temporary) string conversion
 constexpr
 instant String

@@ -250,7 +250,7 @@ Widget_Cursor_ResetBlinking(
 	Assert(widget_io);
 
 	widget_io->text.cursor.show_cursor = widget_io->data.has_focus;
-	Time_Reset(&widget_io->text.cursor.timer_blinking);
+	Time_Reset(widget_io->text.cursor.timer_blinking);
 	widget_io->text.cursor.is_blink_on = true;
 }
 

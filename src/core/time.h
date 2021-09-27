@@ -10,65 +10,60 @@ struct Timer {
 
 instant void
 Time_Reset(
-	Timer *timer_out
+	Timer &timer_out
 ) {
-	if (!timer_out)
-		return;
-
-	timer_out->lo_timer = GetTickCount();
+	timer_out.lo_timer = GetTickCount();
 
 	LARGE_INTEGER largeCounter;
 	QueryPerformanceCounter(&largeCounter);
 
-	timer_out->hi_timer = largeCounter.QuadPart;
-	timer_out->counter = 0;
+	timer_out.hi_timer = largeCounter.QuadPart;
+	timer_out.counter = 0;
 }
 
 /// milliseconds
 instant double
 Time_Measure(
-	Timer *timer_io,
+	Timer &timer,
 	bool restart_after_measuring
 ) {
-	if (!timer_io)
-		return 0.f;
+	static double perfFreq = 0.0;
+
+	if (!perfFreq) {
+        LARGE_INTEGER largeFreq;
+        QueryPerformanceFrequency(&largeFreq);
+        perfFreq = largeFreq.QuadPart / 1000.0;
+	}
+
+	if (!timer.hi_timer) {
+        Time_Reset(timer);
+        return 0.0;
+	}
 
 	LARGE_INTEGER largeCounter;
 	QueryPerformanceCounter(&largeCounter);
 
-	/// init timer
-	if (timer_io->hi_timer == 0) {
-		timer_io->hi_timer = largeCounter.QuadPart;
-		return 0.f;
-	}
-
 	u64 current_time = largeCounter.QuadPart;
 
-	LARGE_INTEGER largeFreq;
-	QueryPerformanceFrequency(&largeFreq);
+	double diff = (current_time - timer.hi_timer) / perfFreq;
 
-	double diff = ((double)( (current_time - timer_io->hi_timer)
-							* 1000.0)
-							/ largeFreq.QuadPart);
-
-	if (restart_after_measuring)
-		timer_io->hi_timer = current_time;
+	if (restart_after_measuring) {
+ 		timer.hi_timer = current_time;
+	}
 
 	return diff;
 }
 
 instant bool
 Time_HasElapsed(
-	Timer *timer_io,
+	Timer &timer,
 	u32 interval_in_ms,
 	bool run_once = false
 ) {
-	Assert(timer_io);
-
-	bool result = Time_Measure(timer_io, false) >= interval_in_ms;
+	bool result = Time_Measure(timer, false) >= interval_in_ms;
 
 	if (result) {
-		Time_Reset(timer_io);
+		Time_Reset(timer);
 	}
 
 	return result;
@@ -82,44 +77,41 @@ Time_Get() {
 /// has to be used every frame or the calculation will be wrong
 instant u32
 Time_GetFPS(
-	Timer *timer_io,
+	Timer &timer,
 	bool get_worst = false
 ) {
-	if (!timer_io)
-		return 0;
+	u32 diff = Time_Get() - timer.lo_timer;
 
-	u32 diff = Time_Get() - timer_io->lo_timer;
-
-	if (timer_io->lo_timer > 0 AND diff < 1000) {
-		++timer_io->counter;
+	if (timer.lo_timer > 0 AND diff < 1000) {
+		++timer.counter;
 	}
 	else {
-		timer_io->fps_worst = MIN(	timer_io->fps_worst,
-									timer_io->counter);
+		timer.fps_worst = MIN(timer.fps_worst,
+                              timer.counter);
 
-		if (timer_io->fps_worst == 0)
-			timer_io->fps_worst = timer_io->counter;
+		if (timer.fps_worst == 0)
+			timer.fps_worst = timer.counter;
 
-		timer_io->fps = timer_io->counter;
-		timer_io->counter = 1;
-		timer_io->lo_timer = Time_Get();
+		timer.fps = timer.counter;
+		timer.counter = 1;
+		timer.lo_timer = Time_Get();
 	}
 
-	return (get_worst ? timer_io->fps_worst : timer_io->fps);
+	return (get_worst ? timer.fps_worst : timer.fps);
 }
 
 /// Reach the end (from the start) in the timespan of the duration
 /// Returns: step increase
 instant float
 Time_Move(
-	Timer *timer_io,
+	Timer &timer,
 	u32 timespan_in_ms,
 	float distance
 ) {
-	Assert(timer_io);
+	if (!timespan_in_ms) {
+        return 0.0f;
+	}
 
-	if (!timespan_in_ms)  return 0.0f;
-
-	double step_size = Time_Measure(timer_io, true) / timespan_in_ms;
+	double step_size = Time_Measure(timer, true) / timespan_in_ms;
 	return distance * step_size;
 }

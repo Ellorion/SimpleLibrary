@@ -276,12 +276,20 @@ _AssertMessage(
 #endif
 
 #define VALUE(_condition) \
-    { \
+{ \
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE); \
     SetConsoleTextAttribute(hConsole, 13); \
     std::cout << "[" << __FILE__ << "] [" << __FUNCTION__ << "::" << __LINE__ << "] " << #_condition << ": " << (_condition) << "\n"; \
     SetConsoleTextAttribute(hConsole, 15); \
-    }
+}
+
+#define PERF(_name) \
+{ \
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE); \
+    SetConsoleTextAttribute(hConsole, 11); \
+    LOG << "PERF: [" << _name << "] " << Time_Measure(context.tmrPerf, true) << " ms" << "\n"; \
+    SetConsoleTextAttribute(hConsole, 15); \
+}
 
 /// ::: Utilities
 /// ===========================================================================
@@ -473,3 +481,6 @@ MatchesAny(S &&checkAgainst, T &&...oneOf) {
 #include "core/console.h"
 
 #include "utility/helper.h"
+
+#include "core/context.h"
+#include "core/bstring.h"
