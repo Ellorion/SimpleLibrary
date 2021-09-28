@@ -232,7 +232,6 @@ String_Destroy(
 	s_data.has_changed = true;
 }
 
-constexpr
 instant String
 String_Copy(
 	const char *c_source,
@@ -488,7 +487,6 @@ String_CopyBuffer(
 	}
 }
 
-constexpr
 instant String
 String_Copy(
 	const String &s_data
@@ -496,7 +494,6 @@ String_Copy(
 	return String_Copy(s_data.value, s_data.length);
 }
 
-constexpr
 instant char *
 String_CreateCBufferCopy(
 	const String &s_source,

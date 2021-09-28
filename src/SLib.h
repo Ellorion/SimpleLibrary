@@ -287,7 +287,7 @@ _AssertMessage(
 { \
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE); \
     SetConsoleTextAttribute(hConsole, 11); \
-    LOG << "PERF: [" << _name << "] " << Time_Measure(context.tmrPerf, true) << " ms" << "\n"; \
+    LOG << "PERF: [" << _name << "] " << Time_Measure(context.timer_performance, true) << " ms" << "\n"; \
     SetConsoleTextAttribute(hConsole, 15); \
 }
 
@@ -440,13 +440,15 @@ MatchesAny(S &&checkAgainst, T &&...oneOf) {
 #include "core/array_const.h"
 #include "core/array_string.h"
 #include "core/memory_segment.h"
+#include "core/time.h"
+
+#include "core/context.h"
 
 #include "utility/convert.h"
 
 #include "core/random.h"
 #include "core/mutex.h"
 #include "core/thread.h"
-#include "core/time.h"
 #include "core/parser.h"
 #include "core/sort.h"
 #include "core/rect.h"
@@ -482,5 +484,4 @@ MatchesAny(S &&checkAgainst, T &&...oneOf) {
 
 #include "utility/helper.h"
 
-#include "core/context.h"
 #include "core/bstring.h"

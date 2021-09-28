@@ -169,3 +169,15 @@ Memory_Compare(
 
 	return true;
 }
+
+/// to bytes
+constexpr u64 Kilobyte(u64 value) {
+    return value * 1024;
+}
+
+constexpr u64 Megabyte(u64 value) {
+    return Kilobyte(1) * 1024;
+}
+constexpr u64 Gigabyte(u64 value) {
+    return Megabyte(1) * 1024;
+}
