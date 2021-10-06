@@ -1,9 +1,11 @@
 #pragma once
 
-enum class Content_Arena_Type {
+enum class Context_Arena_Type {
     Flush,
     Temp,
     Pool,
+
+    Count,
 };
 
 struct Context {
@@ -34,21 +36,44 @@ MemoryArena_Alloc (
     return _MemoryArena_Alloc(*context.arena_current, size);
 }
 
-void Context_SetArena(Content_Arena_Type type) {
+instant MemoryArena*
+Context_GetArena(Context_Arena_Type type) {
     switch (type) {
-        case Content_Arena_Type::Flush: {
-            context.arena_current = &context.arena_flush;
-        } break;
+        case Context_Arena_Type::Flush:
+            return &context.arena_flush;
 
-        case Content_Arena_Type::Temp: {
-            context.arena_current = &context.arena_temp;
-        } break;
+        case Context_Arena_Type::Temp:
+            return &context.arena_temp;
 
-        case Content_Arena_Type::Pool: {
-            context.arena_current = &context.arena_pool;
-        } break;
+        case Context_Arena_Type::Pool:
+            return &context.arena_pool;
 
         default:
             AssertMessage(false, "Unhandled Content Arena Type");
+            return nullptr;
     }
+}
+
+instant Context_Arena_Type
+Context_GetArenaType() {
+    auto type = Context_Arena_Type::Count;
+
+    FOR((u32)Context_Arena_Type::Count, it) {
+        auto arena = Context_GetArena(Context_Arena_Type(it));
+        bool isMatch = (context.arena_current == arena);
+
+        if (isMatch) {
+            type = Context_Arena_Type(it);
+            break;
+        }
+    }
+
+    return type;
+}
+
+instant void
+Context_SetArena(
+    Context_Arena_Type type
+) {
+    context.arena_current = Context_GetArena(type);
 }
