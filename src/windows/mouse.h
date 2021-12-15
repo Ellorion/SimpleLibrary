@@ -87,7 +87,7 @@ Mouse_GetPosition(
 
 	if (window) {
 		GetWindowRect(window->hWnd, &rect_active);
-		Window_UnAdjustRect(window->hWnd, &rect_active);
+		Window_UnAdjustRect(window->hWnd, rect_active);
 
 		RectF rect_viewport;
 		glGetFloatv(GL_VIEWPORT, (GLfloat *)&rect_viewport);

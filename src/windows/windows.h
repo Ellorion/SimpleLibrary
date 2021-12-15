@@ -12,7 +12,7 @@
 	APIENTRY				\
 	WinMain(HINSTANCE _instance, HINSTANCE _prev_instance, LPSTR _cmd_text, int _cmd_show)
 
-#define Window_IsCreated(window) (window->hWnd != 0)
+#define Window_IsCreated(window) (window.hWnd != 0)
 
 struct Mouse;
 struct Keyboard;
@@ -191,32 +191,32 @@ LONG WINAPI WindowProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) {
 
 instant void
 Window_Destroy(
-	Window *window_io
+	Window &window
 ) {
-	if (window_io->uses_opengl)
-		OpenGL_Destroy(window_io);
+	if (window.uses_opengl)
+		OpenGL_Destroy(&window);
 
-	if (window_io->icon.notify_icon_data.hWnd) {
+	if (window.icon.notify_icon_data.hWnd) {
 		Shell_NotifyIcon(	NIM_DELETE,
-							&window_io->icon.notify_icon_data);
+							&window.icon.notify_icon_data);
 	}
 
-	if (window_io->is_fullscreen) {
+	if (window.is_fullscreen) {
 		ChangeDisplaySettings(0, 0);
 	}
 
-	if (Window_IsCreated(window_io)) {
-		if (window_io->hDC)
-			ReleaseDC(window_io->hWnd, window_io->hDC);
+	if (Window_IsCreated(window)) {
+		if (window.hDC)
+			ReleaseDC(window.hWnd, window.hDC);
 
-		DestroyWindow(window_io->hWnd);
+		DestroyWindow(window.hWnd);
 	}
 
 	if (!UnregisterClass(class_name, GetModuleHandle(0))) {
 		LOG_ERROR("UnregisterClass() failed.");
 	}
 
-	*window_io = {};
+	window = {};
 }
 
 instant void
@@ -232,16 +232,14 @@ MemorySegment_AddWindow(
 
 instant void
 Window_ToCenterPosition(
-	Window *window
+	Window &window
 ) {
-	Assert(window);
-
 	RECT rect_desktop;
 	GetWindowRect(GetDesktopWindow(), &rect_desktop);
 
 	/// includes window style size
 	RECT rect_window;
-	GetWindowRect(window->hWnd, &rect_window);
+	GetWindowRect(window.hWnd, &rect_window);
 
 	s32 width  = rect_window.right  - rect_window.left;
 	s32 height = rect_window.bottom - rect_window.top;
@@ -249,30 +247,28 @@ Window_ToCenterPosition(
 	s32 x = ((rect_desktop.right - rect_desktop.left) - width)  / 2 + rect_desktop.left;
 	s32 y = ((rect_desktop.bottom - rect_desktop.top) - height) / 2 + rect_desktop.top;
 
-	MoveWindow(window->hWnd, x, y, width, height, false);
+	MoveWindow(window.hWnd, x, y, width, height, false);
 }
 
 /// nCmdShow = 10 => Normal window size (not min/max)
 /// returns true, if tray icon changed
 instant bool
 Window_Show(
-	Window *window,
+	Window &window,
 	int nCmdShow = 10
 ) {
-	Assert(window);
+	ShowWindow(window.hWnd, nCmdShow);
 
-	ShowWindow(window->hWnd, nCmdShow);
+	SetForegroundWindow(window.hWnd);
+	SetFocus(window.hWnd);
 
-	SetForegroundWindow(window->hWnd);
-	SetFocus(window->hWnd);
-
-	if (!window->icon.enable)                 return false;
-	if (!window->icon.notify_icon_data.hWnd)  return false;
-	if ( window->icon.always_visible)         return false;
-	if (!window->icon.minimize_to)            return false;
+	if (!window.icon.enable)                 return false;
+	if (!window.icon.notify_icon_data.hWnd)  return false;
+	if ( window.icon.always_visible)         return false;
+	if (!window.icon.minimize_to)            return false;
 
 	Shell_NotifyIcon(	NIM_DELETE,
-						&window->icon.notify_icon_data);
+						&window.icon.notify_icon_data);
 
 	return true;
 }
@@ -337,7 +333,7 @@ Window_Create(
 
 	if (!hWnd) {
 		LOG_ERROR("CreateWindow() failed: Cannot create a window_out.");
-		Window_Destroy(&window);
+		Window_Destroy(window);
 		return window;
 	}
 
@@ -358,19 +354,19 @@ Window_Create(
 
 	if (!pf) {
 		LOG_ERROR("ChoosePixelFormat() failed: Cannot find a suitable pixel format.");
-		Window_Destroy(&window);
+		Window_Destroy(window);
 		return window;
 	}
 
 	if (!SetPixelFormat(hDC, pf, &pfd)) {
 		LOG_ERROR("SetPixelFormat() failed: Cannot set format specified.");
-		Window_Destroy(&window);
+		Window_Destroy(window);
 		return window;
 	}
 
 	if (!DescribePixelFormat(hDC, pf, sizeof(PIXELFORMATDESCRIPTOR), &pfd)) {
 		LOG_ERROR("DescribePixelFormat() failed: " << GetLastError());
-		Window_Destroy(&window);
+		Window_Destroy(window);
 		return window;
 	}
 
@@ -399,7 +395,7 @@ Window_Create(
 		String_CopyBuffer(nid->szTip, S(window.title), 63);
 	}
 
-	Window_ToCenterPosition(&window);
+	Window_ToCenterPosition(window);
 
 	window.is_running = true;
 
@@ -411,22 +407,20 @@ Window_Create(
 		OpenGL_Init(&window);
 
 	if (show)
-		Window_Show(&window);
+		Window_Show(window);
 
 	return window;
 }
 
 instant void
 Window_AlwaysOnTop(
-	Window *window
+	Window &window
 ) {
-	Assert(window);
-
 	RECT rctClient;
-	GetWindowRect(window->hWnd, &rctClient);
+	GetWindowRect(window.hWnd, &rctClient);
 
 	SetWindowPos(
-		window->hWnd,
+		window.hWnd,
 		HWND_TOPMOST,
 		rctClient.left,
 		rctClient.top,
@@ -441,51 +435,47 @@ Window_AlwaysOnTop(
 /// the missing borders
 instant void
 Window_ToggleFullscreen(
-	Window *window_io
+	Window &window
 ) {
-	Assert(window_io);
-
-	if (!window_io->is_fullscreen) {
-		DWORD dwStyle = (DWORD)GetWindowLong(window_io->hWnd, GWL_STYLE);
+	if (!window.is_fullscreen) {
+		DWORD dwStyle = (DWORD)GetWindowLong(window.hWnd, GWL_STYLE);
 
 		dwStyle = dwStyle | WS_POPUP;
 		dwStyle = dwStyle & ~WS_OVERLAPPEDWINDOW;
 
-		SetWindowLong(window_io->hWnd, GWL_STYLE, dwStyle);
+		SetWindowLong(window.hWnd, GWL_STYLE, dwStyle);
 
-		ShowWindow(window_io->hWnd, SW_RESTORE);
-		ShowWindow(window_io->hWnd, SW_MAXIMIZE);
+		ShowWindow(window.hWnd, SW_RESTORE);
+		ShowWindow(window.hWnd, SW_MAXIMIZE);
 
-		window_io->is_fullscreen = true;
+		window.is_fullscreen = true;
 	}
 	else {
-		DWORD dwStyle = (DWORD)GetWindowLong(window_io->hWnd, GWL_STYLE);
+		DWORD dwStyle = (DWORD)GetWindowLong(window.hWnd, GWL_STYLE);
 
 		dwStyle = dwStyle & ~WS_POPUP;
 		dwStyle = dwStyle |  WS_OVERLAPPEDWINDOW;
 
-		SetWindowLong(window_io->hWnd, GWL_STYLE, dwStyle);
+		SetWindowLong(window.hWnd, GWL_STYLE, dwStyle);
 
-		ShowWindow(window_io->hWnd, SW_RESTORE);
+		ShowWindow(window.hWnd, SW_RESTORE);
 
-		window_io->is_fullscreen = false;
+		window.is_fullscreen = false;
 	}
 }
 
 instant void
 Window_SetSize(
-	Window *window_io,
+	Window &window,
 	s32 width,
 	s32 height
 ) {
-	Assert(window_io);
-
-	if (window_io->is_fullscreen)
-		Window_ToggleFullscreen(window_io);
+	if (window.is_fullscreen)
+		Window_ToggleFullscreen(window);
 
 	RECT rect = {};
-	DWORD dwStyle   = (DWORD)GetWindowLong(window_io->hWnd, GWL_STYLE);
-	DWORD dwExStyle = (DWORD)GetWindowLong(window_io->hWnd, GWL_EXSTYLE);
+	DWORD dwStyle   = (DWORD)GetWindowLong(window.hWnd, GWL_STYLE);
+	DWORD dwExStyle = (DWORD)GetWindowLong(window.hWnd, GWL_EXSTYLE);
 
 	bool success = AdjustWindowRectEx(&rect, dwStyle, 0, dwExStyle);
 
@@ -494,38 +484,35 @@ Window_SetSize(
 		height += (rect.bottom - rect.top);
 
 		rect = {};
-		GetWindowRect(window_io->hWnd, &rect);
+		GetWindowRect(window.hWnd, &rect);
 
 		s32 x = rect.left + (rect.right  - rect.left - width)  / 2;
 		s32 y = rect.top  + (rect.bottom - rect.top  - height) / 2;
 
-		SetWindowPos(window_io->hWnd, HWND_TOP, x, y, width, height, 0);
+		SetWindowPos(window.hWnd, HWND_TOP, x, y, width, height, 0);
 	}
 }
 
 instant void
 Window_SetTitle(
-	Window *window_io,
+	Window &window,
 	const char *title
 ) {
-	Assert(window_io);
 	Assert(title);
 
-	window_io->title = title;
+	window.title = title;
 
-	SetWindowText(window_io->hWnd, window_io->title);
+	SetWindowText(window.hWnd, window.title);
 
-	NOTIFYICONDATA *nid = &window_io->icon.notify_icon_data;
-	String_CopyBuffer(nid->szTip, S(window_io->title), 63);
+	NOTIFYICONDATA *nid = &window.icon.notify_icon_data;
+	String_CopyBuffer(nid->szTip, S(window.title), 63);
 }
 
 instant bool
 Window_UnAdjustRect(
 	HWND hWnd,
-	RECT *rect_io
+	RECT &rect
 ) {
-	Assert(rect_io);
-
 	RECT t_rect = {};
 
 	DWORD dwStyle   = (DWORD)GetWindowLong(hWnd, GWL_STYLE);
@@ -534,10 +521,10 @@ Window_UnAdjustRect(
 	bool success = AdjustWindowRectEx(&t_rect, dwStyle, 0, dwExStyle);
 
 	if (success) {
-		rect_io->left   -= t_rect.left;
-		rect_io->top    -= t_rect.top;
-		rect_io->right  -= t_rect.right;
-		rect_io->bottom -= t_rect.bottom;
+		rect.left   -= t_rect.left;
+		rect.top    -= t_rect.top;
+		rect.right  -= t_rect.right;
+		rect.bottom -= t_rect.bottom;
 	}
 	return success;
 }
@@ -545,16 +532,16 @@ Window_UnAdjustRect(
 /// return false as decider to trigger DefWindowProc instead
 instant bool
 Window_Hide(
-	Window *window
+	Window &window
 ) {
-	if (!window->icon.enable)                 return false;
-	if (!window->icon.notify_icon_data.hWnd)  return false;
+	if (!window.icon.enable)                 return false;
+	if (!window.icon.notify_icon_data.hWnd)  return false;
 
 	Shell_NotifyIcon(	NIM_ADD,
-						&window->icon.notify_icon_data);
+						&window.icon.notify_icon_data);
 
-	if (window->icon.minimize_to) {
-		ShowWindow(window->hWnd, SW_HIDE);
+	if (window.icon.minimize_to) {
+		ShowWindow(window.hWnd, SW_HIDE);
 		return true;
 	}
 
@@ -563,65 +550,64 @@ Window_Hide(
 
 instant void
 Window_ReadMessage(
-	Window *window_io
+	Window &window
 ) {
-	Assert(window_io);
-	Assert(window_io->hDC);
+	Assert(window.hDC);
 
 	MSG msg;
 
 	/// so resetting event data will not be forgotten during development
-	AssertMessage(window_io->a_segments_reset.count > 0,
+	AssertMessage(window.a_segments_reset.count > 0,
 				  "Missing segment reset data for (at least) window events.");
 
-	MemorySegment_Reset(&window_io->a_segments_reset);
+	MemorySegment_Reset(&window.a_segments_reset);
 
-	Keyboard_Reset(window_io->keyboard, false);
+	Keyboard_Reset(window.keyboard, false);
 
 	/// vsync does not seem to work, when this does not execute,
 	/// so the cpu ends up doing alot more work, because of the
 	/// increased speed in the loop cicle, if this would be disabled
 	/// for a hidden window
-	SwapBuffers(window_io->hDC);
+	SwapBuffers(window.hDC);
 
 	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
-		Memory_Set(window_io->hotkey_triggered, false, KEYBOARD_HOTKEY_ID_COUNT);
+		Memory_Set(window.hotkey_triggered, false, KEYBOARD_HOTKEY_ID_COUNT);
 
-		if (Mouse_Update(window_io->mouse, window_io, &msg))  continue;
-		if (Keyboard_Update(window_io->keyboard, &msg))       continue;
+		if (Mouse_Update(window.mouse, &window, &msg))  continue;
+		if (Keyboard_Update(window.keyboard, &msg))       continue;
 
 		switch (msg.message) {
 			case WM_HOTKEY: {
-				window_io->hotkey_triggered[msg.wParam] = true;
+				window.hotkey_triggered[msg.wParam] = true;
 			} break;
 
 			case WINDOW_CLOSE: {
 				msg.wParam = 0;
-				window_io->is_running = false;
+				window.is_running = false;
 			} break;
 
 			case WINDOW_RESIZE: {
-				OpenGL_AdjustScaleViewport(window_io, window_io->scale_type);
+				OpenGL_AdjustScaleViewport(&window, window.scale_type);
 			} break;
 
 			case WINDOW_TRAY_ICON_CREATE: {
-				if (    window_io->icon.enable
-					AND window_io->icon.notify_icon_data.hWnd
+				if (    window.icon.enable
+					AND window.icon.notify_icon_data.hWnd
 				) {
 					/// if icon is available, enabled and app is not
 					/// supposed to mimimize to tray, the tray icon
 					/// behaves as if it would always be visible
-					if (    window_io->icon.always_visible
-						OR !window_io->icon.minimize_to
+					if (    window.icon.always_visible
+						OR !window.icon.minimize_to
 					) {
 						Shell_NotifyIcon(	NIM_ADD,
-											&window_io->icon.notify_icon_data);
+											&window.icon.notify_icon_data);
 					}
 				}
 			} break;
 
 			case WINDOW_TRAY_ICON_SHOW: {
-				if (!Window_Hide(window_io)) {
+				if (!Window_Hide(window)) {
 					DefWindowProc(	msg.hwnd,
 									WM_SYSCOMMAND,
 									SC_MINIMIZE,
@@ -630,7 +616,7 @@ Window_ReadMessage(
 			} break;
 
 			case WINDOW_TRAY_ICON_HIDE: {
-				Window_Show(window_io);
+				Window_Show(window);
 			} break;
 
 			default: {
@@ -643,36 +629,28 @@ Window_ReadMessage(
 
 instant bool
 Window_IsVisible(
-	Window *window
+	const Window &window
 ) {
-	Assert(window);
-
-	return IsWindowVisible(window->hWnd);
+	return IsWindowVisible(window.hWnd);
 }
 
 instant void
 Window_ResetEvents(
-	Window *window
+	Window &window
 ) {
-	Assert(window);
-
-	window->events = {};
+	window.events = {};
 }
 
 instant bool
 Window_IsRunning(
-	Window *window
+	const Window &window
 ) {
-	Assert(window);
-
-	return window->is_running;
+	return window.is_running;
 }
 
 instant void
 Window_Close(
-	Window *window
+	Window &window
 ) {
-	Assert(window);
-
-	window->is_running = false;
+	window.is_running = false;
 }

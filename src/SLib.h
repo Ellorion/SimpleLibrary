@@ -485,3 +485,6 @@ MatchesAny(S &&checkAgainst, T &&...oneOf) {
 #include "utility/helper.h"
 
 #include "core/bstring.h"
+
+// Simplified approach
+#include "windows/input.h"
