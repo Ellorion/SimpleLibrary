@@ -4,14 +4,19 @@ struct Game {
     String s_name_console;
     String s_name;
     bool completed = false;
+    u8 ranking = 0;
 };
 
 constexpr
 Stream &
 operator<<(Stream &out, const Array<Game> a_data) {
-    out << S("# Console, Name, Completed\n");
+    out << S("# Console, Name, Completed, Ranking\n");
 
     FOR_ARRAY_AUTO(a_data, it) {
+        if (String_IsEmpty(it->s_name)) {
+            continue;
+        }
+
         if (!String_IsEmpty(it->s_name_console)) {
             out << it->s_name_console;
         }
@@ -22,6 +27,11 @@ operator<<(Stream &out, const Array<Game> a_data) {
 
         if (it->completed) {
             out << S("X");
+        }
+        out << S(";");
+
+        if (it->ranking) {
+            out << Convert_IntToString(it->ranking);
         }
         out << S(";");
 
@@ -51,6 +61,10 @@ void Storage_Load(Array<Game> &a_data, File &file) {
             game.completed = !String_IsEmpty(ARRAY_IT(row, 2));
         }
 
+        if (Array_Count(row) > 3) {
+            game.ranking = Convert_ToInt(ARRAY_IT(row, 3));
+        }
+
         Array_Add(a_data, game);
     }
 }
@@ -65,6 +79,14 @@ String createGameLabel(Game *game) {
     }
 
     String_Append(s_text, game->s_name);
+
+    if (game->ranking) {
+        auto rank = Convert_IntToString(game->ranking);
+        String_Append(s_text, S(" [*"));
+        String_Append(s_text, rank);
+        String_Append(s_text, S("] "));
+        String_Destroy(rank);
+    }
 
     return s_text;
 }
@@ -156,7 +178,7 @@ APPLICATION_MAIN {
 	Widget_SetFilterCaseSensitive(wgList, false);
 
 	while(window.is_running) {
-        Window_ReadMessage(&window);
+        Window_ReadMessage(window);
         Layout_Rearrange(&layout, &window);
 
         Widget_Update(&ap_widgets, &keyboard);

@@ -256,8 +256,13 @@ Convert_ToTempCString(
 instant
 s32
 Convert_ToInt(
-	const String &s_data
+	const String &s_data,
+	s32 valueOnFailure = 0
 ) {
+    if (String_IsEmpty(s_data)) {
+        return valueOnFailure;
+    }
+
 	char *c_data = String_CreateCBufferCopy(s_data);
 	s32 result = atoi(c_data);
 	Memory_Free(c_data);
@@ -268,8 +273,13 @@ Convert_ToInt(
 instant
 double
 Convert_ToDouble(
-	const String &s_data
+	const String &s_data,
+	double valueOnFailure = 0.0
 ) {
+    if (String_IsEmpty(s_data)) {
+        return valueOnFailure;
+    }
+
 	char *c_data = String_CreateCBufferCopy(s_data);
 	float result = atof(c_data);
 	Memory_Free(c_data);
